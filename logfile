@@ -1,0 +1,142 @@
+2026-03-16 10:31:02.837 CST [5011] LOG:  starting PostgreSQL 14.18 (Homebrew) on aarch64-apple-darwin24.4.0, compiled by Apple clang version 17.0.0 (clang-1700.0.13.3), 64-bit
+2026-03-16 10:31:02.838 CST [5011] LOG:  listening on IPv6 address "::1", port 5432
+2026-03-16 10:31:02.838 CST [5011] LOG:  listening on IPv4 address "127.0.0.1", port 5432
+2026-03-16 10:31:02.839 CST [5011] LOG:  listening on Unix socket "/tmp/.s.PGSQL.5432"
+2026-03-16 10:31:02.840 CST [5012] LOG:  database system was shut down at 2026-03-16 10:30:56 CST
+2026-03-16 10:31:02.843 CST [5011] LOG:  database system is ready to accept connections
+2026-03-16 10:31:08.697 CST [5255] FATAL:  database "mac" does not exist
+2026-03-16 10:32:07.021 CST [6540] FATAL:  role "Frank" does not exist
+2026-03-16 10:42:42.574 CST [17630] FATAL:  role "postgres" does not exist
+2026-03-16 10:42:48.344 CST [17871] FATAL:  database "mac" does not exist
+2026-03-16 19:53:07.093 CST [40302] ERROR:  function substr(date, integer, integer) does not exist at character 16
+2026-03-16 19:53:07.093 CST [40302] HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+2026-03-16 19:53:07.093 CST [40302] STATEMENT:  select * ,date(substr(col6,1,10)) as day_  from test_data
+2026-03-16 19:53:29.152 CST [40498] ERROR:  function substr(date, integer, integer) does not exist at character 16
+2026-03-16 19:53:29.152 CST [40498] HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+2026-03-16 19:53:29.152 CST [40498] STATEMENT:  select * ,date(substr(col6,1,10)) as day_  from test_data
+2026-03-16 19:53:45.443 CST [40677] ERROR:  function day(date) does not exist at character 11
+2026-03-16 19:53:45.443 CST [40677] HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+2026-03-16 19:53:45.443 CST [40677] STATEMENT:  select * ,day(col6) as day_  from test_data
+2026-03-16 19:53:52.443 CST [40763] ERROR:  syntax error at or near "as" at character 11
+2026-03-16 19:53:52.443 CST [40763] STATEMENT:  select *  as day_  from test_data
+2026-03-16 19:54:25.672 CST [41081] ERROR:  function sum(boolean) does not exist at character 14
+2026-03-16 19:54:25.672 CST [41081] HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+2026-03-16 19:54:25.672 CST [41081] STATEMENT:  SELECT col1, SUM(col5) AS col5_求和 FROM (select *  from test_data) AS dataset GROUP BY col1 ORDER BY col1
+2026-03-17 14:10:12.346 CST [61420] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:10:12.346 CST [61420] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:10:12.346 CST [61420] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:10:12.359 CST [61420] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:10:12.359 CST [61420] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:10:12.359 CST [61420] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:11:08.258 CST [61420] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:11:08.258 CST [61420] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:11:08.258 CST [61420] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:11:08.277 CST [60938] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:11:08.277 CST [60938] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:11:08.277 CST [60938] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:14:32.962 CST [60938] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:14:32.962 CST [60938] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:14:32.962 CST [60938] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:14:32.991 CST [61420] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:14:32.991 CST [61420] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:14:32.991 CST [61420] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:15:25.306 CST [61420] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:15:25.306 CST [61420] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:15:25.306 CST [61420] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:15:25.318 CST [60938] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:15:25.318 CST [60938] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:15:25.318 CST [60938] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:15:27.534 CST [61420] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:15:27.534 CST [61420] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:15:27.534 CST [61420] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:15:27.543 CST [60938] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:15:27.543 CST [60938] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:15:27.543 CST [60938] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:15:29.602 CST [60938] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:15:29.602 CST [60938] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:15:29.602 CST [60938] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:15:29.607 CST [60938] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:15:29.607 CST [60938] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:15:29.607 CST [60938] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:15:31.499 CST [60938] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:15:31.499 CST [60938] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:15:31.499 CST [60938] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:15:31.505 CST [60938] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:15:31.505 CST [60938] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:15:31.505 CST [60938] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:15:33.432 CST [60938] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:15:33.432 CST [60938] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:15:33.432 CST [60938] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:15:33.437 CST [60938] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:15:33.437 CST [60938] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:15:33.437 CST [60938] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:15:38.063 CST [61420] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:15:38.063 CST [61420] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:15:38.063 CST [61420] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:15:38.073 CST [60938] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:15:38.073 CST [60938] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:15:38.073 CST [60938] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:15:40.031 CST [60938] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:15:40.031 CST [60938] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:15:40.031 CST [60938] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:15:40.037 CST [60938] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:15:40.037 CST [60938] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:15:40.037 CST [60938] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:15:43.578 CST [60938] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:15:43.578 CST [60938] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:15:43.578 CST [60938] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:15:43.588 CST [61420] ERROR:  invalid input syntax for type uuid: "select"
+2026-03-17 14:15:43.588 CST [61420] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 14:15:43.588 CST [61420] STATEMENT:  SELECT * FROM "charts" WHERE id = $1 ORDER BY "charts"."id" LIMIT 1
+2026-03-17 14:51:14.625 CST [3522] ERROR:  function sum(character varying) does not exist at character 14
+2026-03-17 14:51:14.625 CST [3522] HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+2026-03-17 14:51:14.625 CST [3522] STATEMENT:  SELECT col1, SUM(col3) AS col3_求和 FROM (select *  from test_data) AS dataset GROUP BY col1 ORDER BY col1
+2026-03-17 15:21:39.111 CST [21311] ERROR:  function sum(character varying) does not exist at character 14
+2026-03-17 15:21:39.111 CST [21311] HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+2026-03-17 15:21:39.111 CST [21311] STATEMENT:  SELECT col1, SUM(col3) AS col3_求和 FROM (select *  from test_data) AS dataset GROUP BY col1 ORDER BY col1
+2026-03-17 15:53:59.561 CST [39951] ERROR:  function sum(character varying) does not exist at character 14
+2026-03-17 15:53:59.561 CST [39951] HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+2026-03-17 15:53:59.561 CST [39951] STATEMENT:  SELECT col2, SUM(col3) AS col3_求和 FROM (select *  from test_data) AS dataset GROUP BY col2 ORDER BY col2
+2026-03-17 16:12:23.001 CST [50422] ERROR:  function sum(character varying) does not exist at character 14
+2026-03-17 16:12:23.001 CST [50422] HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+2026-03-17 16:12:23.001 CST [50422] STATEMENT:  SELECT col2, SUM(col3) AS col3_求和 FROM (select *  from test_data) AS dataset GROUP BY col2 ORDER BY col2
+2026-03-17 19:19:26.580 CST [38758] ERROR:  invalid input syntax for type uuid: "fields"
+2026-03-17 19:19:26.580 CST [38758] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 19:19:26.580 CST [38758] STATEMENT:  SELECT * FROM "datasets" WHERE id = $1 ORDER BY "datasets"."id" LIMIT 1
+2026-03-17 19:19:47.566 CST [38758] ERROR:  invalid input syntax for type uuid: "fields"
+2026-03-17 19:19:47.566 CST [38758] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-17 19:19:47.566 CST [38758] STATEMENT:  SELECT * FROM "datasets" WHERE id = $1 ORDER BY "datasets"."id" LIMIT 1
+2026-03-18 11:58:58.252 CST [38758] ERROR:  invalid input syntax for type uuid: "fields"
+2026-03-18 11:58:58.252 CST [38758] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-18 11:58:58.252 CST [38758] STATEMENT:  SELECT * FROM "datasets" WHERE id = $1 ORDER BY "datasets"."id" LIMIT 1
+2026-03-18 11:59:09.379 CST [38758] ERROR:  invalid input syntax for type uuid: "fields"
+2026-03-18 11:59:09.379 CST [38758] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-18 11:59:09.379 CST [38758] STATEMENT:  SELECT * FROM "datasets" WHERE id = $1 ORDER BY "datasets"."id" LIMIT 1
+2026-03-18 14:13:24.263 CST [14645] ERROR:  function sum(character varying) does not exist at character 14
+2026-03-18 14:13:24.263 CST [14645] HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+2026-03-18 14:13:24.263 CST [14645] STATEMENT:  SELECT col2, sum(col3) AS col3_计数 FROM (select *  from test_data) AS dataset where 1=1 GROUP BY col2 ORDER BY col2;
+2026-03-18 14:14:58.645 CST [60275] ERROR:  function sum(character varying) does not exist at character 14
+2026-03-18 14:14:58.645 CST [60275] HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+2026-03-18 14:14:58.645 CST [60275] STATEMENT:  SELECT col2, SUM(col3) AS col3_求和 FROM (select *  from test_data) AS dataset GROUP BY col2 ORDER BY col2
+2026-03-18 14:15:20.322 CST [60465] ERROR:  function sum(character varying) does not exist at character 14
+2026-03-18 14:15:20.322 CST [60465] HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+2026-03-18 14:15:20.322 CST [60465] STATEMENT:  SELECT col2, SUM(col3) AS col3_求和 FROM (select *  from test_data) AS dataset GROUP BY col2 ORDER BY col2
+2026-03-18 14:15:20.882 CST [60467] ERROR:  function sum(character varying) does not exist at character 14
+2026-03-18 14:15:20.882 CST [60467] HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+2026-03-18 14:15:20.882 CST [60467] STATEMENT:  SELECT col2, SUM(col3) AS col3_求和 FROM (select *  from test_data) AS dataset GROUP BY col2 ORDER BY col2
+2026-03-18 14:16:17.914 CST [61032] ERROR:  function avg(character varying) does not exist at character 14
+2026-03-18 14:16:17.914 CST [61032] HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+2026-03-18 14:16:17.914 CST [61032] STATEMENT:  SELECT col2, AVG(col3) AS col3_平均值 FROM (select *  from test_data) AS dataset GROUP BY col2 ORDER BY col2
+2026-03-18 19:45:58.484 CST [14986] ERROR:  function sum(character varying) does not exist at character 14
+2026-03-18 19:45:58.484 CST [14986] HINT:  No function matches the given name and argument types. You might need to add explicit type casts.
+2026-03-18 19:45:58.484 CST [14986] STATEMENT:  SELECT col2, SUM(col3) AS col3_求和 FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2 ORDER BY col2
+2026-03-18 19:56:38.542 CST [22354] FATAL:  role "postgres" does not exist
+2026-03-18 19:56:38.543 CST [22355] FATAL:  role "postgres" does not exist
+2026-03-23 17:26:43.106 CST [84568] FATAL:  database "mac" does not exist
+2026-03-23 18:13:09.220 CST [96270] ERROR:  invalid input syntax for type uuid: "test-id"
+2026-03-23 18:13:09.220 CST [96270] CONTEXT:  unnamed portal parameter $1 = '...'
+2026-03-23 18:13:09.220 CST [96270] STATEMENT:  SELECT * FROM "dashboards" WHERE workspace_id = $1
+2026-03-23 18:25:53.431 CST [1745] ERROR:  invalid input syntax for type uuid: "" at character 80
+2026-03-23 18:25:53.431 CST [1745] STATEMENT:  SELECT count(*) FROM "dashboards" WHERE workspace_id IS NULL OR workspace_id = ''
+2026-03-23 18:29:58.664 CST [3187] ERROR:  column "workspace_id" does not exist at character 12
+2026-03-23 18:29:58.664 CST [3187] STATEMENT:  SELECT id, workspace_id FROM workspaces;

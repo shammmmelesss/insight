@@ -221,3 +221,17 @@
 2026-04-15 12:50:40.182 CST [17996] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
 2026-04-15 12:50:40.182 CST [17996] DETAIL:  Key (project_name)=() already exists.
 2026-04-15 12:50:40.182 CST [17996] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"project_manager"=$4,"app_packages"=$5,"firebase_project_id"=$6,"access_key"=$7,"creator"=$8,"modifier"=$9,"create_time"=$10,"update_time"=$11 WHERE "project_id" = $12
+2026-04-30 14:55:17.207 CST [10264] ERROR:  column "calculated_10" does not exist at character 50
+2026-04-30 14:55:17.207 CST [10264] STATEMENT:  SELECT col1, col3, COUNT(col4) AS col4_计数, COUNT(calculated_10) AS calculated_10_计数 FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col1, col3 ORDER BY col1
+2026-04-30 14:55:25.338 CST [10327] ERROR:  column "calculated_10" does not exist at character 50
+2026-04-30 14:55:25.338 CST [10327] STATEMENT:  SELECT col1, col3, COUNT(col4) AS col4_计数, COUNT(calculated_10) AS calculated_10_计数 FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col1, col3 ORDER BY col1
+2026-04-30 15:00:47.159 CST [12762] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:00:47.159 CST [12762] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:00:47.166 CST [12765] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:00:47.166 CST [12765] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:00:53.011 CST [12810] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:00:53.011 CST [12810] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:00:53.019 CST [12814] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:00:53.019 CST [12814] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:00:53.025 CST [12815] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:00:53.025 CST [12815] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2

@@ -19,14 +19,14 @@ const ChartConfigPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const chartId = searchParams.get('chartId');
   const [datasets, setDatasets] = useState<{ id: string; name: string }[]>([]);
-  const [datasetFields, setDatasetFields] = useState<{ originalName: string; displayName: string; type: string }[]>([]);
+  const [datasetFields, setDatasetFields] = useState<{ originalName: string; displayName: string; type: string; isCalculated?: boolean; expression?: string }[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [datasetSQL, setDatasetSQL] = useState('');
   const [dataSourceId, setDataSourceId] = useState('');
   
   // 拖拽相关状态
   const [droppableArea, setDroppableArea] = useState<string | null>(null);
-  const [draggedField, setDraggedField] = useState<{ originalName: string; displayName: string; type: string } | null>(null);
+  const [draggedField, setDraggedField] = useState<{ originalName: string; displayName: string; type: string; isCalculated?: boolean; expression?: string } | null>(null);
   
   // 字段设置对话框状态
   const [isFieldSettingsModalVisible, setIsFieldSettingsModalVisible] = useState(false);
@@ -62,6 +62,8 @@ const ChartConfigPage: React.FC = () => {
     originalName: string;
     displayName: string;
     type: string;
+    isCalculated?: boolean;
+    expression?: string;
     config?: {
       aggregation?: string;
       dataFormat?: string;
@@ -116,11 +118,13 @@ const ChartConfigPage: React.FC = () => {
       // 生成聚合指标字段
       const aggregatedMeasureFields = measureFields.map(field => {
         const aggregation = field.config?.aggregation || '计数';
+        if (field.isCalculated && field.expression) {
+          return `${field.expression} AS ${field.originalName}_${aggregation}`;
+        }
         const aggregationFunction = mapAggregationToSQL(aggregation);
-        
         return `${aggregationFunction}(${field.originalName}) AS ${field.originalName}_${aggregation}`;
       });
-      
+
       // 组合所有字段
       const allFields = [...rowFieldNames, ...colFieldNames, ...aggregatedMeasureFields];
       
@@ -154,8 +158,10 @@ const ChartConfigPage: React.FC = () => {
       // 生成聚合Y轴字段
       const aggregatedYAxisFields = yAxisFields.map(field => {
         const aggregation = field.config?.aggregation || '计数';
+        if (field.isCalculated && field.expression) {
+          return `${field.expression} AS ${field.originalName}_${aggregation}`;
+        }
         const aggregationFunction = mapAggregationToSQL(aggregation);
-        
         return `${aggregationFunction}(${field.originalName}) AS ${field.originalName}_${aggregation}`;
       });
       
@@ -191,11 +197,13 @@ const ChartConfigPage: React.FC = () => {
       // 生成聚合指标字段
       const aggregatedMeasureFields = measureFields.map(field => {
         const aggregation = field.config?.aggregation || '计数';
+        if (field.isCalculated && field.expression) {
+          return `${field.expression} AS ${field.originalName}_${aggregation}`;
+        }
         const aggregationFunction = mapAggregationToSQL(aggregation);
-        
         return `${aggregationFunction}(${field.originalName}) AS ${field.originalName}_${aggregation}`;
       });
-      
+
       // 组合所有字段
       const allFields = [...groupFieldNames, ...aggregatedMeasureFields];
       
@@ -219,8 +227,10 @@ const ChartConfigPage: React.FC = () => {
       // 生成聚合指标字段
       const aggregatedIndicatorFields = indicatorFields.map(field => {
         const aggregation = field.config?.aggregation || '计数';
+        if (field.isCalculated && field.expression) {
+          return `${field.expression} AS ${field.originalName}_${aggregation}`;
+        }
         const aggregationFunction = mapAggregationToSQL(aggregation);
-        
         return `${aggregationFunction}(${field.originalName}) AS ${field.originalName}_${aggregation}`;
       });
       
@@ -404,7 +414,7 @@ const ChartConfigPage: React.FC = () => {
   }, [selectedDataset, datasetSQL, dataSourceId, generateSQL]);
 
   // 拖拽开始事件
-  const handleDragStart = (e: React.DragEvent, field: { originalName: string; displayName: string; type: string }) => {
+  const handleDragStart = (e: React.DragEvent, field: { originalName: string; displayName: string; type: string; isCalculated?: boolean; expression?: string }) => {
     setDraggedField(field);
     e.dataTransfer.effectAllowed = 'copy';
     e.dataTransfer.setData('text/plain', JSON.stringify(field));
@@ -659,7 +669,7 @@ const ChartConfigPage: React.FC = () => {
           </Space>
 
           {/* 字段配置区 */}
-          <div style={{ maxHeight: 'calc(100vh - 200px)', overflow: 'auto' }}>
+          <div>
             <h4 style={{ marginBottom: 16 }}>字段配置</h4>
             
             {/* 交叉表配置 */}

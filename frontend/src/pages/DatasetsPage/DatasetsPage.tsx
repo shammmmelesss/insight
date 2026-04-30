@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Table, Modal, Form, Input, message, Tabs, Row, Col, Select } from 'antd';
+import { Button, Card, Table, Modal, Drawer, Form, Input, message, Tabs, Row, Col, Select } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { Dataset, CreateDatasetRequest, UpdateDatasetRequest, FieldConfig } from '@shared/api.interface';
@@ -111,7 +111,7 @@ const DatasetsPage: React.FC = () => {
       // 自动生成字段配置
       const autoFieldsConfig: FieldConfig[] = (response.data.columns || []).map((col: any) => {
         const dataType = mapDbTypeToDataType(col.type);
-        // 字段类型默认逻辑：数字类型默认度量，其他默认维度
+        // 字段类型默认逻辑：数字类型默认指标，其他默认维度
         const fieldType = dataType === 'number' ? 'measure' : 'dimension';
         return {
           originalName: col.name,
@@ -159,8 +159,9 @@ const DatasetsPage: React.FC = () => {
       originalName: `calculated_${fieldsConfig.length}`,
       displayName: `计算字段${fieldsConfig.length + 1}`,
       type: 'measure' as const,
-      dataType: 'number' as const, // 计算字段默认数据类型为数字
-      expression: ''
+      dataType: 'number' as const,
+      expression: '',
+      isCalculated: true,
     };
     setFieldsConfig([...fieldsConfig, newField]);
   };
@@ -171,7 +172,10 @@ const DatasetsPage: React.FC = () => {
       // 编辑模式
       setEditingId(record.id);
       setSelectedDataSource(record.dataSourceId || '');
-      setFieldsConfig(record.fieldsConfig || []);
+      setFieldsConfig((record.fieldsConfig || []).map(f => ({
+        ...f,
+        isCalculated: f.isCalculated ?? f.originalName.startsWith('calculated_'),
+      })));
       setFormValues({
         name: record.name,
         sql: record.sql,
@@ -221,6 +225,14 @@ const DatasetsPage: React.FC = () => {
       // 验证至少有一个字段配置
       if (fieldsConfig.length === 0) {
         message.error('请至少定义一个字段');
+        return;
+      }
+
+      // 验证计算字段必须填写表达式
+      const missingExpression = fieldsConfig.find(f => f.isCalculated && !f.expression?.trim());
+      if (missingExpression) {
+        message.error(`计算字段「${missingExpression.displayName}」必须填写计算表达式`);
+        setActiveTab('fields');
         return;
       }
       
@@ -380,8 +392,8 @@ const DatasetsPage: React.FC = () => {
   ];
 
   return (
-    <div className="datasets-page">
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+    <div className="datasets-page" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexShrink: 0 }}>
         <h2>数据集管理</h2>
         <Button
           type="primary"
@@ -392,7 +404,7 @@ const DatasetsPage: React.FC = () => {
         </Button>
       </div>
 
-      <Card style={{ marginBottom: 16 }}>
+      <Card style={{ marginBottom: 16, flexShrink: 0 }}>
         <div style={{ display: 'flex', gap: 16 }}>
           <Input
             placeholder="搜索数据集名称..."
@@ -406,7 +418,7 @@ const DatasetsPage: React.FC = () => {
         </div>
       </Card>
 
-      <Card>
+      <Card style={{ flex: 1, minHeight: 0, overflow: 'hidden' }} styles={{ body: { height: '100%', overflow: 'auto', padding: '0 16px' } }}>
         <Table
           columns={columns}
           dataSource={datasets}
@@ -416,12 +428,13 @@ const DatasetsPage: React.FC = () => {
         />
       </Card>
 
-      <Modal
+      <Drawer
         title={editingId ? '编辑数据集' : '新增数据集'}
         open={isModalVisible}
-        onCancel={handleCancel}
-        footer={null}
-        width={1000}
+        onClose={handleCancel}
+        width="80vw"
+        placement="right"
+        destroyOnHidden
       >
         <Form
           form={form}
@@ -559,7 +572,7 @@ const DatasetsPage: React.FC = () => {
                         style={{ width: 120 }}
                       >
                         <Option value="dimension">维度</Option>
-                        <Option value="measure">度量</Option>
+                        <Option value="measure">指标</Option>
                       </Select>
                     )}
                   />
@@ -582,13 +595,38 @@ const DatasetsPage: React.FC = () => {
                   <Table.Column
                     title="计算表达式"
                     key="expression"
-                    render={(_, __, index) => (
-                      <Input
-                        value={fieldsConfig[index]?.expression || ''}
-                        onChange={(e) => updateFieldConfig(index, 'expression', e.target.value)}
-                        placeholder="输入计算表达式"
-                      />
-                    )}
+                    render={(_, __, index) => {
+                      const field = fieldsConfig[index];
+                      const isCalculated = field?.isCalculated;
+                      const isEmpty = isCalculated && !field?.expression?.trim();
+                      return (
+                        <Input
+                          value={field?.expression || ''}
+                          onChange={(e) => updateFieldConfig(index, 'expression', e.target.value)}
+                          placeholder={isCalculated ? '请输入计算表达式（必填）' : '—'}
+                          disabled={!isCalculated}
+                          status={isEmpty ? 'error' : undefined}
+                          style={!isCalculated ? { background: '#f5f5f5', color: '#bbb', cursor: 'not-allowed' } : undefined}
+                        />
+                      );
+                    }}
+                  />
+                  <Table.Column
+                    title="操作"
+                    key="action"
+                    width={60}
+                    render={(_, __, index) => {
+                      if (!fieldsConfig[index]?.isCalculated) return null;
+                      return (
+                        <Button
+                          type="text"
+                          danger
+                          size="small"
+                          icon={<DeleteOutlined />}
+                          onClick={() => setFieldsConfig(fieldsConfig.filter((_, i) => i !== index))}
+                        />
+                      );
+                    }}
                   />
                 </Table>
               )}
@@ -604,8 +642,8 @@ const DatasetsPage: React.FC = () => {
             </Button>
           </div>
         </Form>
-      </Modal>
-      
+      </Drawer>
+
       {/* 图表列表模态框 */}
       <Modal
         title="使用该数据集的图表"

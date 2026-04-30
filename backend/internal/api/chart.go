@@ -464,6 +464,8 @@ type fieldConfig struct {
 	OriginalName string `json:"originalName"`
 	DisplayName  string `json:"displayName"`
 	Type         string `json:"type"`
+	IsCalculated bool   `json:"isCalculated"`
+	Expression   string `json:"expression"`
 	Config       *struct {
 		Aggregation string `json:"aggregation"`
 	} `json:"config"`
@@ -472,6 +474,17 @@ type fieldConfig struct {
 func buildAggField(f fieldConfig) (string, error) {
 	if !isValidIdentifier(f.OriginalName) {
 		return "", fmt.Errorf("非法字段名: %s", f.OriginalName)
+	}
+
+	aggLabel := "计数"
+	if f.Config != nil && f.Config.Aggregation != "" {
+		aggLabel = f.Config.Aggregation
+	}
+	alias := sanitizeAlias(f.OriginalName + "_" + aggLabel)
+
+	// 计算字段直接使用表达式，不包裹聚合函数
+	if f.IsCalculated && f.Expression != "" {
+		return fmt.Sprintf("%s AS %s", f.Expression, alias), nil
 	}
 
 	agg := "COUNT"
@@ -486,14 +499,12 @@ func buildAggField(f fieldConfig) (string, error) {
 		case "最小值":
 			agg = "MIN"
 		case "去重计数":
-			alias := f.OriginalName + "_去重计数"
-			return fmt.Sprintf("COUNT(DISTINCT %s) AS %s", f.OriginalName, sanitizeAlias(alias)), nil
+			return fmt.Sprintf("COUNT(DISTINCT %s) AS %s", f.OriginalName, sanitizeAlias(f.OriginalName+"_去重计数")), nil
 		case "计数":
 			agg = "COUNT"
 		}
 	}
-	alias := f.OriginalName + "_" + getAggLabel(agg)
-	return fmt.Sprintf("%s(%s) AS %s", agg, f.OriginalName, sanitizeAlias(alias)), nil
+	return fmt.Sprintf("%s(%s) AS %s", agg, f.OriginalName, sanitizeAlias(f.OriginalName+"_"+getAggLabel(agg))), nil
 }
 
 // sanitizeAlias 将别名中的非法字符替换为下划线

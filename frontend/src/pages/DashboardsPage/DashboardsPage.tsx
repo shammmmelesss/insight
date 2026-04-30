@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Button, Card, Modal, Form, Input, message, Layout, Space, Divider, Spin, Select, DatePicker } from 'antd';
-import { PlusOutlined, EditOutlined, ShareAltOutlined, SettingOutlined } from '@ant-design/icons';
+import { Button, Card, Modal, Form, Input, message, Layout, Space, Divider, Spin, Select, DatePicker, Tooltip, Dropdown } from 'antd';
+import { PlusOutlined, EditOutlined, ShareAltOutlined, SettingOutlined, MenuFoldOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Dashboard, CreateDashboardRequest, UpdateDashboardRequest, ChartOption, FilterField } from '@shared/api.interface';
@@ -27,6 +27,10 @@ const DashboardsPage: React.FC = () => {
   const [filterValues, setFilterValues] = useState<Record<string, any>>({});
   const [filterFieldOptions, setFilterFieldOptions] = useState<Record<string, any[]>>({});
   const [datasetFieldTypes, setDatasetFieldTypes] = useState<Record<string, string>>({});
+  const [siderCollapsed, setSiderCollapsed] = useState(false);
+  const [chartSQLs, setChartSQLs] = useState<Record<string, string>>({});
+  const [sqlModalVisible, setSqlModalVisible] = useState(false);
+  const [currentSQL, setCurrentSQL] = useState('');
 
   // 获取看板列表
   const fetchDashboards = async () => {
@@ -142,6 +146,9 @@ const DashboardsPage: React.FC = () => {
         ...prev,
         [chartId]: response.data.data
       }));
+      if (response.data.sql) {
+        setChartSQLs(prev => ({ ...prev, [chartId]: response.data.sql }));
+      }
       // 保存图表配置
       if (response.data.chart?.config) {
         let config = response.data.chart.config;
@@ -275,6 +282,11 @@ const DashboardsPage: React.FC = () => {
     }
   }, [selectedDashboard]);
 
+  const refetchSingleChart = (chartId: string) => {
+    const params = buildFilterParamsForChart(chartId);
+    fetchChartData(chartId, params.length > 0 ? params : undefined);
+  };
+
   // 筛选器值变化时重新获取受影响图表的数据
   useEffect(() => {
     if (filters.length === 0) return;
@@ -289,9 +301,15 @@ const DashboardsPage: React.FC = () => {
 
 
   return (
-    <Layout style={{ minHeight: 'calc(100vh - 64px)' }}>
+    <Layout style={{ minHeight: 'calc(100vh - 64px)', position: 'relative' }}>
       {/* 左侧：看板目录 */}
-      <Sider width={300} style={{ background: '#fff', boxShadow: '2px 0 8px rgba(0, 0, 0, 0.06)', borderRight: '1px solid #f0f0f0' }}>
+      <Sider
+        width={280}
+        collapsedWidth={0}
+        collapsed={siderCollapsed}
+        trigger={null}
+        style={{ background: '#fff', boxShadow: '2px 0 8px rgba(0, 0, 0, 0.06)', borderRight: '1px solid #f0f0f0', position: 'relative', transition: 'all 0.2s' }}
+      >
         <DashboardList
           dashboards={dashboards}
           loading={loading}
@@ -301,7 +319,53 @@ const DashboardsPage: React.FC = () => {
           onEditDashboard={(dashboard) => navigate(`/dashboards/edit/${dashboard.id}`)}
           onDeleteDashboard={handleDelete}
         />
+        {/* 收起按钮 */}
+        <Tooltip title={siderCollapsed ? '展开' : '收起'} placement="right">
+          <Button
+            type="text"
+            size="small"
+            icon={siderCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            onClick={() => setSiderCollapsed(!siderCollapsed)}
+            style={{
+              position: 'absolute',
+              bottom: 16,
+              right: 8,
+              color: '#999',
+              fontSize: 14,
+            }}
+          />
+        </Tooltip>
       </Sider>
+      {/* 侧边栏收起时的展开入口 */}
+      {siderCollapsed && (
+        <Tooltip title="展开侧边栏" placement="right">
+          <Button
+            type="text"
+            size="small"
+            icon={<MenuUnfoldOutlined />}
+            onClick={() => setSiderCollapsed(false)}
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 10,
+              background: '#fff',
+              border: '1px solid #f0f0f0',
+              borderLeft: 'none',
+              borderRadius: '0 4px 4px 0',
+              width: 16,
+              height: 48,
+              padding: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '2px 0 6px rgba(0,0,0,0.08)',
+              color: '#666',
+            }}
+          />
+        </Tooltip>
+      )}
       
       {/* 右侧：看板展示区域 */}
       <Content style={{ padding: '10px', background: '#f0f2f5', overflow: 'auto' }}>
@@ -398,8 +462,21 @@ const DashboardsPage: React.FC = () => {
                         const cfg = chartConfigs[item.chartId] || {};
                         const extractNames = (fields: any[]) => (fields || []).map((f: any) => f.originalName);
                         const isLarge = item.width >= 8;
+                        const chartMenuItems = [
+                          { key: 'refresh', label: '刷新数据', onClick: () => refetchSingleChart(item.chartId) },
+                          { key: 'sql', label: '查看SQL', icon: <CodeOutlined />, onClick: () => { setCurrentSQL(chartSQLs[item.chartId] || '暂无SQL'); setSqlModalVisible(true); } },
+                          { key: 'edit', label: '编辑图表', onClick: () => navigate(`/chart-config?chartId=${item.chartId}`) },
+                        ];
+                        const cardTitle = (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 500, fontSize: 14, color: '#1f1f1f' }}>{chart?.name || `图表${index + 1}`}</span>
+                            <Dropdown menu={{ items: chartMenuItems }} trigger={['click']} placement="bottomRight">
+                              <Button type="text" size="small" icon={<EllipsisOutlined style={{ fontSize: 13, color: '#8c8c8c' }} />} onClick={e => e.stopPropagation()} />
+                            </Dropdown>
+                          </div>
+                        );
                         return (
-                          <Card key={item.chartId} title={chart?.name || `图表${index + 1}`} style={{ gridColumn: isLarge ? 'span 2' : 'span 1', minWidth: 0 }} styles={{ body: { padding: '10px', overflow: 'hidden' } }}>
+                          <Card key={item.chartId} title={cardTitle} style={{ gridColumn: isLarge ? 'span 2' : 'span 1', minWidth: 0, borderRadius: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }} styles={{ header: { padding: '10px 16px', minHeight: 44, borderBottom: '1px solid #f5f5f5' }, body: { padding: '12px 16px', overflow: 'hidden' } }}>
                             <div style={{ width: '100%' }}>
                               <ChartRenderer
                                 chartType={chart?.type as any || 'bar'}
@@ -488,6 +565,17 @@ const DashboardsPage: React.FC = () => {
             </Button>
           </div>
         </Form>
+      </Modal>
+      <Modal
+        title="查看SQL"
+        open={sqlModalVisible}
+        onCancel={() => setSqlModalVisible(false)}
+        footer={null}
+        width={700}
+      >
+        <pre style={{ background: '#f5f5f5', padding: 16, borderRadius: 4, overflow: 'auto', maxHeight: 400, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 13 }}>
+          {currentSQL}
+        </pre>
       </Modal>
     </Layout>
   );

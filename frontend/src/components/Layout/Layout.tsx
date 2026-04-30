@@ -135,15 +135,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <AntLayout>
-      <Header style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 10px', background: '#fff', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', width: '100%', maxWidth: '1200px', justifyContent: 'space-between' }}>
-          <Title level={4} style={{ margin: 0, color: '#165DFF' }}>Insight</Title>
-          <Menu
-            mode="horizontal"
-            selectedKeys={[location.pathname]}
-            items={menuItems}
-            style={{ background: 'transparent', borderBottom: 0, margin: '0 auto' }}
-          />
+      <Header style={{ display: 'flex', alignItems: 'center', padding: '0 24px', background: '#fff', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <Title level={4} style={{ margin: '0 24px 0 0', color: '#165DFF', whiteSpace: 'nowrap' }}>Insight</Title>
+            <Menu
+              mode="horizontal"
+              selectedKeys={[location.pathname]}
+              items={menuItems}
+              style={{ background: 'transparent', borderBottom: 0 }}
+            />
+          </div>
           <Space size={8}>
             <SwapOutlined style={{ color: '#666' }} />
             <Select
@@ -166,14 +168,18 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {(location.pathname === '/dashboards' || location.pathname.startsWith('/dashboards/edit/') || location.pathname === '/dashboards/create') ? (
         children
       ) : (
-        <Content style={{ padding: '10px', overflow: 'auto', background: '#f0f2f5' }}>
+        <Content style={{ padding: '10px', background: '#f0f2f5', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
           <div
             style={{
               background: '#fff',
-              minHeight: 360,
+              flex: 1,
+              minHeight: 0,
               borderRadius: 8,
               boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
               padding: 10,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
             }}
           >
             {children}

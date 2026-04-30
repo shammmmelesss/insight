@@ -115,8 +115,8 @@ const ChartsPage: React.FC = () => {
   ];
 
   return (
-    <div className="charts-page">
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+    <div className="charts-page" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexShrink: 0 }}>
         <h2>图表配置</h2>
         <Button
           type="primary"
@@ -127,7 +127,7 @@ const ChartsPage: React.FC = () => {
         </Button>
       </div>
 
-      <Card>
+      <Card style={{ flex: 1, minHeight: 0, overflow: 'hidden' }} styles={{ body: { height: '100%', overflow: 'auto', padding: '0 16px' } }}>
         <Table
           columns={columns}
           dataSource={charts}

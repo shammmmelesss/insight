@@ -56,6 +56,7 @@ export interface FieldConfig {
   type: "dimension" | "measure";
   dataType: DataType;
   expression?: string;
+  isCalculated?: boolean;
 }
 
 /** 数据集 */

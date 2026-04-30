@@ -55,10 +55,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   const createAndRenderG2Chart = (chartConfig: (chart: Chart) => void) => {
     if (!chartRef.current) return;
 
-    // 为不同图表类型设置合理的默认高度
-    let defaultHeight = 300;
+    let defaultHeight = 360;
     if (chartType === 'pie') {
-      defaultHeight = 250;
+      defaultHeight = 280;
     } else if (chartType === 'indicator') {
       defaultHeight = 200;
     }
@@ -253,7 +252,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         });
         chart.axis(actualYField, {
           title: { text: actualYField, style: { fontSize: 12 } },
-          label: { style: { fontSize: 11 } },
+          label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
         });
 
         const bar = chart
@@ -278,6 +277,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
         if (actualGroupField) {
           bar.encode('color', actualGroupField);
+          chart.legend('color', { position: 'bottom', layout: { justifyContent: 'center' } });
         }
       });
     } else {
@@ -313,7 +313,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         });
         chart.axis('_value', {
           title: { text: '值', style: { fontSize: 12 } },
-          label: { style: { fontSize: 11 } },
+          label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
         });
 
         chart
@@ -329,6 +329,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
             指标: d._metric,
             值: d._value,
           }));
+
+        chart.legend('color', { position: 'bottom', layout: { justifyContent: 'center' } });
       });
     }
   };
@@ -394,8 +396,20 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         });
         chart.axis(actualYField, {
           title: { text: actualYField, style: { fontSize: 12 } },
-          label: { style: { fontSize: 11 } },
+          label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
         });
+
+        const area = chart
+          .area()
+          .data(cleanedData)
+          .encode('x', actualXField)
+          .encode('y', actualYField)
+          .encode('shape', 'smooth')
+          .style({ fillOpacity: 0.15 });
+
+        if (actualGroupField) {
+          area.encode('color', actualGroupField);
+        }
 
         const line = chart
           .line()
@@ -403,6 +417,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .encode('x', actualXField)
           .encode('y', actualYField)
           .encode('shape', 'smooth')
+          .style({ lineWidth: 2 })
           .interaction('elementHighlight', { background: true })
           .tooltip((d: any) => {
             const xValue = d[actualXField] !== undefined ? d[actualXField] : '';
@@ -420,6 +435,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         if (actualGroupField) {
           line.encode('color', actualGroupField);
         }
+
+        chart.legend('color', { position: 'bottom', layout: { justifyContent: 'center' } });
       });
     } else {
       // 多Y轴：将宽格式数据转换为长格式
@@ -454,8 +471,17 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         });
         chart.axis('_value', {
           title: { text: '值', style: { fontSize: 12 } },
-          label: { style: { fontSize: 11 } },
+          label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
         });
+
+        chart
+          .area()
+          .data(longData)
+          .encode('x', actualXField)
+          .encode('y', '_value')
+          .encode('color', '_metric')
+          .encode('shape', 'smooth')
+          .style({ fillOpacity: 0.15 });
 
         chart
           .line()
@@ -464,12 +490,15 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .encode('y', '_value')
           .encode('color', '_metric')
           .encode('shape', 'smooth')
+          .style({ lineWidth: 2 })
           .interaction('elementHighlight', { background: true })
           .tooltip((d: any) => ({
             [actualXField]: d[actualXField] !== undefined ? d[actualXField] : '',
             指标: d._metric,
             值: d._value,
           }));
+
+        chart.legend('color', { position: 'bottom', layout: { justifyContent: 'center' } });
       });
     }
   };
@@ -631,7 +660,6 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       ref={chartRef}
       style={{
         width: '100%',
-        padding: '10px',
         overflow: 'hidden',
       }}
     />

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Table, Modal, Form, Input, InputNumber, Switch, message, Select, Row, Col, Tag } from 'antd';
+import { Button, Card, Table, Drawer, Form, Input, InputNumber, Switch, message, Select, Row, Col, Tag } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, CheckOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { DataSource, CreateDataSourceRequest, UpdateDataSourceRequest } from '@shared/api.interface';
@@ -207,8 +207,8 @@ const DataSourcesPage: React.FC = () => {
   const isBigQuery = isBigQueryType(selectedType);
 
   return (
-    <div className="data-sources-page">
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+    <div className="data-sources-page" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexShrink: 0 }}>
         <h2>数据源管理</h2>
         <Button
           type="primary"
@@ -219,7 +219,7 @@ const DataSourcesPage: React.FC = () => {
         </Button>
       </div>
 
-      <Card>
+      <Card style={{ flex: 1, minHeight: 0, overflow: 'hidden' }} styles={{ body: { height: '100%', overflow: 'auto', padding: '0 16px' } }}>
         <Table
           columns={columns}
           dataSource={dataSources}
@@ -229,17 +229,18 @@ const DataSourcesPage: React.FC = () => {
         />
       </Card>
 
-      <Modal
+      <Drawer
         title={
           <div>
-            <h2>{editingId ? '编辑数据源' : '新增数据源'}</h2>
-            <p style={{ margin: '8px 0 0 0', color: '#888', fontSize: '14px' }}>配置数据库连接信息，用于后续创建数据集</p>
+            <div style={{ fontWeight: 600, fontSize: 16 }}>{editingId ? '编辑数据源' : '新增数据源'}</div>
+            <div style={{ marginTop: 4, color: '#888', fontSize: '13px', fontWeight: 400 }}>配置数据库连接信息，用于后续创建数据集</div>
           </div>
         }
         open={isModalVisible}
-        onCancel={handleCancel}
-        footer={null}
-        width={800}
+        onClose={handleCancel}
+        width={600}
+        placement="right"
+        destroyOnHidden
       >
         <Form
           form={form}
@@ -364,7 +365,7 @@ const DataSourcesPage: React.FC = () => {
             </Button>
           </div>
         </Form>
-      </Modal>
+      </Drawer>
     </div>
   );
 };

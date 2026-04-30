@@ -55,17 +55,25 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   const createAndRenderG2Chart = (chartConfig: (chart: Chart) => void) => {
     if (!chartRef.current) return;
 
-    let defaultHeight = 360;
+    let defaultHeight = 260;
     if (chartType === 'pie') {
-      defaultHeight = 280;
+      defaultHeight = 240;
     } else if (chartType === 'indicator') {
-      defaultHeight = 200;
+      defaultHeight = 120;
     }
+
+    // Detect available height from parent container; fall back to defaultHeight
+    chartRef.current.style.height = '100%';
+    const detectedHeight = chartRef.current.clientHeight;
+    const actualHeight = detectedHeight > 80 ? detectedHeight : defaultHeight;
+    chartRef.current.style.height = `${actualHeight}px`;
 
     const chart = new Chart({
       container: chartRef.current,
-      width: chartRef.current.clientWidth,
-      height: defaultHeight,
+      autoFit: true,
+      height: actualHeight,
+      insetTop: 10,
+      insetBottom: 10,
     });
 
     chartConfig(chart);
@@ -167,12 +175,14 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       data: chartData,
     };
 
-    // 为交叉表设置合理的默认高度
-    const defaultHeight = 300;
+    chartRef.current.style.height = '100%';
+    const detectedHeight = chartRef.current.clientHeight;
+    const crossTableHeight = detectedHeight > 80 ? detectedHeight : 300;
+    chartRef.current.style.height = `${crossTableHeight}px`;
 
     const s2Options: S2Options = {
       width: chartRef.current.clientWidth,
-      height: defaultHeight,
+      height: crossTableHeight,
       interaction: {
         hoverHighlight: true,
       },
@@ -258,17 +268,14 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .encode('y', actualYField)
           .style({ fillOpacity: 1, lineWidth: 0 })
           .interaction('elementHighlight', { background: true })
-          .tooltip((d: any) => {
-            const xValue = d[actualXField] !== undefined ? d[actualXField] : '';
-            const yValue = d[actualYField] !== undefined ? d[actualYField] : 0;
-            const tooltipItems: any = {
-              [actualXField]: xValue,
-              [actualYField]: yValue,
-            };
-            if (actualGroupField) {
-              tooltipItems[actualGroupField] = d[actualGroupField] !== undefined ? d[actualGroupField] : '';
-            }
-            return tooltipItems;
+          .tooltip({
+            title: (d: any) => String(d[actualXField] ?? ''),
+            items: [
+              (d: any) => ({
+                name: actualGroupField ? String(d[actualGroupField] ?? actualYField) : actualYField,
+                value: d[actualYField] ?? 0,
+              }),
+            ],
           });
 
         if (actualGroupField) {
@@ -315,16 +322,18 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         chart
           .interval()
           .data(longData)
+          .transform({ type: 'stackY' })
           .encode('x', actualXField)
           .encode('y', '_value')
           .encode('color', '_metric')
           .style({ fillOpacity: 1, lineWidth: 0 })
           .interaction('elementHighlight', { background: true })
-          .tooltip((d: any) => ({
-            [actualXField]: d[actualXField] !== undefined ? d[actualXField] : '',
-            指标: d._metric,
-            值: d._value,
-          }));
+          .tooltip({
+            title: (d: any) => String(d[actualXField] ?? ''),
+            items: [
+              (d: any) => ({ name: String(d._metric ?? ''), value: d._value ?? 0 }),
+            ],
+          });
 
         chart.legend('color', { position: 'bottom', layout: { justifyContent: 'center' } });
       });
@@ -401,7 +410,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .encode('x', actualXField)
           .encode('y', actualYField)
           .encode('shape', 'smooth')
-          .style({ fillOpacity: 0.15 });
+          .style({ fillOpacity: 0.15 })
+          .tooltip(false);
 
         if (actualGroupField) {
           area.encode('color', actualGroupField);
@@ -415,17 +425,14 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .encode('shape', 'smooth')
           .style({ lineWidth: 2 })
           .interaction('elementHighlight', { background: true })
-          .tooltip((d: any) => {
-            const xValue = d[actualXField] !== undefined ? d[actualXField] : '';
-            const yValue = d[actualYField] !== undefined ? d[actualYField] : 0;
-            const tooltipItems: any = {
-              [actualXField]: xValue,
-              [actualYField]: yValue,
-            };
-            if (actualGroupField) {
-              tooltipItems[actualGroupField] = d[actualGroupField] !== undefined ? d[actualGroupField] : '';
-            }
-            return tooltipItems;
+          .tooltip({
+            title: (d: any) => String(d[actualXField] ?? ''),
+            items: [
+              (d: any) => ({
+                name: actualGroupField ? String(d[actualGroupField] ?? actualYField) : actualYField,
+                value: d[actualYField] ?? 0,
+              }),
+            ],
           });
 
         if (actualGroupField) {
@@ -471,15 +478,6 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         });
 
         chart
-          .area()
-          .data(longData)
-          .encode('x', actualXField)
-          .encode('y', '_value')
-          .encode('color', '_metric')
-          .encode('shape', 'smooth')
-          .style({ fillOpacity: 0.15 });
-
-        chart
           .line()
           .data(longData)
           .encode('x', actualXField)
@@ -488,11 +486,12 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .encode('shape', 'smooth')
           .style({ lineWidth: 2 })
           .interaction('elementHighlight', { background: true })
-          .tooltip((d: any) => ({
-            [actualXField]: d[actualXField] !== undefined ? d[actualXField] : '',
-            指标: d._metric,
-            值: d._value,
-          }));
+          .tooltip({
+            title: (d: any) => String(d[actualXField] ?? ''),
+            items: [
+              (d: any) => ({ name: String(d._metric ?? ''), value: d._value ?? 0 }),
+            ],
+          });
 
         chart.legend('color', { position: 'bottom', layout: { justifyContent: 'center' } });
       });
@@ -656,6 +655,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       ref={chartRef}
       style={{
         width: '100%',
+        height: '100%',
         overflow: 'hidden',
       }}
     />

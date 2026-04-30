@@ -44,5 +44,6 @@ config.local.yml
 .kiro/
 .trae/
 .claude
+frontend/.trae/
 # Docker
 docker-compose.override.yml

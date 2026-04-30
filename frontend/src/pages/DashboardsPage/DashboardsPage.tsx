@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Modal, Layout, Space, Spin, Select, DatePicker, Tooltip, Dropdown } from 'antd';
-import { PlusOutlined, EditOutlined, ShareAltOutlined, SettingOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined } from '@ant-design/icons';
+import { Button, Card, Modal, Layout, Skeleton, Select, DatePicker, Tooltip, Dropdown } from 'antd';
+import { EditOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined, InboxOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Dashboard, ChartOption, FilterField, DashboardLayoutItem } from '@shared/api.interface';
@@ -254,126 +254,125 @@ const DashboardsPage: React.FC = () => {
         </Tooltip>
       )}
 
-      <Content style={{ padding: '10px', background: '#f0f2f5', overflow: 'auto' }}>
-        <Card style={{ borderRadius: '8px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h2 style={{ margin: 0 }}>
-              {selectedDashboard ? selectedDashboard.name : '请选择看板'}
-            </h2>
-            {selectedDashboard && (
-              <Space>
-                <Button type="text" icon={<ShareAltOutlined />} onClick={() => console.info('分享功能开发中')}>分享</Button>
-                <Button type="text" icon={<SettingOutlined />} onClick={() => console.info('设置功能开发中')}>设置</Button>
-                <Button
-                  type="primary"
-                  icon={<EditOutlined />}
-                  onClick={() => navigate(`/dashboards/edit/${selectedDashboard.id}`)}
+      <Content style={{ background: '#f0f2f5', overflow: 'auto', padding: '12px 12px 12px' }}>
+        {/* 标题栏 - sticky，负margin抵消Content两侧padding */}
+        <div style={{ background: '#fff', border: '1px solid #ebebeb', padding: '0 12px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderRadius: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {selectedDashboard && <div style={{ width: 3, height: 16, background: '#4096ff', borderRadius: 2 }} />}
+            <span style={{ fontSize: 16, fontWeight: 600, color: '#1f1f1f' }}>
+              {selectedDashboard ? selectedDashboard.name : '看板'}
+            </span>
+          </div>
+          {selectedDashboard && (
+            <Button
+              type="primary"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => navigate(`/dashboards/edit/${selectedDashboard.id}`)}
+            >
+              编辑
+            </Button>
+          )}
+        </div>
+
+        {/* 筛选器栏 */}
+        {selectedDashboard && filters.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, padding: '10px 12px', marginBottom: 12, background: '#fff', borderRadius: 6, border: '1px solid #ebebeb' }}>
+            {filters.map(filter => (
+              <div key={filter.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                <span style={{ fontSize: 12, color: '#666' }}>{filter.name}</span>
+                {filter.type === 'dateRange' ? (
+                  <RangePicker
+                    size="small"
+                    style={{ width: '100%' }}
+                    value={filterValues[filter.id] as Parameters<typeof RangePicker>[0]['value']}
+                    onChange={(dates) => setFilterValues(prev => ({ ...prev, [filter.id]: dates }))}
+                  />
+                ) : (
+                  <Select
+                    size="small"
+                    style={{ width: '100%' }}
+                    mode={filter.type === 'multiple' ? 'multiple' : undefined}
+                    maxTagCount="responsive"
+                    value={filterValues[filter.id]}
+                    onChange={(value) => setFilterValues(prev => ({ ...prev, [filter.id]: value }))}
+                    allowClear
+                    placeholder="请选择"
+                  >
+                    {(filterFieldOptions[`${filter.dataset}:${filter.field}`] || []).map(val => (
+                      <Select.Option key={String(val)} value={String(val)}>{String(val)}</Select.Option>
+                    ))}
+                  </Select>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 图表网格 / 空态 */}
+        {selectedDashboard ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+            {parsedLayout.length > 0 ? parsedLayout.map((item, index) => {
+              const chart = charts.find(c => c.id === item.chartId);
+              const cfg = chartConfigs[item.chartId] || {};
+              const isLarge = item.width >= 8;
+              const chartMenuItems = [
+                { key: 'refresh', label: '刷新数据', onClick: () => refetchSingleChart(item.chartId) },
+                { key: 'sql', label: '查看SQL', icon: <CodeOutlined />, onClick: () => { setCurrentSQL(chartSQLs[item.chartId] || '暂无SQL'); setSqlModalVisible(true); } },
+                { key: 'edit', label: '编辑图表', onClick: () => navigate(`/chart-config?chartId=${item.chartId}`) },
+              ];
+              const cardTitle = (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 500, fontSize: 13, color: '#262626' }}>{chart?.name || `图表${index + 1}`}</span>
+                  <Dropdown menu={{ items: chartMenuItems }} trigger={['click']} placement="bottomRight">
+                    <Button type="text" size="small" icon={<EllipsisOutlined style={{ fontSize: 13, color: '#8c8c8c' }} />} onClick={e => e.stopPropagation()} />
+                  </Dropdown>
+                </div>
+              );
+              return (
+                <Card
+                  key={item.chartId}
+                  title={cardTitle}
+                  style={{ gridColumn: isLarge ? 'span 2' : 'span 1', minWidth: 0, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', transition: 'box-shadow 0.2s, transform 0.2s' }}
+                  styles={{ header: { padding: '10px 16px', minHeight: 44, borderBottom: 'none' }, body: { padding: '12px 16px', overflow: 'hidden' } }}
+                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}
                 >
-                  编辑
-                </Button>
-              </Space>
+                  {chartLoading ? (
+                    <Skeleton active paragraph={{ rows: 4 }} />
+                  ) : (
+                    <ChartRenderer
+                      chartType={chart?.type ?? 'bar'}
+                      chartData={chartData[item.chartId] as Record<string, unknown>[] || []}
+                      rowFields={extractNames(cfg.rowFields)}
+                      colFields={extractNames(cfg.colFields)}
+                      measureFields={extractNames(cfg.measureFields)}
+                      xAxisFields={extractNames(cfg.xAxisFields)}
+                      yAxisFields={extractNames(cfg.yAxisFields)}
+                      groupFields={extractNames(cfg.groupFields)}
+                      indicatorFields={extractNames(cfg.indicatorFields)}
+                    />
+                  )}
+                </Card>
+              );
+            }) : (
+              <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', background: '#fff', borderRadius: 8 }}>
+                <InboxOutlined style={{ fontSize: 40, color: '#d9d9d9', marginBottom: 12 }} />
+                <div style={{ fontSize: 14, color: '#595959', marginBottom: 4 }}>暂无图表</div>
+                <div style={{ fontSize: 12, color: '#bbb' }}>请编辑看板添加图表</div>
+              </div>
             )}
           </div>
-
-          {selectedDashboard ? (
-            <div style={{ padding: '10px' }}>
-              {filters.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, padding: '12px 16px', marginBottom: 10, background: '#fff', borderRadius: 4, border: '1px solid #f0f0f0' }}>
-                  {filters.map(filter => (
-                    <div key={filter.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 'calc(100% / 6 - 14px)' }}>
-                      <span style={{ fontSize: 12, color: '#666' }}>{filter.name}</span>
-                      {filter.type === 'dateRange' ? (
-                        <RangePicker
-                          size="small"
-                          style={{ width: '100%', height: 32 }}
-                          value={filterValues[filter.id] as Parameters<typeof RangePicker>[0]['value']}
-                          onChange={(dates) => setFilterValues(prev => ({ ...prev, [filter.id]: dates }))}
-                        />
-                      ) : (
-                        <Select
-                          size="small"
-                          style={{ width: '100%', height: 32 }}
-                          mode={filter.type === 'multiple' ? 'multiple' : undefined}
-                          maxTagCount="responsive"
-                          value={filterValues[filter.id]}
-                          onChange={(value) => setFilterValues(prev => ({ ...prev, [filter.id]: value }))}
-                          allowClear
-                          placeholder="请选择"
-                        >
-                          {(filterFieldOptions[`${filter.dataset}:${filter.field}`] || []).map(val => (
-                            <Select.Option key={String(val)} value={String(val)}>{String(val)}</Select.Option>
-                          ))}
-                        </Select>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {chartLoading ? (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
-                  <Spin size="large" />
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                  {parsedLayout.length > 0 ? parsedLayout.map((item, index) => {
-                    const chart = charts.find(c => c.id === item.chartId);
-                    const cfg = chartConfigs[item.chartId] || {};
-                    const isLarge = item.width >= 8;
-                    const chartMenuItems = [
-                      { key: 'refresh', label: '刷新数据', onClick: () => refetchSingleChart(item.chartId) },
-                      { key: 'sql', label: '查看SQL', icon: <CodeOutlined />, onClick: () => { setCurrentSQL(chartSQLs[item.chartId] || '暂无SQL'); setSqlModalVisible(true); } },
-                      { key: 'edit', label: '编辑图表', onClick: () => navigate(`/chart-config?chartId=${item.chartId}`) },
-                    ];
-                    const cardTitle = (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontWeight: 500, fontSize: 14, color: '#1f1f1f' }}>{chart?.name || `图表${index + 1}`}</span>
-                        <Dropdown menu={{ items: chartMenuItems }} trigger={['click']} placement="bottomRight">
-                          <Button type="text" size="small" icon={<EllipsisOutlined style={{ fontSize: 13, color: '#8c8c8c' }} />} onClick={e => e.stopPropagation()} />
-                        </Dropdown>
-                      </div>
-                    );
-                    return (
-                      <Card
-                        key={item.chartId}
-                        title={cardTitle}
-                        style={{ gridColumn: isLarge ? 'span 2' : 'span 1', minWidth: 0, borderRadius: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}
-                        styles={{ header: { padding: '10px 16px', minHeight: 44, borderBottom: '1px solid #f5f5f5' }, body: { padding: '12px 16px', overflow: 'hidden' } }}
-                      >
-                        <div style={{ width: '100%' }}>
-                          <ChartRenderer
-                            chartType={chart?.type ?? 'bar'}
-                            chartData={chartData[item.chartId] as Record<string, unknown>[] || []}
-                            rowFields={extractNames(cfg.rowFields)}
-                            colFields={extractNames(cfg.colFields)}
-                            measureFields={extractNames(cfg.measureFields)}
-                            xAxisFields={extractNames(cfg.xAxisFields)}
-                            yAxisFields={extractNames(cfg.yAxisFields)}
-                            groupFields={extractNames(cfg.groupFields)}
-                            indicatorFields={extractNames(cfg.indicatorFields)}
-                          />
-                        </div>
-                      </Card>
-                    );
-                  }) : (
-                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px 0', backgroundColor: '#fafafa', borderRadius: '8px' }}>
-                      <div style={{ fontSize: '16px', color: '#666', marginBottom: 16 }}>暂无图表</div>
-                      <div style={{ fontSize: '14px', color: '#999' }}>请编辑看板添加图表</div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div style={{ padding: '40px 20px', textAlign: 'center', backgroundColor: '#fafafa', borderRadius: '8px' }}>
-              <div style={{ fontSize: '16px', color: '#666', marginBottom: 8 }}>
-                请从左侧选择或创建一个看板
-              </div>
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/dashboards/create')}>
-                立即创建
-              </Button>
-            </div>
-          )}
-        </Card>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 320 }}>
+            <InboxOutlined style={{ fontSize: 48, color: '#d9d9d9', marginBottom: 16 }} />
+            <div style={{ fontSize: 15, color: '#595959', marginBottom: 6 }}>请从左侧选择一个看板</div>
+            <div style={{ fontSize: 13, color: '#bbb', marginBottom: 20 }}>或新建一个看板开始使用</div>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/dashboards/create')}>
+              新建看板
+            </Button>
+          </div>
+        )}
       </Content>
 
       <Modal

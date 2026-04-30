@@ -140,3 +140,84 @@
 2026-03-23 18:25:53.431 CST [1745] STATEMENT:  SELECT count(*) FROM "dashboards" WHERE workspace_id IS NULL OR workspace_id = ''
 2026-03-23 18:29:58.664 CST [3187] ERROR:  column "workspace_id" does not exist at character 12
 2026-03-23 18:29:58.664 CST [3187] STATEMENT:  SELECT id, workspace_id FROM workspaces;
+2026-03-27 18:08:09.831 CST [51894] FATAL:  database "game_marketing" does not exist
+2026-03-27 18:08:20.965 CST [52256] FATAL:  database "mac" does not exist
+2026-03-31 16:51:23.207 CST [9446] FATAL:  database "mac" does not exist
+2026-03-31 16:51:45.528 CST [9740] FATAL:  role "postgres" does not exist
+2026-03-31 16:51:45.530 CST [9741] FATAL:  role "postgres" does not exist
+2026-03-31 16:52:03.229 CST [9893] FATAL:  database "mac" does not exist
+2026-04-01 17:35:42.206 CST [99512] FATAL:  role "postgres" does not exist
+2026-04-01 17:35:42.211 CST [99513] FATAL:  role "postgres" does not exist
+2026-04-01 17:39:50.083 CST [455] FATAL:  role "postgres" does not exist
+2026-04-01 17:39:50.087 CST [456] FATAL:  role "postgres" does not exist
+2026-04-01 18:06:54.685 CST [2802] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
+2026-04-01 18:06:54.685 CST [2802] DETAIL:  Key (project_name)=() already exists.
+2026-04-01 18:06:54.685 CST [2802] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"creator"=$4,"create_time"=$5,"update_time"=$6 WHERE "project_id" = $7
+2026-04-01 18:06:57.853 CST [2802] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
+2026-04-01 18:06:57.853 CST [2802] DETAIL:  Key (project_name)=() already exists.
+2026-04-01 18:06:57.853 CST [2802] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"creator"=$4,"create_time"=$5,"update_time"=$6 WHERE "project_id" = $7
+2026-04-01 18:08:53.686 CST [6017] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
+2026-04-01 18:08:53.686 CST [6017] DETAIL:  Key (project_name)=() already exists.
+2026-04-01 18:08:53.686 CST [6017] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"creator"=$4,"create_time"=$5,"update_time"=$6 WHERE "project_id" = $7
+2026-04-01 18:09:06.222 CST [6017] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
+2026-04-01 18:09:06.222 CST [6017] DETAIL:  Key (project_name)=() already exists.
+2026-04-01 18:09:06.222 CST [6017] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"creator"=$4,"create_time"=$5,"update_time"=$6 WHERE "project_id" = $7
+2026-04-01 18:09:06.661 CST [6017] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
+2026-04-01 18:09:06.661 CST [6017] DETAIL:  Key (project_name)=() already exists.
+2026-04-01 18:09:06.661 CST [6017] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"creator"=$4,"create_time"=$5,"update_time"=$6 WHERE "project_id" = $7
+2026-04-01 18:09:12.661 CST [6017] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
+2026-04-01 18:09:12.661 CST [6017] DETAIL:  Key (project_name)=() already exists.
+2026-04-01 18:09:12.661 CST [6017] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"creator"=$4,"create_time"=$5,"update_time"=$6 WHERE "project_id" = $7
+2026-04-01 18:09:14.362 CST [6017] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
+2026-04-01 18:09:14.362 CST [6017] DETAIL:  Key (project_name)=() already exists.
+2026-04-01 18:09:14.362 CST [6017] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"creator"=$4,"create_time"=$5,"update_time"=$6 WHERE "project_id" = $7
+2026-04-01 18:09:14.835 CST [6017] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
+2026-04-01 18:09:14.835 CST [6017] DETAIL:  Key (project_name)=() already exists.
+2026-04-01 18:09:14.835 CST [6017] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"creator"=$4,"create_time"=$5,"update_time"=$6 WHERE "project_id" = $7
+2026-04-01 18:09:15.350 CST [6017] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
+2026-04-01 18:09:15.350 CST [6017] DETAIL:  Key (project_name)=() already exists.
+2026-04-01 18:09:15.350 CST [6017] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"creator"=$4,"create_time"=$5,"update_time"=$6 WHERE "project_id" = $7
+2026-04-01 18:10:13.565 CST [6017] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
+2026-04-01 18:10:13.565 CST [6017] DETAIL:  Key (project_name)=() already exists.
+2026-04-01 18:10:13.565 CST [6017] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"creator"=$4,"create_time"=$5,"update_time"=$6 WHERE "project_id" = $7
+2026-04-01 18:10:16.066 CST [6017] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
+2026-04-01 18:10:16.066 CST [6017] DETAIL:  Key (project_name)=() already exists.
+2026-04-01 18:10:16.066 CST [6017] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"creator"=$4,"create_time"=$5,"update_time"=$6 WHERE "project_id" = $7
+2026-04-01 18:14:41.849 CST [2802] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
+2026-04-01 18:14:41.849 CST [2802] DETAIL:  Key (project_name)=() already exists.
+2026-04-01 18:14:41.849 CST [2802] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"creator"=$4,"create_time"=$5,"update_time"=$6 WHERE "project_id" = $7
+2026-04-01 18:14:48.308 CST [2802] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
+2026-04-01 18:14:48.308 CST [2802] DETAIL:  Key (project_name)=() already exists.
+2026-04-01 18:14:48.308 CST [2802] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"creator"=$4,"create_time"=$5,"update_time"=$6 WHERE "project_id" = $7
+2026-04-01 18:15:02.298 CST [2802] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
+2026-04-01 18:15:02.298 CST [2802] DETAIL:  Key (project_name)=() already exists.
+2026-04-01 18:15:02.298 CST [2802] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"creator"=$4,"create_time"=$5,"update_time"=$6 WHERE "project_id" = $7
+2026-04-01 18:15:08.840 CST [2802] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
+2026-04-01 18:15:08.840 CST [2802] DETAIL:  Key (project_name)=() already exists.
+2026-04-01 18:15:08.840 CST [2802] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"creator"=$4,"create_time"=$5,"update_time"=$6 WHERE "project_id" = $7
+2026-04-02 10:06:05.417 CST [39652] FATAL:  role "postgres" does not exist
+2026-04-02 10:06:05.422 CST [39653] FATAL:  role "postgres" does not exist
+2026-04-02 17:03:10.045 CST [80770] FATAL:  role "postgres" does not exist
+2026-04-02 17:03:10.048 CST [80771] FATAL:  role "postgres" does not exist
+2026-04-02 17:04:11.960 CST [81286] FATAL:  role "postgres" does not exist
+2026-04-02 17:04:11.964 CST [81287] FATAL:  role "postgres" does not exist
+2026-04-02 17:05:45.667 CST [82013] FATAL:  role "postgres" does not exist
+2026-04-02 17:05:45.669 CST [82014] FATAL:  role "postgres" does not exist
+2026-04-02 18:08:44.834 CST [97399] FATAL:  role "postgres" does not exist
+2026-04-02 18:08:44.836 CST [97400] FATAL:  role "postgres" does not exist
+2026-04-02 18:10:49.954 CST [99562] FATAL:  role "postgres" does not exist
+2026-04-02 18:10:55.378 CST [99705] FATAL:  database "mac" does not exist
+2026-04-02 18:11:03.329 CST [108] ERROR:  database "game_marketing" already exists
+2026-04-02 18:11:03.329 CST [108] STATEMENT:  CREATE DATABASE game_marketing OWNER postgres
+2026-04-02 18:20:03.993 CST [5040] ERROR:  invalid input syntax for type json
+2026-04-02 18:20:03.993 CST [5040] DETAIL:  Token "user1" is invalid.
+2026-04-02 18:20:03.993 CST [5040] CONTEXT:  JSON data, line 1: user1
+2026-04-02 18:20:03.993 CST [5040] STATEMENT:  ALTER TABLE "project_space" ALTER COLUMN "project_manager" TYPE jsonb USING "project_manager"::jsonb
+2026-04-13 14:00:15.472 CST [5901] ERROR:  column "firebase_project_id" of relation "project_space" contains null values
+2026-04-13 14:00:15.472 CST [5901] STATEMENT:  ALTER TABLE "project_space" ADD "firebase_project_id" text NOT NULL
+2026-04-15 12:50:38.748 CST [17996] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
+2026-04-15 12:50:38.748 CST [17996] DETAIL:  Key (project_name)=() already exists.
+2026-04-15 12:50:38.748 CST [17996] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"project_manager"=$4,"app_packages"=$5,"firebase_project_id"=$6,"access_key"=$7,"creator"=$8,"modifier"=$9,"create_time"=$10,"update_time"=$11 WHERE "project_id" = $12
+2026-04-15 12:50:40.182 CST [17996] ERROR:  duplicate key value violates unique constraint "project_space_project_name_key"
+2026-04-15 12:50:40.182 CST [17996] DETAIL:  Key (project_name)=() already exists.
+2026-04-15 12:50:40.182 CST [17996] STATEMENT:  UPDATE "project_space" SET "project_name"=$1,"description"=$2,"status"=$3,"project_manager"=$4,"app_packages"=$5,"firebase_project_id"=$6,"access_key"=$7,"creator"=$8,"modifier"=$9,"create_time"=$10,"update_time"=$11 WHERE "project_id" = $12

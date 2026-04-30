@@ -43,5 +43,6 @@ config.local.yml
 *.swo
 .kiro/
 .trae/
+.claude
 # Docker
 docker-compose.override.yml

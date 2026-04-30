@@ -37,7 +37,11 @@ const DashboardsPage: React.FC = () => {
     setLoading(true);
     try {
       const response = await axios.get('/api/dashboards');
-      setDashboards(response.data.items);
+      const items = response.data.items;
+      setDashboards(items);
+      if (items.length > 0) {
+        setSelectedDashboard(prev => prev ?? items[0]);
+      }
     } catch (error) {
       message.error('获取看板列表失败');
       console.error('获取看板列表失败:', error);

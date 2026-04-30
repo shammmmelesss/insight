@@ -235,3 +235,75 @@
 2026-04-30 15:00:53.019 CST [12814] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
 2026-04-30 15:00:53.025 CST [12815] ERROR:  column "calculated_10" does not exist at character 42
 2026-04-30 15:00:53.025 CST [12815] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:03:16.637 CST [14349] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:03:16.637 CST [14349] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:03:16.644 CST [14351] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:03:16.644 CST [14351] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:03:20.552 CST [14384] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:03:20.552 CST [14384] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:03:20.558 CST [14387] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:03:20.558 CST [14387] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:03:20.563 CST [14389] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:03:20.563 CST [14389] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:03:29.842 CST [14459] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:03:29.842 CST [14459] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:03:29.848 CST [14461] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:03:29.848 CST [14461] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:03:37.904 CST [14526] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:03:37.904 CST [14526] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:03:37.911 CST [14527] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:03:37.911 CST [14527] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:03:46.344 CST [14608] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:03:46.344 CST [14608] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:03:46.360 CST [14611] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:03:46.360 CST [14611] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:03:46.998 CST [14627] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:03:46.998 CST [14627] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:03:47.007 CST [14629] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:03:47.007 CST [14629] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:05:18.654 CST [15300] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:05:18.654 CST [15300] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:05:18.675 CST [15303] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:05:18.675 CST [15303] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:05:19.119 CST [15308] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:05:19.119 CST [15308] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:05:19.129 CST [15310] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:05:19.129 CST [15310] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:06:04.575 CST [15806] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:06:04.575 CST [15806] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:06:46.685 CST [16231] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:06:46.685 CST [16231] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:06:46.693 CST [16233] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:06:46.693 CST [16233] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:06:46.721 CST [16235] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:06:46.721 CST [16235] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:07:54.332 CST [16805] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:07:54.332 CST [16805] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:07:54.347 CST [16807] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:07:54.347 CST [16807] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:07:56.386 CST [16829] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:07:56.386 CST [16829] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:07:56.398 CST [16832] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:07:56.398 CST [16832] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:07:56.956 CST [16846] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:07:56.956 CST [16846] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:07:56.965 CST [16848] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:07:56.965 CST [16848] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:07:57.234 CST [16851] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:07:57.234 CST [16851] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:07:57.739 CST [16857] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:07:57.739 CST [16857] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:07:57.790 CST [16859] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:07:57.790 CST [16859] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:07:58.205 CST [16869] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:07:58.205 CST [16869] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:07:58.219 CST [16871] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:07:58.219 CST [16871] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:08:06.460 CST [16928] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:08:06.460 CST [16928] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:08:06.473 CST [16930] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:08:06.473 CST [16930] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:08:30.640 CST [17108] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:08:30.640 CST [17108] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2
+2026-04-30 15:08:30.649 CST [17110] ERROR:  column "calculated_10" does not exist at character 42
+2026-04-30 15:08:30.649 CST [17110] STATEMENT:  SELECT col2, SUM(col4) AS col4___, COUNT(calculated_10) AS calculated_10___ FROM (select *  from test_data) AS dataset WHERE 1=1 GROUP BY col2

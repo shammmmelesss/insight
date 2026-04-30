@@ -22,3 +22,21 @@ var validIdentifierRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 func isValidIdentifier(name string) bool {
 	return validIdentifierRegex.MatchString(name)
 }
+
+// isValidExpression 校验计算字段表达式，防止SQL注入。
+// 只允许：标识符、数字、算术运算符、括号、空白、点、逗号。
+// 拒绝：分号、引号、注释符（-- 和 /* */）。
+var (
+	validExpressionCharsRegex = regexp.MustCompile(`^[a-zA-Z0-9_\s\+\-\*\/\(\)\.,]+$`)
+	dangerousExpressionRegex  = regexp.MustCompile(`--|/\*|\*/|;|'|"`)
+)
+
+func isValidExpression(expr string) bool {
+	if expr == "" {
+		return false
+	}
+	if dangerousExpressionRegex.MatchString(expr) {
+		return false
+	}
+	return validExpressionCharsRegex.MatchString(expr)
+}

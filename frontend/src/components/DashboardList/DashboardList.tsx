@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Button, Input, Modal, Dropdown } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, MoreOutlined } from '@ant-design/icons';
+import { Button, Input, Modal, Dropdown, Tooltip } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, MoreOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons';
 import { Dashboard } from '@shared/api.interface';
+import './DashboardList.css';
 
 interface DashboardListProps {
   dashboards: Dashboard[];
@@ -11,6 +12,8 @@ interface DashboardListProps {
   onAddDashboard: () => void;
   onEditDashboard: (dashboard: Dashboard) => void;
   onDeleteDashboard: (id: string) => void;
+  collapsed?: boolean;
+  onCollapse?: () => void;
 }
 
 const DashboardList: React.FC<DashboardListProps> = ({
@@ -21,23 +24,22 @@ const DashboardList: React.FC<DashboardListProps> = ({
   onAddDashboard,
   onEditDashboard,
   onDeleteDashboard,
+  collapsed,
+  onCollapse,
 }) => {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [dashboardToDelete, setDashboardToDelete] = useState<string | null>(null);
 
-  // 过滤看板列表
-  const filteredDashboards = dashboards.filter(dashboard => 
-    dashboard.name.toLowerCase().includes(searchKeyword.toLowerCase())
+  const filteredDashboards = dashboards.filter(d =>
+    d.name.toLowerCase().includes(searchKeyword.toLowerCase())
   );
 
-  // 处理删除确认
   const handleDeleteClick = (id: string) => {
     setDashboardToDelete(id);
     setDeleteModalVisible(true);
   };
 
-  // 确认删除
   const handleDeleteConfirm = () => {
     if (dashboardToDelete) {
       onDeleteDashboard(dashboardToDelete);
@@ -46,117 +48,102 @@ const DashboardList: React.FC<DashboardListProps> = ({
     }
   };
 
-  // 取消删除
-  const handleDeleteCancel = () => {
-    setDeleteModalVisible(false);
-    setDashboardToDelete(null);
-  };
-
   return (
-    <div>
-      <div style={{ padding: '20px', borderBottom: '1px solid #f0f0f0' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <Input
-            placeholder="搜索看板"
-            prefix={<SearchOutlined />}
-            value={searchKeyword}
-            onChange={(e) => setSearchKeyword(e.target.value)}
-            style={{ width: '180px' }}
-            size="small"
-          />
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            size="small"
-            onClick={onAddDashboard}
-          >
-            新增
-          </Button>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      {/* 标题栏 */}
+      <div className="dashboard-list-header">
+        <span className="dashboard-list-title">看板</span>
+        <div className="dashboard-list-header-actions">
+          <Tooltip title="新建看板" placement="bottom">
+            <Button type="text" size="small" icon={<PlusOutlined />} onClick={onAddDashboard} />
+          </Tooltip>
+          {onCollapse && (
+            <Tooltip title={collapsed ? '展开' : '收起'} placement="bottom">
+              <Button
+                type="text"
+                size="small"
+                icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                onClick={onCollapse}
+                style={{ color: '#999' }}
+              />
+            </Tooltip>
+          )}
         </div>
       </div>
-      
-      <div style={{ padding: '16px' }}>
+
+      {/* 搜索框 */}
+      <div className="dashboard-list-search">
+        <Input
+          placeholder="搜索看板"
+          prefix={<SearchOutlined style={{ color: '#bbb' }} />}
+          value={searchKeyword}
+          onChange={(e) => setSearchKeyword(e.target.value)}
+          size="small"
+          style={{ width: '100%' }}
+          allowClear
+        />
+      </div>
+
+      {/* 列表 */}
+      <div className="dashboard-list-body">
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>加载中...</div>
+          <div className="dashboard-list-empty">加载中...</div>
         ) : filteredDashboards.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-            <div style={{ marginBottom: 16 }}>{searchKeyword ? '没有找到匹配的看板' : '暂无看板'}</div>
-            <Button
-              type="dashed"
-              icon={<PlusOutlined />}
-              onClick={onAddDashboard}
-            >
-              创建第一个看板
-            </Button>
+          <div className="dashboard-list-empty">
+            {searchKeyword ? '没有匹配的看板' : '暂无看板'}
           </div>
         ) : (
-          <div>
-            {filteredDashboards.map((dashboard) => (
-              <div
-                key={dashboard.id}
-                style={{
-                  height: 32,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '0 8px',
-                  cursor: 'pointer',
-                  borderRadius: 4,
-                  backgroundColor: selectedDashboard?.id === dashboard.id ? '#e8f0fe' : 'transparent',
-                  fontWeight: selectedDashboard?.id === dashboard.id ? 'bold' : 'normal',
-                  fontSize: 13,
+          filteredDashboards.map((dashboard) => (
+            <div
+              key={dashboard.id}
+              className={`dashboard-list-item${selectedDashboard?.id === dashboard.id ? ' selected' : ''}`}
+              onClick={() => onSelectDashboard(dashboard)}
+            >
+              <span className="item-name">{dashboard.name}</span>
+              <Dropdown
+                menu={{
+                  items: [
+                    {
+                      key: 'edit',
+                      icon: <EditOutlined />,
+                      label: '编辑',
+                      onClick: ({ domEvent }) => {
+                        domEvent.stopPropagation();
+                        onEditDashboard(dashboard);
+                      },
+                    },
+                    {
+                      key: 'delete',
+                      icon: <DeleteOutlined />,
+                      label: '删除',
+                      danger: true,
+                      onClick: ({ domEvent }) => {
+                        domEvent.stopPropagation();
+                        handleDeleteClick(dashboard.id);
+                      },
+                    },
+                  ],
                 }}
-                onClick={() => onSelectDashboard(dashboard)}
+                trigger={['click']}
               >
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                  {dashboard.name}
-                </span>
-                <Dropdown
-                  menu={{
-                    items: [
-                      {
-                        key: 'edit',
-                        icon: <EditOutlined />,
-                        label: '编辑',
-                        onClick: ({ domEvent }) => {
-                          domEvent.stopPropagation();
-                          onEditDashboard(dashboard);
-                        },
-                      },
-                      {
-                        key: 'delete',
-                        icon: <DeleteOutlined />,
-                        label: '删除',
-                        danger: true,
-                        onClick: ({ domEvent }) => {
-                          domEvent.stopPropagation();
-                          handleDeleteClick(dashboard.id);
-                        },
-                      },
-                    ],
-                  }}
-                  trigger={['click']}
-                >
-                  <Button
-                    type="text"
-                    icon={<MoreOutlined />}
-                    size="small"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ flexShrink: 0 }}
-                  />
-                </Dropdown>
-              </div>
-            ))}
-          </div>
+                <Button
+                  type="text"
+                  icon={<MoreOutlined />}
+                  size="small"
+                  className="more-btn"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </Dropdown>
+            </div>
+          ))
         )}
       </div>
 
-      {/* 删除确认弹窗 */}
       <Modal
         title="删除确认"
         open={deleteModalVisible}
         onOk={handleDeleteConfirm}
-        onCancel={handleDeleteCancel}
+        onCancel={() => { setDeleteModalVisible(false); setDashboardToDelete(null); }}
         okText="确认删除"
         cancelText="取消"
         okType="danger"

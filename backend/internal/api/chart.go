@@ -228,7 +228,8 @@ func GetChartData(c *gin.Context) {
 	var filterConditions []FilterCondition
 	if filtersParam != "" {
 		if err := json.Unmarshal([]byte(filtersParam), &filterConditions); err != nil {
-			fmt.Printf("[GetChartData] 解析筛选器参数失败: %v\n", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "解析筛选器参数失败: " + err.Error()})
+			return
 		}
 	}
 
@@ -238,7 +239,6 @@ func GetChartData(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
 		return
 	}
-	fmt.Printf("[GetChartData] chartId=%s, type=%s, sql=%s\n", id, chart.Type, querySQL)
 
 	// 连接数据源执行查询
 	db, err := connectToDataSource(dataSource)
@@ -482,8 +482,11 @@ func buildAggField(f fieldConfig) (string, error) {
 	}
 	alias := sanitizeAlias(f.OriginalName + "_" + aggLabel)
 
-	// 计算字段直接使用表达式，不包裹聚合函数
+	// 计算字段直接使用表达式，校验后不包裹聚合函数
 	if f.IsCalculated && f.Expression != "" {
+		if !isValidExpression(f.Expression) {
+			return "", fmt.Errorf("非法计算字段表达式: %s", f.OriginalName)
+		}
 		return fmt.Sprintf("%s AS %s", f.Expression, alias), nil
 	}
 

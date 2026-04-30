@@ -1,0 +1,87 @@
+.dashboard-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 52px;
+  border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+
+.dashboard-list-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f1f1f;
+  letter-spacing: 0.02em;
+}
+
+.dashboard-list-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.dashboard-list-search {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.dashboard-list-body {
+  padding: 8px 8px;
+  overflow-y: auto;
+}
+
+.dashboard-list-item {
+  position: relative;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  border-left: 3px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+  margin-bottom: 2px;
+}
+
+.dashboard-list-item:hover {
+  background: #f5f5f5;
+}
+
+.dashboard-list-item.selected {
+  background: #f0f5ff;
+  border-left-color: #4096ff;
+}
+
+.dashboard-list-item .item-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: #333;
+}
+
+.dashboard-list-item.selected .item-name {
+  color: #1677ff;
+  font-weight: 500;
+}
+
+.dashboard-list-item .more-btn {
+  opacity: 0;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.dashboard-list-item:hover .more-btn,
+.dashboard-list-item.selected .more-btn {
+  opacity: 1;
+}
+
+.dashboard-list-empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: #aaa;
+  font-size: 13px;
+}

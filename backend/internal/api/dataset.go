@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"data-analysis-platform/internal/database"
@@ -240,11 +239,8 @@ func GetDatasetFields(c *gin.Context) {
 		if err == nil {
 			defer db.Close()
 
-			sql := dataset.SQL
-			if !strings.Contains(strings.ToUpper(sql), "LIMIT") {
-				sql += " LIMIT 1"
-			}
-			rows, err := db.Query(sql)
+			schemaSQL := fmt.Sprintf("SELECT * FROM (%s) AS _schema LIMIT 1", dataset.SQL)
+			rows, err := db.Query(schemaSQL)
 			if err == nil {
 				defer rows.Close()
 
@@ -333,7 +329,7 @@ func GetDatasetFieldValues(c *gin.Context) {
 	}
 	defer db.Close()
 
-	query := fmt.Sprintf("SELECT %s FROM (%s) AS dataset WHERE 1=1 GROUP BY %s ORDER BY %s",
+	query := fmt.Sprintf("SELECT %s FROM (%s) AS dataset WHERE 1=1 GROUP BY %s ORDER BY %s LIMIT 1000",
 		fieldName, dataset.SQL, fieldName, fieldName)
 
 	rows, err := db.Query(query)

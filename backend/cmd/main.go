@@ -41,7 +41,7 @@ func main() {
 	r := gin.Default()
 
 	// CORS中间件 — 限制允许的来源
-	r.Use(corsMiddleware())
+	r.Use(corsMiddleware(cfg.Server.AllowedOrigins))
 
 	// 数据库可用性中间件
 	r.Use(dbCheckMiddleware())
@@ -89,23 +89,15 @@ func migrateOrphanedData() {
 	log.Println("Orphaned data migration completed")
 }
 
-// corsMiddleware 设置CORS，生产环境应配置具体域名
-func corsMiddleware() gin.HandlerFunc {
+// corsMiddleware 设置CORS，允许来源列表从配置加载（支持环境变量 ALLOWED_ORIGINS）
+func corsMiddleware(allowedOrigins []string) gin.HandlerFunc {
+	originSet := make(map[string]struct{}, len(allowedOrigins))
+	for _, o := range allowedOrigins {
+		originSet[o] = struct{}{}
+	}
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		// 允许的来源列表，生产环境应从配置读取
-		allowedOrigins := []string{
-			"http://localhost:3000",
-			"http://127.0.0.1:3000",
-		}
-
-		allowed := false
-		for _, o := range allowedOrigins {
-			if origin == o {
-				allowed = true
-				break
-			}
-		}
+		_, allowed := originSet[origin]
 
 		if allowed {
 			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)

@@ -91,10 +91,6 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
     // 根据图表类型渲染不同的图表
     try {
-      console.log('当前图表类型:', chartType);
-      console.log('当前Y轴字段:', yAxisFields);
-      console.log('当前指标字段:', indicatorFields);
-      
       // 清理之前的内容
       chartRef.current.innerHTML = '';
       
@@ -182,7 +178,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       },
       seriesNumber: { enable: false },
       pagination: {
-        enabled: true,
+        current: 1,
         pageSize: 10,
       },
     };

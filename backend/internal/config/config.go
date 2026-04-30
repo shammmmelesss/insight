@@ -2,13 +2,15 @@ package config
 
 import (
 	"os"
+	"strings"
 
 	"github.com/jinzhu/configor"
 )
 
 type Config struct {
 	Server struct {
-		Port string `default:"8080"`
+		Port           string   `default:"8080"`
+		AllowedOrigins []string `default:"[\"http://localhost:3000\",\"http://127.0.0.1:3000\"]"`
 	}
 	Database struct {
 		Host     string `default:"localhost"`
@@ -24,8 +26,8 @@ func LoadConfig() (*Config, error) {
 	var cfg Config
 	err := configor.Load(&cfg, "config.yml")
 	if err != nil {
-		// 配置文件加载失败，使用默认值
 		cfg.Server.Port = "8080"
+		cfg.Server.AllowedOrigins = []string{"http://localhost:3000", "http://127.0.0.1:3000"}
 		cfg.Database.Host = "localhost"
 		cfg.Database.Port = "5432"
 		cfg.Database.User = "postgres"
@@ -55,6 +57,14 @@ func LoadConfig() (*Config, error) {
 	}
 	if v := os.Getenv("SERVER_PORT"); v != "" {
 		cfg.Server.Port = v
+	}
+	// ALLOWED_ORIGINS 逗号分隔，如: http://app.example.com,https://app.example.com
+	if v := os.Getenv("ALLOWED_ORIGINS"); v != "" {
+		cfg.Server.AllowedOrigins = strings.Split(v, ",")
+	}
+
+	if len(cfg.Server.AllowedOrigins) == 0 {
+		cfg.Server.AllowedOrigins = []string{"http://localhost:3000", "http://127.0.0.1:3000"}
 	}
 
 	return &cfg, nil

@@ -267,7 +267,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .encode('x', actualXField)
           .encode('y', actualYField)
           .style({ fillOpacity: 1, lineWidth: 0 })
-          .interaction('elementHighlight', { background: true })
+          .interaction('elementHighlight')
           .tooltip({
             title: (d: any) => String(d[actualXField] ?? ''),
             items: [
@@ -327,7 +327,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .encode('y', '_value')
           .encode('color', '_metric')
           .style({ fillOpacity: 1, lineWidth: 0 })
-          .interaction('elementHighlight', { background: true })
+          .interaction('elementHighlight')
           .tooltip({
             title: (d: any) => String(d[actualXField] ?? ''),
             items: [
@@ -424,7 +424,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .encode('y', actualYField)
           .encode('shape', 'smooth')
           .style({ lineWidth: 2 })
-          .interaction('elementHighlight', { background: true })
+          .interaction('elementHighlight')
           .tooltip({
             title: (d: any) => String(d[actualXField] ?? ''),
             items: [
@@ -485,7 +485,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .encode('color', '_metric')
           .encode('shape', 'smooth')
           .style({ lineWidth: 2 })
-          .interaction('elementHighlight', { background: true })
+          .interaction('elementHighlight')
           .tooltip({
             title: (d: any) => String(d[actualXField] ?? ''),
             items: [

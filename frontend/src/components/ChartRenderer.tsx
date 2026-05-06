@@ -55,10 +55,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   const createAndRenderG2Chart = (chartConfig: (chart: Chart) => void) => {
     if (!chartRef.current) return;
 
-    let defaultHeight = 260;
-    if (chartType === 'pie') {
-      defaultHeight = 240;
-    } else if (chartType === 'indicator') {
+    let defaultHeight = 300;
+    if (chartType === 'indicator') {
       defaultHeight = 120;
     }
 

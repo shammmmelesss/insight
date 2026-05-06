@@ -43,7 +43,7 @@ const DashboardsPage: React.FC = () => {
   const [parsedLayout, setParsedLayout] = useState<DashboardLayoutItem[]>([]);
   const [chartSQLs, setChartSQLs] = useState<Record<string, string>>({});
   const [sqlModalVisible, setSqlModalVisible] = useState(false);
-  const [currentSQL, setCurrentSQL] = useState('');
+  const [currentSQLChartId, setCurrentSQLChartId] = useState('');
 
   const fetchDashboards = async () => {
     setLoading(true);
@@ -138,11 +138,15 @@ const DashboardsPage: React.FC = () => {
     }
   };
 
-  const buildFilterParamsForChart = (chartId: string): FilterParam[] => {
+  const buildFilterParamsForChart = (
+    chartId: string,
+    activeFilters: FilterField[] = filters,
+    activeValues: Record<string, unknown> = filterValues,
+  ): FilterParam[] => {
     const params: FilterParam[] = [];
-    filters.forEach(f => {
+    activeFilters.forEach(f => {
       if (!f.charts.includes(chartId)) return;
-      const val = filterValues[f.id];
+      const val = activeValues[f.id];
       if (val === undefined || val === null) return;
       const dataType = datasetFieldTypes[`${f.dataset}:${f.field}`] || 'text';
       if (f.type === 'dateRange') {
@@ -192,7 +196,10 @@ const DashboardsPage: React.FC = () => {
       }
     });
 
-    Promise.all(layout.map(item => fetchChartData(item.chartId))).finally(() => {
+    Promise.all(layout.map(item => {
+      const fp = buildFilterParamsForChart(item.chartId, savedFilters, initialValues);
+      return fetchChartData(item.chartId, fp.length > 0 ? fp : undefined);
+    })).finally(() => {
       setChartLoading(false);
     });
   }, [selectedDashboard]);
@@ -318,7 +325,7 @@ const DashboardsPage: React.FC = () => {
               const isLarge = item.width >= 8;
               const chartMenuItems = [
                 { key: 'refresh', label: '刷新数据', onClick: () => refetchSingleChart(item.chartId) },
-                { key: 'sql', label: '查看SQL', icon: <CodeOutlined />, onClick: () => { setCurrentSQL(chartSQLs[item.chartId] || '暂无SQL'); setSqlModalVisible(true); } },
+                { key: 'sql', label: '查看SQL', icon: <CodeOutlined />, onClick: () => { setCurrentSQLChartId(item.chartId); setSqlModalVisible(true); } },
                 { key: 'edit', label: '编辑图表', onClick: () => navigate(`/chart-config?chartId=${item.chartId}`) },
               ];
               const cardTitle = (
@@ -383,7 +390,7 @@ const DashboardsPage: React.FC = () => {
         width={700}
       >
         <pre style={{ background: '#f5f5f5', padding: 16, borderRadius: 4, overflow: 'auto', maxHeight: 400, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 13 }}>
-          {currentSQL}
+          {chartSQLs[currentSQLChartId] || '暂无SQL'}
         </pre>
       </Modal>
     </Layout>

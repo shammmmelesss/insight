@@ -386,15 +386,9 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 		return datasetSQL, nil
 	}
 
-	// 合并图表自身保存的筛选条件（外部传入的 dashboard 筛选优先）
-	externalFields := make(map[string]bool, len(filters))
-	for _, f := range filters {
-		externalFields[f.Field] = true
-	}
+	// 从图表配置中提取图表级筛选条件
+	var chartFilters []FilterCondition
 	for _, ff := range config.FilterFields {
-		if externalFields[ff.OriginalName] {
-			continue // dashboard 筛选覆盖图表级筛选
-		}
 		if !isValidIdentifier(ff.OriginalName) {
 			continue
 		}
@@ -427,13 +421,17 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 		if len(values) == 0 {
 			continue
 		}
-		filters = append(filters, FilterCondition{
+		chartFilters = append(chartFilters, FilterCondition{
 			Field:    ff.OriginalName,
 			Type:     filterType,
 			DataType: "text",
 			Values:   values,
 		})
 	}
+
+	// 构建内层 SQL：数据集 + 图表级筛选
+	// 结构：SELECT * FROM (<datasetSQL>) AS _inner WHERE <图表筛选>
+	innerSQL := buildFilteredSQL(fmt.Sprintf("SELECT * FROM (%s) AS _inner", datasetSQL), chartFilters)
 
 	var selectFields []string
 	var groupByFields []string
@@ -513,18 +511,28 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 	}
 
 	if len(selectFields) == 0 {
-		return datasetSQL, nil
+		return innerSQL, nil
 	}
 
-	sql := fmt.Sprintf("SELECT %s FROM (%s) AS dataset WHERE 1=1", strings.Join(selectFields, ", "), datasetSQL)
+	// 构建外层 SQL：图表聚合字段 + 看板级筛选
+	// 结构：SELECT <fields> FROM (<innerSQL>) AS dataset WHERE <看板筛选> GROUP BY ...
+	sql := buildFilteredSQL(fmt.Sprintf("SELECT %s FROM (%s) AS dataset", strings.Join(selectFields, ", "), innerSQL), filters)
 
-	// 注入筛选条件 — 校验字段名防止SQL注入
+	if len(groupByFields) > 0 {
+		sql += fmt.Sprintf(" GROUP BY %s", strings.Join(groupByFields, ", "))
+	}
+	return sql, nil
+}
+
+// buildFilteredSQL 在 base SQL 后追加 WHERE 筛选条件，校验字段名防止 SQL 注入
+func buildFilteredSQL(base string, filters []FilterCondition) string {
+	sql := base + " WHERE 1=1"
 	for _, f := range filters {
 		if len(f.Values) == 0 {
 			continue
 		}
 		if !isValidIdentifier(f.Field) {
-			return "", fmt.Errorf("非法筛选字段名: %s", f.Field)
+			continue
 		}
 		switch f.Type {
 		case "dateRange":
@@ -554,11 +562,7 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 			}
 		}
 	}
-
-	if len(groupByFields) > 0 {
-		sql += fmt.Sprintf(" GROUP BY %s", strings.Join(groupByFields, ", "))
-	}
-	return sql, nil
+	return sql
 }
 
 // sanitizeSQLString 转义SQL字符串中的单引号，防止注入

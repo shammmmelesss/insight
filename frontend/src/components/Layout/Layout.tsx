@@ -97,18 +97,27 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
   };
 
-  const handleDelete = async (ws: Workspace) => {
+  const handleDelete = (ws: Workspace) => {
     if (workspaces.length <= 1) {
       message.warning('至少保留一个项目空间');
       return;
     }
-    try {
-      await axios.delete(`/api/workspaces/${ws.id}`);
-      message.success('项目空间删除成功');
-      await refreshWorkspaces();
-    } catch (error) {
-      message.error('删除失败');
-    }
+    Modal.confirm({
+      title: '确认删除',
+      content: `确定要删除项目空间「${ws.name}」吗？此操作不可恢复。`,
+      okText: '确认删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await axios.delete(`/api/workspaces/${ws.id}`);
+          message.success('项目空间删除成功');
+          await refreshWorkspaces();
+        } catch (error) {
+          message.error('删除失败');
+        }
+      },
+    });
   };
 
   const manageMenuItems = [

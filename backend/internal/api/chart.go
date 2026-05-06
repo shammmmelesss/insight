@@ -23,6 +23,32 @@ func RegisterChartRoutes(rg *gin.RouterGroup) {
 		chart.DELETE("/:id", DeleteChart)
 		chart.GET("/select-list", GetChartSelectList)
 		chart.GET("/:id/data", GetChartData)
+		chart.GET("/:id/dashboards", GetChartDashboards)
+	}
+}
+
+// chartDashboardCount 统计引用该图表的看板数量
+func chartDashboardCount(chartID string) int64 {
+	var count int64
+	database.DB.Raw(
+		`SELECT COUNT(*) FROM dashboards WHERE layout @> CAST(? AS jsonb)`,
+		fmt.Sprintf(`[{"chartId":"%s"}]`, chartID),
+	).Scan(&count)
+	return count
+}
+
+// chartResponse 构建图表响应（含看板数量）
+func chartResponse(chart models.Chart) map[string]interface{} {
+	return map[string]interface{}{
+		"id":             chart.ID,
+		"name":           chart.Name,
+		"datasetId":      chart.DatasetID,
+		"type":           chart.Type,
+		"config":         chart.Config,
+		"workspaceId":    chart.WorkspaceID,
+		"createdAt":      chart.CreatedAt,
+		"updatedAt":      chart.UpdatedAt,
+		"dashboardCount": chartDashboardCount(chart.ID.String()),
 	}
 }
 
@@ -40,12 +66,32 @@ func ListCharts(c *gin.Context) {
 		return
 	}
 
+	items := make([]map[string]interface{}, 0, len(charts))
+	for _, chart := range charts {
+		items = append(items, chartResponse(chart))
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"items":    charts,
-		"total":    len(charts),
+		"items":    items,
+		"total":    len(items),
 		"page":     1,
-		"pageSize": len(charts),
+		"pageSize": len(items),
 	})
+}
+
+// GetChartDashboards 获取引用该图表的看板列表
+func GetChartDashboards(c *gin.Context) {
+	id := c.Param("id")
+	var dashboards []models.Dashboard
+	result := database.DB.Raw(
+		`SELECT * FROM dashboards WHERE layout @> CAST(? AS jsonb)`,
+		fmt.Sprintf(`[{"chartId":"%s"}]`, id),
+	).Scan(&dashboards)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": dashboards, "total": len(dashboards)})
 }
 
 // CreateChart 创建图表

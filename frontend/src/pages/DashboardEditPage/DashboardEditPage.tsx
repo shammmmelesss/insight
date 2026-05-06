@@ -440,7 +440,7 @@ const DashboardEditPage: React.FC = () => {
                     <Card
                       title={chart?.name || `图表${index + 1}`}
                       style={{ boxShadow: 'none' }}
-                      styles={{ header: { height: '40px', padding: '0 24px', display: 'flex', alignItems: 'center' }, body: { padding: '10px', overflow: 'hidden' } }}
+                      styles={{ header: { height: '40px', padding: '0 24px', display: 'flex', alignItems: 'center', borderBottom: 'none' }, body: { padding: '10px', overflow: 'hidden' } }}
                       extra={
                         <Dropdown menu={{ items: sizeMenuItems }} trigger={['hover']}>
                           <Tooltip title="更多">

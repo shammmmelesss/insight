@@ -284,21 +284,24 @@ const DatasetsPage: React.FC = () => {
   };
 
   // 删除数据集
-  const handleDelete = async (id: string) => {
-    try {
-      const dataset = datasets.find(d => d.id === id);
-      if (dataset && dataset.chartCount > 0) {
-        message.error('该数据集下有关联图表，不可删除');
-        return;
-      }
-      
-      await axios.delete(`/api/datasets/${id}`);
-      message.success('数据集删除成功');
-      fetchDatasets();
-    } catch (error) {
-      message.error('数据集删除失败');
-      console.error('数据集删除失败:', error);
-    }
+  const handleDelete = (id: string) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: '删除后不可恢复，确认删除该数据集吗？',
+      okText: '确认删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await axios.delete(`/api/datasets/${id}`);
+          message.success('数据集删除成功');
+          fetchDatasets();
+        } catch (error) {
+          message.error('数据集删除失败');
+          console.error('数据集删除失败:', error);
+        }
+      },
+    });
   };
   
   // 获取使用特定数据集的图表列表
@@ -368,7 +371,7 @@ const DatasetsPage: React.FC = () => {
         <div className="action-buttons">
           <Button
             size="small"
-            onClick={() => window.open(`/charts/create?datasetId=${record.id}`, '_blank')}
+            onClick={() => window.open(`/chart-config?datasetId=${record.id}`, '_blank')}
             style={{ marginRight: 8, color: '#1890ff' }}
           >
             可视化
@@ -385,6 +388,8 @@ const DatasetsPage: React.FC = () => {
             icon={<DeleteOutlined />}
             size="small"
             danger
+            disabled={record.chartCount > 0}
+            title={record.chartCount > 0 ? '该数据集有关联图表，不可删除' : undefined}
             onClick={() => handleDelete(record.id)}
           >
             删除

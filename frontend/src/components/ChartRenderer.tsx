@@ -249,6 +249,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       }
 
       createAndRenderG2Chart((chart) => {
+        chart.axis('x', { title: false });
         chart.axis(actualXField, {
           label: {
             style: { textWrap: { width: 80, method: 'wrap' } },
@@ -315,6 +316,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       });
 
       createAndRenderG2Chart((chart) => {
+        chart.axis('x', { title: false });
         chart.axis(actualXField, {
           label: {
             style: { textWrap: { width: 80, method: 'wrap' } },
@@ -401,6 +403,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       }
 
       createAndRenderG2Chart((chart) => {
+        chart.axis('x', { title: false });
         chart.axis(actualXField, {
           label: {
             style: { textWrap: { width: 80, method: 'wrap' } },
@@ -474,6 +477,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       }
 
       createAndRenderG2Chart((chart) => {
+        chart.axis('x', { title: false });
         chart.axis(actualXField, {
           label: {
             style: { textWrap: { width: 80, method: 'wrap' } },

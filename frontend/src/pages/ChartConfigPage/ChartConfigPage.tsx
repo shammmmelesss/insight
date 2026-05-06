@@ -180,10 +180,10 @@ const DropZone: React.FC<DropZoneProps> = ({
 // --- 主组件 ---
 const ChartConfigPage: React.FC = () => {
   const [chartName, setChartName] = useState('');
-  const [selectedDataset, setSelectedDataset] = useState('');
-  const [chartType, setChartType] = useState<ChartType>('crossTable');
   const [searchParams] = useSearchParams();
   const chartId = searchParams.get('chartId');
+  const [selectedDataset, setSelectedDataset] = useState(searchParams.get('datasetId') || '');
+  const [chartType, setChartType] = useState<ChartType>('crossTable');
   const [datasets, setDatasets] = useState<{ id: string; name: string }[]>([]);
   const [datasetFields, setDatasetFields] = useState<FieldConfig[]>([]);
   const [fieldSearch, setFieldSearch] = useState('');

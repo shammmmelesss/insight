@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Table, Space, message } from 'antd';
+import { Button, Card, Table, Space, message, Modal } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -8,6 +8,9 @@ import { Chart } from '@shared/api.interface';
 const ChartsPage: React.FC = () => {
   const [charts, setCharts] = useState<Chart[]>([]);
   const [loading, setLoading] = useState(false);
+  const [dashboardModalVisible, setDashboardModalVisible] = useState(false);
+  const [chartDashboards, setChartDashboards] = useState<any[]>([]);
+  const [loadingDashboards, setLoadingDashboards] = useState(false);
   const navigate = useNavigate();
 
   // 获取图表列表
@@ -39,16 +42,39 @@ const ChartsPage: React.FC = () => {
     }
   };
 
-  // 删除图表
-  const handleDelete = async (id: string) => {
+  // 获取引用该图表的看板列表
+  const showDashboardModal = async (chartId: string) => {
+    setLoadingDashboards(true);
+    setDashboardModalVisible(true);
     try {
-      await axios.delete(`/api/charts/${id}`);
-      message.success('图表删除成功');
-      fetchCharts();
+      const response = await axios.get(`/api/charts/${chartId}/dashboards`);
+      setChartDashboards(response.data.items || []);
     } catch (error) {
-      message.error('图表删除失败');
-      console.error('图表删除失败:', error);
+      message.error('获取看板列表失败');
+    } finally {
+      setLoadingDashboards(false);
     }
+  };
+
+  // 删除图表
+  const handleDelete = (id: string) => {
+    Modal.confirm({
+      title: '确认删除',
+      content: '删除后不可恢复，确认删除该图表吗？',
+      okText: '确认删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await axios.delete(`/api/charts/${id}`);
+          message.success('图表删除成功');
+          fetchCharts();
+        } catch (error) {
+          message.error('图表删除失败');
+          console.error('图表删除失败:', error);
+        }
+      },
+    });
   };
 
   // 表格列配置
@@ -85,7 +111,14 @@ const ChartsPage: React.FC = () => {
       title: '看板',
       dataIndex: 'dashboardCount',
       key: 'dashboardCount',
-      render: (count: number) => count,
+      render: (count: number, record: Chart) => (
+        <span
+          style={{ color: '#1890ff', cursor: 'pointer' }}
+          onClick={() => showDashboardModal(record.id)}
+        >
+          {count}个
+        </span>
+      ),
     },
     {
       title: '操作',
@@ -136,6 +169,24 @@ const ChartsPage: React.FC = () => {
           pagination={false}
         />
       </Card>
+      <Modal
+        title="引用该图表的看板"
+        open={dashboardModalVisible}
+        onCancel={() => setDashboardModalVisible(false)}
+        footer={null}
+        width={600}
+      >
+        <Table
+          columns={[
+            { title: '看板名称', dataIndex: 'name', key: 'name' },
+            { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt' },
+          ]}
+          dataSource={chartDashboards}
+          rowKey="id"
+          loading={loadingDashboards}
+          pagination={{ pageSize: 10 }}
+        />
+      </Modal>
     </div>
   );
 };

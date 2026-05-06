@@ -244,6 +244,9 @@ const ChartConfigPage: React.FC = () => {
     if (field.isCalculated && field.expression) {
       return `${field.expression} AS ${field.originalName}_${aggregation}`;
     }
+    if (aggregation === '去重计数') {
+      return `COUNT(DISTINCT ${field.originalName}) AS ${field.originalName}_${aggregation}`;
+    }
     const fn = mapAggregationToSQL(aggregation);
     return `${fn}(${field.originalName}) AS ${field.originalName}_${aggregation}`;
   };

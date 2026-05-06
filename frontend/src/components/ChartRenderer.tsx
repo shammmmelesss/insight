@@ -594,67 +594,41 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
   // 渲染指标卡
   const renderIndicatorCard = () => {
-    if (chartData.length === 0) {
-      if (chartRef.current) {
-        chartRef.current.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">暂无数据</div>';
-      }
+    if (!chartRef.current) return;
+
+    if (chartData.length === 0 || indicatorFields.length === 0) {
+      chartRef.current.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">暂无数据</div>';
       return;
     }
 
-    // 获取数据中的实际字段名
     const dataFields = Object.keys(chartData[0]);
-    
-    // 处理指标字段 - 安全检查
-    let actualIndicatorField = '';
-    if (Array.isArray(indicatorFields) && indicatorFields.length > 0 && indicatorFields[0]) {
-      actualIndicatorField = getActualField(indicatorFields[0], dataFields);
-    }
-    
-    // 校验核心字段是否存在
-    if (!actualIndicatorField) {
-      if (chartRef.current) {
-        chartRef.current.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">请配置有效的指标字段</div>';
-      }
-      return;
-    }
-    
-    // 数据清洗函数，确保指标值为数值类型
-    const cleanIndicatorData = (data: any[], indicatorField: string) => {
-      return data.map(item => ({
-        ...item,
-        [indicatorField]: Number(item[indicatorField]) || 0, // 非数值转0，避免渲染异常
-      })).filter(item => !isNaN(item[indicatorField])); // 过滤NaN数据
-    };
-    
-    const cleanedData = cleanIndicatorData(chartData, actualIndicatorField);
-    
-    if (cleanedData.length === 0) {
-      if (chartRef.current) {
-        chartRef.current.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">指标字段无有效数值</div>';
-      }
+    const row = chartData[0];
+
+    const cards = indicatorFields
+      .map(field => ({ label: field, actualField: getActualField(field, dataFields) }))
+      .filter(({ actualField }) => actualField && actualField in row);
+
+    if (cards.length === 0) {
+      chartRef.current.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">请配置有效的指标字段</div>';
       return;
     }
 
-    createAndRenderG2Chart((chart) => {
-      // 使用文本标签实现指标卡效果
-      chart
-        .text()
-        .data(cleanedData)
-        .encode('text', (d: any) => {
-          const value = d[actualIndicatorField] || 0;
-          return `${d.name || '指标'}: ${value}`;
-        })
-        .style('fontSize', 24)
-        .style('textAlign', 'center')
-        .style('fill', '#165DFF')
-        // 新增：Tooltip 配置
-        .tooltip((d: any) => {
-          return {
-            名称: d.name || '指标',
-            值: d[actualIndicatorField],
-          };
-        });
-    });
+    const cardHTML = cards.map(({ label, actualField }) => {
+      const value = row[actualField];
+      const display = value === null || value === undefined ? '-' : Number(value).toLocaleString();
+      return `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+          min-width:120px;padding:16px 24px;background:#f0f5ff;border-radius:8px;">
+          <div style="font-size:13px;color:#8c8c8c;margin-bottom:8px;text-align:center;">${label}</div>
+          <div style="font-size:32px;font-weight:700;color:#165DFF;line-height:1.2;">${display}</div>
+        </div>`;
+    }).join('');
+
+    chartRef.current.innerHTML = `
+      <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;
+        justify-content:center;width:100%;height:100%;padding:16px;box-sizing:border-box;">
+        ${cardHTML}
+      </div>`;
   };
 
   // 渲染默认内容

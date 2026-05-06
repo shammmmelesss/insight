@@ -254,7 +254,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
             style: { textWrap: { width: 80, method: 'wrap' } },
             align: 'center',
           },
-          title: { text: actualXField, style: { fontSize: 12 } },
+          title: false,
         });
         chart.axis(actualYField, {
           title: { text: actualYField, style: { fontSize: 12 } },
@@ -306,13 +306,21 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         return;
       }
 
+      // 构建 X 值 → 各指标值的查找表，用于 tooltip 展示全部指标
+      const xMetricsMap: Record<string, Record<string, number>> = {};
+      longData.forEach(item => {
+        const xKey = String(item[actualXField] ?? '');
+        if (!xMetricsMap[xKey]) xMetricsMap[xKey] = {};
+        xMetricsMap[xKey][item._metric] = item._value;
+      });
+
       createAndRenderG2Chart((chart) => {
         chart.axis(actualXField, {
           label: {
             style: { textWrap: { width: 80, method: 'wrap' } },
             align: 'center',
           },
-          title: { text: actualXField, style: { fontSize: 12 } },
+          title: false,
         });
         chart.axis('_value', {
           title: { text: '值', style: { fontSize: 12 } },
@@ -330,9 +338,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .interaction('elementHighlight')
           .tooltip({
             title: (d: any) => String(d[actualXField] ?? ''),
-            items: [
-              (d: any) => ({ name: String(d._metric ?? ''), value: d._value ?? 0 }),
-            ],
+            items: actualYFields.map(yField => (d: any) => ({
+              name: yField,
+              value: xMetricsMap[String(d[actualXField] ?? '')]?.[yField] ?? 0,
+            })),
           });
 
         chart.legend('color', { position: 'bottom', layout: { justifyContent: 'center' } });
@@ -397,7 +406,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
             style: { textWrap: { width: 80, method: 'wrap' } },
             align: 'center',
           },
-          title: { text: actualXField, style: { fontSize: 12 } },
+          title: false,
         });
         chart.axis(actualYField, {
           title: { text: actualYField, style: { fontSize: 12 } },
@@ -470,7 +479,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
             style: { textWrap: { width: 80, method: 'wrap' } },
             align: 'center',
           },
-          title: { text: actualXField, style: { fontSize: 12 } },
+          title: false,
         });
         chart.axis('_value', {
           title: { text: '值', style: { fontSize: 12 } },

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Button, Input, Select, message, Modal, Tag, Tooltip, Space } from 'antd';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Button, Input, Select, message, Modal, Tag, Tooltip, Space, Radio, DatePicker } from 'antd';
 import {
   ArrowLeftOutlined,
   SettingOutlined,
@@ -32,6 +32,8 @@ interface FieldConfig {
     aggregation?: string;
     dataFormat?: string;
     sort?: string;
+    filterType?: 'multiple' | 'single' | 'dateRange';
+    filterDefault?: any;
   };
 }
 
@@ -200,6 +202,8 @@ const ChartConfigPage: React.FC = () => {
     aggregation?: string;
     dataFormat?: string;
     sort?: string;
+    filterType?: 'multiple' | 'single' | 'dateRange';
+    filterDefault?: any;
   }>({ aggregation: '计数', dataFormat: '原始值', sort: '升序' });
 
   const [isSQLModalVisible, setIsSQLModalVisible] = useState(false);
@@ -213,6 +217,10 @@ const ChartConfigPage: React.FC = () => {
   const [groupFields, setGroupFields] = useState<FieldConfig[]>([]);
   const [indicatorFields, setIndicatorFields] = useState<FieldConfig[]>([]);
   const [filterFields, setFilterFields] = useState<FieldConfig[]>([]);
+  const [filterValues, setFilterValues] = useState<Record<string, any>>({});
+  const [filterFieldOptions, setFilterFieldOptions] = useState<Record<string, string[]>>({});
+  const loadedFilterKeys = useRef<Set<string>>(new Set());
+  const pendingFilterValues = useRef<Record<string, any> | null>(null);
 
   const navigate = useNavigate();
 
@@ -254,10 +262,32 @@ const ChartConfigPage: React.FC = () => {
   const generateSQL = useCallback(() => {
     if (!datasetSQL) return `SELECT * FROM ${selectedDataset || 'your_table'}`;
 
+    const filterClauses = filterFields
+      .map(f => {
+        const filterType = f.config?.filterType || 'multiple';
+        const vals = filterValues[f.originalName];
+        if (!vals) return null;
+        if (filterType === 'dateRange') {
+          if (Array.isArray(vals) && vals.length === 2 && vals[0] && vals[1]) {
+            return `${f.originalName} BETWEEN '${vals[0]}' AND '${vals[1]}'`;
+          }
+          return null;
+        }
+        const arr: string[] = Array.isArray(vals) ? vals : (vals !== '' ? [String(vals)] : []);
+        if (arr.length === 0) return null;
+        const quoted = arr.map((v: string) => `'${v.replace(/'/g, "''")}'`).join(', ');
+        return `${f.originalName} IN (${quoted})`;
+      })
+      .filter((c): c is string => c !== null);
+
+    const innerSQL = filterClauses.length > 0
+      ? `SELECT * FROM (${datasetSQL}) AS _inner WHERE ${filterClauses.join(' AND ')}`
+      : datasetSQL;
+
     const wrap = (fields: string[], aggFields: string[], groupBy: string[], orderBy: string[]) => {
       const all = [...fields, ...aggFields];
-      if (all.length === 0) return datasetSQL;
-      let sql = `SELECT ${all.join(', ')} FROM (${datasetSQL}) AS dataset WHERE 1=1`;
+      if (all.length === 0) return innerSQL;
+      let sql = `SELECT ${all.join(', ')} FROM (${innerSQL}) AS dataset WHERE 1=1`;
       if (groupBy.length > 0) sql += ` GROUP BY ${groupBy.join(', ')}`;
       if (orderBy.length > 0) sql += ` ORDER BY ${orderBy.join(', ')}`;
       return sql;
@@ -284,11 +314,11 @@ const ChartConfigPage: React.FC = () => {
     }
     if (chartType === 'indicator') {
       const agg = indicatorFields.map(buildAggField);
-      if (agg.length === 0) return datasetSQL;
-      return `SELECT ${agg.join(', ')} FROM (${datasetSQL}) AS dataset WHERE 1=1`;
+      if (agg.length === 0) return innerSQL;
+      return `SELECT ${agg.join(', ')} FROM (${innerSQL}) AS dataset WHERE 1=1`;
     }
-    return datasetSQL;
-  }, [datasetSQL, selectedDataset, chartType, rowFields, colFields, measureFields, xAxisFields, yAxisFields, groupFields, indicatorFields]);
+    return innerSQL;
+  }, [datasetSQL, selectedDataset, chartType, rowFields, colFields, measureFields, xAxisFields, yAxisFields, groupFields, indicatorFields, filterFields, filterValues]);
 
   useEffect(() => {
     if (!chartId) return;
@@ -306,6 +336,7 @@ const ChartConfigPage: React.FC = () => {
       setGroupFields(config.groupFields || []);
       setIndicatorFields(config.indicatorFields || []);
       setFilterFields(config.filterFields || []);
+      if (config.filterValues) pendingFilterValues.current = config.filterValues;
       message.success('图表信息加载成功');
     }).catch(() => message.error('获取图表详情失败'));
   }, [chartId]);
@@ -313,7 +344,7 @@ const ChartConfigPage: React.FC = () => {
   const handleSaveChart = async () => {
     if (!chartName) { message.error('请输入图表名称'); return; }
     if (!selectedDataset) { message.error('请选择数据集'); return; }
-    const config = JSON.stringify({ rowFields, colFields, measureFields, xAxisFields, yAxisFields, groupFields, indicatorFields, filterFields });
+    const config = JSON.stringify({ rowFields, colFields, measureFields, xAxisFields, yAxisFields, groupFields, indicatorFields, filterFields, filterValues });
     try {
       if (chartId) {
         await axios.put(`/api/charts/${chartId}`, { name: chartName, datasetId: selectedDataset, type: chartType, config });
@@ -339,15 +370,47 @@ const ChartConfigPage: React.FC = () => {
       setDatasetFields([]); setDatasetSQL(''); setDataSourceId('');
       return;
     }
+    loadedFilterKeys.current.clear();
+    setFilterFieldOptions({});
+    setFilterValues({});
     axios.get(`/api/datasets/${selectedDataset}`).then(res => {
       setDatasetFields(res.data.fieldsConfig || []);
       setDatasetSQL(res.data.sql || '');
       setDataSourceId(res.data.dataSourceId || '');
+      if (pendingFilterValues.current) {
+        setFilterValues(pendingFilterValues.current);
+        pendingFilterValues.current = null;
+      }
     }).catch(() => {
       message.error('获取数据集字段失败');
       setDatasetFields([]); setDatasetSQL(''); setDataSourceId('');
     });
   }, [selectedDataset]);
+
+  const fetchFilterFieldOptions = useCallback(async (fieldName: string) => {
+    if (!selectedDataset) return;
+    const cacheKey = `${selectedDataset}:${fieldName}`;
+    if (loadedFilterKeys.current.has(cacheKey)) return;
+    loadedFilterKeys.current.add(cacheKey);
+    try {
+      const res = await axios.get(`/api/datasets/${selectedDataset}/field-values`, {
+        params: { field: fieldName },
+      });
+      setFilterFieldOptions(prev => ({ ...prev, [cacheKey]: res.data.values || [] }));
+    } catch {
+      loadedFilterKeys.current.delete(cacheKey);
+    }
+  }, [selectedDataset]);
+
+  useEffect(() => {
+    filterFields.forEach(f => fetchFilterFieldOptions(f.originalName));
+    // clean up values for removed fields
+    setFilterValues(prev => {
+      const names = new Set(filterFields.map(f => f.originalName));
+      const next = Object.fromEntries(Object.entries(prev).filter(([k]) => names.has(k)));
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
+  }, [filterFields, fetchFilterFieldOptions]);
 
   useEffect(() => {
     if (!selectedDataset || !datasetSQL || !dataSourceId) { setChartData([]); return; }
@@ -373,7 +436,9 @@ const ChartConfigPage: React.FC = () => {
     if (!draggedField) return;
     const fieldConfig: FieldConfig = {
       ...draggedField,
-      config: { aggregation: '计数', dataFormat: '原始值', sort: '升序' },
+      config: area === 'filter'
+        ? { filterType: 'multiple', filterDefault: [] }
+        : { aggregation: '计数', dataFormat: '原始值', sort: '升序' },
     };
     fieldSetters[area]?.(prev => [...prev, fieldConfig]);
   };
@@ -383,9 +448,11 @@ const ChartConfigPage: React.FC = () => {
   };
 
   const openFieldSettingsModal = (field: FieldConfig, area?: string) => {
-    const config = field.config || { aggregation: '计数', dataFormat: '原始值', sort: '升序' };
+    const defaultConfig = area === 'filter'
+      ? { filterType: 'multiple' as const, filterDefault: [] }
+      : { aggregation: '计数', dataFormat: '原始值', sort: '升序' };
     setCurrentField({ ...field, area });
-    setTempFieldConfig(config);
+    setTempFieldConfig(field.config || defaultConfig);
     setIsFieldSettingsModalVisible(true);
   };
 
@@ -691,6 +758,57 @@ const ChartConfigPage: React.FC = () => {
           >
             <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>报表预览</span>
           </div>
+
+          {/* 筛选条件 */}
+          {filterFields.length > 0 && (
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 12,
+                padding: '10px 16px',
+                borderBottom: '1px solid #f0f0f0',
+                backgroundColor: '#fafafa',
+                flexShrink: 0,
+              }}
+            >
+              {filterFields.map(f => {
+                const filterType = f.config?.filterType || 'multiple';
+                const options = filterFieldOptions[`${selectedDataset}:${f.originalName}`] || [];
+                const value = filterValues[f.originalName] ?? f.config?.filterDefault;
+                return (
+                  <div key={f.originalName} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 160, maxWidth: 240 }}>
+                    <span style={{ fontSize: 12, color: '#595959' }}>{f.displayName}</span>
+                    {filterType === 'dateRange' ? (
+                      <DatePicker.RangePicker
+                        size="small"
+                        style={{ width: '100%' }}
+                        onChange={(_dates, dateStrings) =>
+                          setFilterValues(prev => ({ ...prev, [f.originalName]: dateStrings }))
+                        }
+                      />
+                    ) : (
+                      <Select
+                        size="small"
+                        mode={filterType === 'single' ? undefined : 'multiple'}
+                        maxTagCount="responsive"
+                        style={{ width: '100%' }}
+                        value={value ?? (filterType === 'single' ? undefined : [])}
+                        onChange={(vals) => setFilterValues(prev => ({ ...prev, [f.originalName]: vals }))}
+                        allowClear
+                        placeholder="请选择"
+                      >
+                        {options.map((val: string) => (
+                          <Select.Option key={String(val)} value={String(val)}>{String(val)}</Select.Option>
+                        ))}
+                      </Select>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           <div style={{ flex: 1, padding: 12, overflow: 'hidden', minHeight: 0 }}>
             <ChartRenderer
               chartType={chartType}
@@ -722,58 +840,101 @@ const ChartConfigPage: React.FC = () => {
               <Input value={currentField.displayName} disabled />
             </div>
 
-            {(currentField.type !== 'dimension' ||
-              currentField.area === 'measure' ||
-              currentField.area === 'yAxis' ||
-              currentField.area === 'indicator') && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>聚合方式</div>
-                <Select
-                  value={tempFieldConfig.aggregation}
-                  style={{ width: '100%' }}
-                  onChange={(v) => setTempFieldConfig(p => ({ ...p, aggregation: v }))}
-                >
-                  <Option value="求和">求和</Option>
-                  <Option value="平均值">平均值</Option>
-                  <Option value="最大值">最大值</Option>
-                  <Option value="最小值">最小值</Option>
-                  <Option value="计数">计数</Option>
-                  <Option value="去重计数">去重计数</Option>
-                </Select>
-              </div>
-            )}
+            {currentField.area === 'filter' ? (
+              <>
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>筛选器类型</div>
+                  <Radio.Group
+                    value={tempFieldConfig.filterType || 'multiple'}
+                    onChange={(e) => setTempFieldConfig(p => ({ ...p, filterType: e.target.value, filterDefault: [] }))}
+                  >
+                    <Radio value="multiple">多选</Radio>
+                    <Radio value="single">单选</Radio>
+                    <Radio value="dateRange">日期区间</Radio>
+                  </Radio.Group>
+                </div>
 
-            {((chartType === 'crossTable' && currentField.area === 'measure') ||
-              ((chartType === 'bar' || chartType === 'line') && currentField.area === 'yAxis') ||
-              (chartType === 'pie' && currentField.area === 'measure') ||
-              (chartType === 'indicator' && currentField.area === 'indicator')) && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>数据格式</div>
-                <Select
-                  value={tempFieldConfig.dataFormat}
-                  style={{ width: '100%' }}
-                  onChange={(v) => setTempFieldConfig(p => ({ ...p, dataFormat: v }))}
-                >
-                  <Option value="原始值">原始值</Option>
-                  <Option value="百分比">百分比</Option>
-                  <Option value="千分比">千分比</Option>
-                  <Option value="小数">小数</Option>
-                  <Option value="整数">整数</Option>
-                </Select>
-              </div>
-            )}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>筛选默认值</div>
+                  {tempFieldConfig.filterType === 'dateRange' ? (
+                    <DatePicker.RangePicker
+                      style={{ width: '100%' }}
+                      onChange={(_dates, dateStrings) =>
+                        setTempFieldConfig(p => ({ ...p, filterDefault: dateStrings }))
+                      }
+                    />
+                  ) : (
+                    <Select
+                      style={{ width: '100%' }}
+                      mode={tempFieldConfig.filterType === 'single' ? undefined : 'multiple'}
+                      value={tempFieldConfig.filterDefault}
+                      onChange={(v) => setTempFieldConfig(p => ({ ...p, filterDefault: v }))}
+                      allowClear
+                      placeholder="请选择默认值"
+                    >
+                      {(filterFieldOptions[`${selectedDataset}:${currentField.originalName}`] || []).map((val: string) => (
+                        <Option key={String(val)} value={String(val)}>{String(val)}</Option>
+                      ))}
+                    </Select>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                {(currentField.type !== 'dimension' ||
+                  currentField.area === 'measure' ||
+                  currentField.area === 'yAxis' ||
+                  currentField.area === 'indicator') && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>聚合方式</div>
+                    <Select
+                      value={tempFieldConfig.aggregation}
+                      style={{ width: '100%' }}
+                      onChange={(v) => setTempFieldConfig(p => ({ ...p, aggregation: v }))}
+                    >
+                      <Option value="求和">求和</Option>
+                      <Option value="平均值">平均值</Option>
+                      <Option value="最大值">最大值</Option>
+                      <Option value="最小值">最小值</Option>
+                      <Option value="计数">计数</Option>
+                      <Option value="去重计数">去重计数</Option>
+                    </Select>
+                  </div>
+                )}
 
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>排序</div>
-              <Select
-                value={tempFieldConfig.sort}
-                style={{ width: '100%' }}
-                onChange={(v) => setTempFieldConfig(p => ({ ...p, sort: v }))}
-              >
-                <Option value="升序">升序</Option>
-                <Option value="降序">降序</Option>
-              </Select>
-            </div>
+                {((chartType === 'crossTable' && currentField.area === 'measure') ||
+                  ((chartType === 'bar' || chartType === 'line') && currentField.area === 'yAxis') ||
+                  (chartType === 'pie' && currentField.area === 'measure') ||
+                  (chartType === 'indicator' && currentField.area === 'indicator')) && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>数据格式</div>
+                    <Select
+                      value={tempFieldConfig.dataFormat}
+                      style={{ width: '100%' }}
+                      onChange={(v) => setTempFieldConfig(p => ({ ...p, dataFormat: v }))}
+                    >
+                      <Option value="原始值">原始值</Option>
+                      <Option value="百分比">百分比</Option>
+                      <Option value="千分比">千分比</Option>
+                      <Option value="小数">小数</Option>
+                      <Option value="整数">整数</Option>
+                    </Select>
+                  </div>
+                )}
+
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>排序</div>
+                  <Select
+                    value={tempFieldConfig.sort}
+                    style={{ width: '100%' }}
+                    onChange={(v) => setTempFieldConfig(p => ({ ...p, sort: v }))}
+                  >
+                    <Option value="升序">升序</Option>
+                    <Option value="降序">降序</Option>
+                  </Select>
+                </div>
+              </>
+            )}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
               <Button onClick={() => { setIsFieldSettingsModalVisible(false); setCurrentField(null); }}>取消</Button>

@@ -359,20 +359,80 @@ type FilterCondition struct {
 	Values   []string `json:"values"`
 }
 
+// chartFilterFieldConfig 图表配置中的筛选字段
+type chartFilterFieldConfig struct {
+	OriginalName string `json:"originalName"`
+	Config       *struct {
+		FilterType    string          `json:"filterType"`
+		FilterDefault json.RawMessage `json:"filterDefault"`
+	} `json:"config"`
+}
+
 // buildChartSQL 根据图表配置生成聚合SQL，带输入校验防止SQL注入
 func buildChartSQL(configJSON string, chartType string, datasetSQL string, filters []FilterCondition) (string, error) {
 	var config struct {
-		RowFields       []fieldConfig `json:"rowFields"`
-		ColFields       []fieldConfig `json:"colFields"`
-		MeasureFields   []fieldConfig `json:"measureFields"`
-		XAxisFields     []fieldConfig `json:"xAxisFields"`
-		YAxisFields     []fieldConfig `json:"yAxisFields"`
-		GroupFields     []fieldConfig `json:"groupFields"`
-		IndicatorFields []fieldConfig `json:"indicatorFields"`
+		RowFields       []fieldConfig                      `json:"rowFields"`
+		ColFields       []fieldConfig                      `json:"colFields"`
+		MeasureFields   []fieldConfig                      `json:"measureFields"`
+		XAxisFields     []fieldConfig                      `json:"xAxisFields"`
+		YAxisFields     []fieldConfig                      `json:"yAxisFields"`
+		GroupFields     []fieldConfig                      `json:"groupFields"`
+		IndicatorFields []fieldConfig                      `json:"indicatorFields"`
+		FilterFields    []chartFilterFieldConfig           `json:"filterFields"`
+		FilterValues    map[string]json.RawMessage         `json:"filterValues"`
 	}
 
 	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
 		return datasetSQL, nil
+	}
+
+	// 合并图表自身保存的筛选条件（外部传入的 dashboard 筛选优先）
+	externalFields := make(map[string]bool, len(filters))
+	for _, f := range filters {
+		externalFields[f.Field] = true
+	}
+	for _, ff := range config.FilterFields {
+		if externalFields[ff.OriginalName] {
+			continue // dashboard 筛选覆盖图表级筛选
+		}
+		if !isValidIdentifier(ff.OriginalName) {
+			continue
+		}
+		rawVal, ok := config.FilterValues[ff.OriginalName]
+		if !ok || rawVal == nil {
+			if ff.Config != nil && ff.Config.FilterDefault != nil {
+				rawVal = ff.Config.FilterDefault
+			} else {
+				continue
+			}
+		}
+		filterType := "multiple"
+		if ff.Config != nil && ff.Config.FilterType != "" {
+			filterType = ff.Config.FilterType
+		}
+		var values []string
+		var arr []interface{}
+		if err := json.Unmarshal(rawVal, &arr); err == nil {
+			for _, v := range arr {
+				if s, ok := v.(string); ok && s != "" {
+					values = append(values, s)
+				}
+			}
+		} else {
+			var s string
+			if err := json.Unmarshal(rawVal, &s); err == nil && s != "" {
+				values = []string{s}
+			}
+		}
+		if len(values) == 0 {
+			continue
+		}
+		filters = append(filters, FilterCondition{
+			Field:    ff.OriginalName,
+			Type:     filterType,
+			DataType: "text",
+			Values:   values,
+		})
 	}
 
 	var selectFields []string

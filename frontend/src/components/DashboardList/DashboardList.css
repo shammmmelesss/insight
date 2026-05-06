@@ -29,6 +29,8 @@
 .dashboard-list-body {
   padding: 8px 8px;
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .dashboard-list-item {

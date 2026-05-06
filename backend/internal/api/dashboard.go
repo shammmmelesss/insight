@@ -28,7 +28,7 @@ func ListDashboards(c *gin.Context) {
 	if workspaceID != "" {
 		query = query.Where("workspace_id = ?", workspaceID)
 	}
-	result := query.Find(&dashboards)
+	result := query.Order("created_at ASC").Find(&dashboards)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 		return

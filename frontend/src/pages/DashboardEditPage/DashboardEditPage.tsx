@@ -1,23 +1,73 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Button, Input, Layout, Space, Card, Modal, message, Spin, Dropdown, Tooltip, Select, DatePicker } from 'antd';
-import { ArrowLeftOutlined, SearchOutlined, EllipsisOutlined, CheckOutlined, CodeOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, SearchOutlined, EllipsisOutlined, CodeOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import RGL, { WidthProvider } from 'react-grid-layout/legacy';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
+
+interface RGLLayout {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minW?: number;
+  minH?: number;
+  static?: boolean;
+}
+
 import { DashboardLayoutItem, ChartOption, FilterField } from '@shared/api.interface';
 import ChartRenderer from '../../components/ChartRenderer';
 import FilterConfigModal from '../../components/FilterConfigModal/FilterConfigModal';
 
+const ReactGridLayout = WidthProvider(RGL);
 const { RangePicker } = DatePicker;
 const { Sider, Content } = Layout;
+
+const COLS = 12;
+const ROW_HEIGHT = 30;
+const GRID_MARGIN: [number, number] = [10, 10];
+const DEFAULT_W = 6;
+const DEFAULT_H = 10;
+
+// Total pixel height of a grid item: ROW_HEIGHT * h + MARGIN * (h - 1)
+const gridItemPixelHeight = (h: number) => ROW_HEIGHT * h + GRID_MARGIN[1] * (h - 1);
+// Chart area height = card total - header (40px) - body padding (20px)
+const chartAreaHeight = (h: number) => Math.max(120, gridItemPixelHeight(h) - 60);
+
+// Detect old layout format (width <= 8 and height <= 8 means pre-RGL format)
+const toRGLLayout = (items: DashboardLayoutItem[]): RGLLayout[] =>
+  items.map((item, index) => {
+    const isOld = item.width <= 8 && item.height <= 8;
+    return {
+      i: item.chartId,
+      x: isOld ? 0 : item.x,
+      y: isOld ? index * DEFAULT_H : item.y,
+      w: isOld ? (item.width >= 8 ? COLS : DEFAULT_W) : item.width,
+      h: isOld ? DEFAULT_H : item.height,
+      minW: 3,
+      minH: 4,
+    };
+  });
+
+const fromRGLLayout = (rglLayout: RGLLayout[], existing: DashboardLayoutItem[]): DashboardLayoutItem[] =>
+  existing.map(item => {
+    const l = rglLayout.find(r => r.i === item.chartId);
+    if (!l) return item;
+    return { ...item, x: l.x, y: l.y, width: l.w, height: l.h };
+  });
 
 const DashboardEditPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  
+
   const [charts, setCharts] = useState<ChartOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [selectedCharts, setSelectedCharts] = useState<DashboardLayoutItem[]>([]);
+  const [rglLayout, setRglLayout] = useState<RGLLayout[]>([]);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [isCancelModalVisible, setIsCancelModalVisible] = useState(false);
   const [chartData, setChartData] = useState<Record<string, any[]>>({});
@@ -32,10 +82,8 @@ const DashboardEditPage: React.FC = () => {
   const [sqlModalVisible, setSqlModalVisible] = useState(false);
   const [currentSQL, setCurrentSQL] = useState('');
 
-  // 跟踪已加载数据的图表ID，避免重复请求
   const loadedChartIds = useRef<Set<string>>(new Set());
 
-  // 获取看板详情
   const fetchDashboardDetail = async () => {
     if (id) {
       try {
@@ -44,41 +92,27 @@ const DashboardEditPage: React.FC = () => {
         setName(dashboardData.name);
         let layout: DashboardLayoutItem[] = [];
         if (typeof dashboardData.layout === 'string') {
-          try {
-            layout = JSON.parse(dashboardData.layout);
-          } catch (e) {
-            console.error('解析layout失败:', e);
-            layout = [];
-          }
+          try { layout = JSON.parse(dashboardData.layout); } catch (e) { layout = []; }
         } else if (Array.isArray(dashboardData.layout)) {
           layout = dashboardData.layout;
         }
         setSelectedCharts(layout);
+        setRglLayout(toRGLLayout(layout));
 
-        // 加载已保存的筛选器配置
         let savedFilters: FilterField[] = [];
         if (typeof dashboardData.filters === 'string') {
-          try {
-            savedFilters = JSON.parse(dashboardData.filters);
-          } catch (e) {
-            console.error('解析filters失败:', e);
-            savedFilters = [];
-          }
+          try { savedFilters = JSON.parse(dashboardData.filters); } catch (e) { savedFilters = []; }
         } else if (Array.isArray(dashboardData.filters)) {
           savedFilters = dashboardData.filters;
         }
         if (savedFilters.length > 0) {
           setFilters(savedFilters);
           const initialValues: Record<string, any> = {};
-          savedFilters.forEach(f => {
-            initialValues[f.id] = f.defaultValue;
-          });
+          savedFilters.forEach(f => { initialValues[f.id] = f.defaultValue; });
           setFilterValues(initialValues);
           savedFilters.forEach(f => {
             if (f.dataset && f.field) {
-              if (f.type !== 'dateRange') {
-                fetchFilterFieldOptions(f.dataset, f.field);
-              }
+              if (f.type !== 'dateRange') fetchFilterFieldOptions(f.dataset, f.field);
               fetchDatasetFieldType(f.dataset, f.field);
             }
           });
@@ -110,7 +144,6 @@ const DashboardEditPage: React.FC = () => {
     }
   };
 
-  // 获取图表数据（支持筛选条件）
   const fetchChartData = useCallback(async (chartId: string, filterParams?: Array<{ field: string; type: string; dataType: string; values: string[] }>) => {
     try {
       const params: Record<string, string> = {};
@@ -143,7 +176,6 @@ const DashboardEditPage: React.FC = () => {
     loadData();
   }, [id]);
 
-  // 当选中的图表变化时，只获取新增图表的数据
   useEffect(() => {
     selectedCharts.forEach(item => {
       if (!loadedChartIds.current.has(item.chartId)) {
@@ -151,12 +183,9 @@ const DashboardEditPage: React.FC = () => {
         fetchChartData(item.chartId);
       }
     });
-    // 清理已移除图表的缓存
     const currentIds = new Set(selectedCharts.map(item => item.chartId));
     loadedChartIds.current.forEach(cid => {
-      if (!currentIds.has(cid)) {
-        loadedChartIds.current.delete(cid);
-      }
+      if (!currentIds.has(cid)) loadedChartIds.current.delete(cid);
     });
   }, [selectedCharts, fetchChartData]);
 
@@ -164,70 +193,56 @@ const DashboardEditPage: React.FC = () => {
     chart.name.toLowerCase().includes(searchKeyword.toLowerCase())
   );
 
-  const isChartAdded = (chartId: string) => {
-    return selectedCharts.some(item => item.chartId === chartId);
-  };
+  const isChartAdded = (chartId: string) => selectedCharts.some(item => item.chartId === chartId);
 
   const handleAddChart = (chartId: string) => {
     if (isChartAdded(chartId)) {
       message.info('该图表已添加至看板');
       return;
     }
-    const newItem: DashboardLayoutItem = {
-      chartId,
-      x: 0,
-      y: selectedCharts.length,
-      width: 4,
-      height: 4
-    };
-    setSelectedCharts([...selectedCharts, newItem]);
+    const newItem: DashboardLayoutItem = { chartId, x: 0, y: 0, width: DEFAULT_W, height: DEFAULT_H };
+    const newRgl: RGLLayout = { i: chartId, x: 0, y: Infinity, w: DEFAULT_W, h: DEFAULT_H, minW: 3, minH: 4 };
+    setSelectedCharts(prev => [...prev, newItem]);
+    setRglLayout(prev => [...prev, newRgl]);
   };
 
   const handleRemoveChart = (chartId: string) => {
-    setSelectedCharts(selectedCharts.filter(item => item.chartId !== chartId));
+    setSelectedCharts(prev => prev.filter(item => item.chartId !== chartId));
+    setRglLayout(prev => prev.filter(l => l.i !== chartId));
   };
 
-  const handleBack = () => navigate('/dashboards');
+  const handleLayoutChange = (layout: RGLLayout[]) => {
+    setRglLayout(layout);
+    setSelectedCharts(prev => fromRGLLayout(layout, prev));
+  };
 
+  const backToDashboards = (selectedId?: string) =>
+    navigate(selectedId ? `/dashboards?selected=${selectedId}` : '/dashboards');
+
+  const handleBack = () => backToDashboards(id);
   const handleCancel = () => setIsCancelModalVisible(true);
+  const handleConfirmCancel = () => { setIsCancelModalVisible(false); backToDashboards(id); };
 
-  const handleConfirmCancel = () => {
-    setIsCancelModalVisible(false);
-    navigate('/dashboards');
-  };
-
-  // 保存 — 创建时一次请求搞定（后端已支持 layout 字段）
   const handleSave = async () => {
-    if (!name.trim()) {
-      message.error('请输入看板名称');
-      return;
-    }
-
+    if (!name.trim()) { message.error('请输入看板名称'); return; }
     try {
-      const payload = {
-        name,
-        layout: JSON.stringify(selectedCharts),
-        filters: JSON.stringify(filters)
-      };
-
+      const sortedCharts = [...selectedCharts].sort((a, b) =>
+        a.y !== b.y ? a.y - b.y : a.x - b.x
+      );
+      const payload = { name, layout: JSON.stringify(sortedCharts), filters: JSON.stringify(filters) };
       if (id) {
         await axios.put(`/api/dashboards/${id}`, payload);
         message.success('看板更新成功');
+        backToDashboards(id);
       } else {
-        await axios.post('/api/dashboards', payload);
+        const res = await axios.post('/api/dashboards', payload);
         message.success('看板创建成功');
+        backToDashboards(res.data?.id);
       }
-      navigate('/dashboards');
     } catch (error) {
       message.error('保存失败，请重试');
       console.error('保存失败:', error);
     }
-  };
-
-  const handleChartSizeChange = (chartId: string, size: 'medium' | 'large') => {
-    setSelectedCharts(prev => prev.map(item =>
-      item.chartId === chartId ? { ...item, width: size === 'large' ? 8 : 4 } : item
-    ));
   };
 
   const handleOpenFilterModal = () => setIsFilterModalVisible(true);
@@ -236,15 +251,11 @@ const DashboardEditPage: React.FC = () => {
   const handleSaveFilterConfig = (newFilters: FilterField[]) => {
     setFilters(newFilters);
     const initialValues: Record<string, any> = {};
-    newFilters.forEach(f => {
-      initialValues[f.id] = f.defaultValue;
-    });
+    newFilters.forEach(f => { initialValues[f.id] = f.defaultValue; });
     setFilterValues(initialValues);
     newFilters.forEach(f => {
       if (f.dataset && f.field) {
-        if (f.type !== 'dateRange') {
-          fetchFilterFieldOptions(f.dataset, f.field);
-        }
+        if (f.type !== 'dateRange') fetchFilterFieldOptions(f.dataset, f.field);
         fetchDatasetFieldType(f.dataset, f.field);
       }
     });
@@ -278,12 +289,7 @@ const DashboardEditPage: React.FC = () => {
       const dataType = datasetFieldTypes[`${f.dataset}:${f.field}`] || 'text';
       if (f.type === 'dateRange') {
         if (Array.isArray(val) && val.length === 2 && val[0] && val[1]) {
-          params.push({
-            field: f.field,
-            type: 'dateRange',
-            dataType,
-            values: [val[0].format('YYYY-MM-DD'), val[1].format('YYYY-MM-DD')]
-          });
+          params.push({ field: f.field, type: 'dateRange', dataType, values: [val[0].format('YYYY-MM-DD'), val[1].format('YYYY-MM-DD')] });
         }
       } else {
         const values = Array.isArray(val) ? val : (val !== undefined && val !== null && val !== '' ? [val] : []);
@@ -295,7 +301,6 @@ const DashboardEditPage: React.FC = () => {
     return params;
   };
 
-  // 筛选器值变化时重新获取受影响图表的数据
   useEffect(() => {
     if (filters.length === 0) return;
     const affectedChartIds = new Set<string>();
@@ -310,13 +315,8 @@ const DashboardEditPage: React.FC = () => {
     const cacheKey = `${datasetId}:${fieldName}`;
     if (filterFieldOptions[cacheKey]) return;
     try {
-      const response = await axios.get(`/api/datasets/${datasetId}/field-values`, {
-        params: { field: fieldName }
-      });
-      setFilterFieldOptions(prev => ({
-        ...prev,
-        [cacheKey]: response.data.values || []
-      }));
+      const response = await axios.get(`/api/datasets/${datasetId}/field-values`, { params: { field: fieldName } });
+      setFilterFieldOptions(prev => ({ ...prev, [cacheKey]: response.data.values || [] }));
     } catch (error) {
       console.error('获取筛选字段值失败:', error);
     }
@@ -335,12 +335,7 @@ const DashboardEditPage: React.FC = () => {
       {/* 顶部操作栏 */}
       <div style={{ padding: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <Button
-            type="text"
-            icon={<ArrowLeftOutlined />}
-            onClick={handleBack}
-            style={{ marginRight: 16 }}
-          >
+          <Button type="text" icon={<ArrowLeftOutlined />} onClick={handleBack} style={{ marginRight: 16 }}>
             返回
           </Button>
           <Input
@@ -351,9 +346,7 @@ const DashboardEditPage: React.FC = () => {
           />
         </div>
         <div style={{ display: 'flex', alignItems: 'center' }}>
-          <Button type="default" onClick={handleOpenFilterModal}>
-            筛选器
-          </Button>
+          <Button type="default" onClick={handleOpenFilterModal}>筛选器</Button>
         </div>
         <Space>
           <Button onClick={handleCancel}>取消</Button>
@@ -397,82 +390,89 @@ const DashboardEditPage: React.FC = () => {
               ))}
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-            {selectedCharts.length > 0 ? (
-              selectedCharts.map((item, index) => {
+
+          {selectedCharts.length > 0 ? (
+            <ReactGridLayout
+              layout={rglLayout}
+              cols={COLS}
+              rowHeight={ROW_HEIGHT}
+              margin={GRID_MARGIN}
+              onLayoutChange={handleLayoutChange as any}
+              isDraggable
+              isResizable
+              draggableHandle=".chart-drag-handle"
+              resizeHandles={['se', 'sw', 'ne', 'nw', 's', 'e']}
+            >
+              {selectedCharts.map((item, index) => {
                 const chart = charts.find(c => c.id === item.chartId);
                 const cfg = chartConfigs[item.chartId] || {};
                 const extractNames = (fields: any[]) => (fields || []).map((f: any) => f.originalName);
-                const currentSize = item.width >= 8 ? 'large' : 'medium';
-                const isLarge = currentSize === 'large';
-                const sizeMenuItems = [
-                  {
-                    key: 'viewSQL',
-                    label: '查看SQL',
-                    icon: <CodeOutlined />,
-                    onClick: () => {
-                      setCurrentSQL(chartSQLs[item.chartId] || '暂无SQL');
-                      setSqlModalVisible(true);
-                    },
-                  },
-                  { type: 'divider' as const },
-                  {
-                    key: 'medium',
-                    label: (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        中图{currentSize === 'medium' && <CheckOutlined style={{ color: '#1677ff' }} />}
-                      </span>
-                    ),
-                    onClick: () => handleChartSizeChange(item.chartId, 'medium'),
-                  },
-                  {
-                    key: 'large',
-                    label: (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        大图{currentSize === 'large' && <CheckOutlined style={{ color: '#1677ff' }} />}
-                      </span>
-                    ),
-                    onClick: () => handleChartSizeChange(item.chartId, 'large'),
-                  },
-                ];
+                const layoutItem = rglLayout.find(l => l.i === item.chartId);
+                const h = layoutItem?.h ?? DEFAULT_H;
+                const chartH = chartAreaHeight(h);
+
                 return (
-                  <div key={item.chartId} style={{ marginBottom: '10px', gridColumn: isLarge ? 'span 2' : 'span 1', minWidth: 0 }}>
+                  <div key={item.chartId}>
                     <Card
-                      title={chart?.name || `图表${index + 1}`}
-                      style={{ boxShadow: 'none' }}
-                      styles={{ header: { height: '40px', padding: '0 24px', display: 'flex', alignItems: 'center', borderBottom: 'none' }, body: { padding: '10px', overflow: 'hidden' } }}
+                      title={
+                        <span className="chart-drag-handle" style={{ cursor: 'move', display: 'block' }}>
+                          {chart?.name || `图表${index + 1}`}
+                        </span>
+                      }
+                      style={{ height: '100%', boxShadow: 'none', overflow: 'hidden' }}
+                      styles={{
+                        header: { height: '40px', padding: '0 12px', display: 'flex', alignItems: 'center', borderBottom: 'none', cursor: 'move' },
+                        body: { padding: '10px', overflow: 'hidden', height: 'calc(100% - 40px)' },
+                      }}
                       extra={
-                        <Dropdown menu={{ items: sizeMenuItems }} trigger={['hover']}>
+                        <Dropdown
+                          menu={{
+                            items: [
+                              {
+                                key: 'viewSQL',
+                                label: '查看SQL',
+                                icon: <CodeOutlined />,
+                                onClick: () => { setCurrentSQL(chartSQLs[item.chartId] || '暂无SQL'); setSqlModalVisible(true); },
+                              },
+                              { type: 'divider' as const },
+                              {
+                                key: 'remove',
+                                label: <span style={{ color: '#ff4d4f' }}>移除</span>,
+                                onClick: () => handleRemoveChart(item.chartId),
+                              },
+                            ],
+                          }}
+                          trigger={['hover']}
+                        >
                           <Tooltip title="更多">
-                            <Button type="text" icon={<EllipsisOutlined />} size="small" />
+                            <Button type="text" icon={<EllipsisOutlined />} size="small" style={{ cursor: 'pointer' }} onMouseDown={e => e.stopPropagation()} />
                           </Tooltip>
                         </Dropdown>
                       }
                     >
-                      <div style={{ width: '100%' }}>
-                        <ChartRenderer
-                          chartType={chart?.type as any || 'bar'}
-                          chartData={chartData[item.chartId] || []}
-                          rowFields={extractNames(cfg.rowFields)}
-                          colFields={extractNames(cfg.colFields)}
-                          measureFields={extractNames(cfg.measureFields)}
-                          xAxisFields={extractNames(cfg.xAxisFields)}
-                          yAxisFields={extractNames(cfg.yAxisFields)}
-                          groupFields={extractNames(cfg.groupFields)}
-                          indicatorFields={extractNames(cfg.indicatorFields)}
-                        />
-                      </div>
+                      <ChartRenderer
+                        chartType={chart?.type as any || 'bar'}
+                        chartData={chartData[item.chartId] || []}
+                        rowFields={extractNames(cfg.rowFields)}
+                        colFields={extractNames(cfg.colFields)}
+                        measureFields={extractNames(cfg.measureFields)}
+                        xAxisFields={extractNames(cfg.xAxisFields)}
+                        yAxisFields={extractNames(cfg.yAxisFields)}
+                        groupFields={extractNames(cfg.groupFields)}
+                        indicatorFields={extractNames(cfg.indicatorFields)}
+                        containerHeight={chartH}
+                      />
                     </Card>
                   </div>
                 );
-              })
-            ) : (
-              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px 0', backgroundColor: '#fafafa', borderRadius: '8px' }}>
-                <div style={{ fontSize: '16px', color: '#666', marginBottom: 16 }}>暂无图表</div>
-                <div style={{ fontSize: '14px', color: '#999' }}>请从右侧选择图表添加到看板</div>
-              </div>
-            )}
-          </div>
+              })}
+            </ReactGridLayout>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '60px 0', backgroundColor: '#fafafa', borderRadius: '8px' }}>
+              <div style={{ fontSize: '16px', color: '#666', marginBottom: 16 }}>暂无图表</div>
+              <div style={{ fontSize: '14px', color: '#999' }}>请从右侧选择图表添加到看板</div>
+            </div>
+          )}
         </Content>
 
         {/* 图表选择区域 */}
@@ -495,21 +495,15 @@ const DashboardEditPage: React.FC = () => {
                   <div key={chart.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, padding: '8px 12px', borderRadius: '4px', backgroundColor: '#fafafa' }}>
                     <div>{chart.name}</div>
                     {isChartAdded(chart.id) ? (
-                      <Button type="text" danger size="small" onClick={() => handleRemoveChart(chart.id)}>
-                        移除
-                      </Button>
+                      <Button type="text" danger size="small" onClick={() => handleRemoveChart(chart.id)}>移除</Button>
                     ) : (
-                      <Button type="text" size="small" onClick={() => handleAddChart(chart.id)}>
-                        添加
-                      </Button>
+                      <Button type="text" size="small" onClick={() => handleAddChart(chart.id)}>添加</Button>
                     )}
                   </div>
                 ))}
               </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
-                没有找到匹配的图表
-              </div>
+              <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>没有找到匹配的图表</div>
             )}
           </div>
         </Sider>

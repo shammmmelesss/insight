@@ -18,6 +18,7 @@ interface ChartRendererProps {
   yAxisFields?: string[];
   groupFields?: string[];
   indicatorFields?: string[];
+  containerHeight?: number;
 }
 
 const ChartRenderer: React.FC<ChartRendererProps> = ({
@@ -30,6 +31,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   yAxisFields = [],
   groupFields = [],
   indicatorFields = [],
+  containerHeight,
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<PivotSheet | Chart | null>(null);
@@ -60,9 +62,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       defaultHeight = 120;
     }
 
-    // Detect available height from parent container; fall back to defaultHeight
-    chartRef.current.style.height = '100%';
-    const detectedHeight = chartRef.current.clientHeight;
+    chartRef.current.style.height = containerHeight ? `${containerHeight}px` : '100%';
+    const detectedHeight = containerHeight || chartRef.current.clientHeight;
     const actualHeight = detectedHeight > 80 ? detectedHeight : defaultHeight;
     chartRef.current.style.height = `${actualHeight}px`;
 
@@ -173,8 +174,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       data: chartData,
     };
 
-    chartRef.current.style.height = '100%';
-    const detectedHeight = chartRef.current.clientHeight;
+    chartRef.current.style.height = containerHeight ? `${containerHeight}px` : '100%';
+    const detectedHeight = containerHeight || chartRef.current.clientHeight;
     const crossTableHeight = detectedHeight > 80 ? detectedHeight : 300;
     chartRef.current.style.height = `${crossTableHeight}px`;
 

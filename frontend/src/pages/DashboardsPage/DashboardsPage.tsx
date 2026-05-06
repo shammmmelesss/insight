@@ -1,11 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Card, Modal, Layout, Skeleton, Select, DatePicker, Tooltip, Dropdown } from 'antd';
 import { EditOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined, InboxOutlined, PlusOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Dashboard, ChartOption, FilterField, DashboardLayoutItem } from '@shared/api.interface';
 import DashboardList from '../../components/DashboardList/DashboardList';
 import ChartRenderer from '../../components/ChartRenderer';
+
+const ROW_HEIGHT = 30;
+const GRID_MARGIN = 10;
+const DEFAULT_H = 10;
+
+// Mirror the formula used in DashboardEditPage
+const resolveH = (item: DashboardLayoutItem) =>
+  item.width <= 8 && item.height <= 8 ? DEFAULT_H : item.height;
+const chartAreaHeight = (h: number) =>
+  Math.max(120, ROW_HEIGHT * h + GRID_MARGIN * (h - 1) - 60);
+const isWide = (item: DashboardLayoutItem) =>
+  item.width <= 8 ? item.width >= 8 : item.width >= 10;
 
 const { RangePicker } = DatePicker;
 const { Sider, Content } = Layout;
@@ -28,6 +40,7 @@ function parseFilters(raw: FilterField[] | string | unknown): FilterField[] {
 
 const DashboardsPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedDashboard, setSelectedDashboard] = useState<Dashboard | null>(null);
@@ -52,7 +65,12 @@ const DashboardsPage: React.FC = () => {
       const items: Dashboard[] = response.data.items;
       setDashboards(items);
       if (items.length > 0) {
-        setSelectedDashboard(prev => prev ?? items[0]);
+        const selectedId = searchParams.get('selected');
+        setSelectedDashboard(prev => {
+          if (prev) return prev;
+          if (selectedId) return items.find(d => d.id === selectedId) ?? items[0];
+          return items[0];
+        });
       }
     } catch (error) {
       console.error('获取看板列表失败:', error);
@@ -222,13 +240,13 @@ const DashboardsPage: React.FC = () => {
     (Array.isArray(fields) ? fields : []).map((f: { originalName: string }) => f.originalName);
 
   return (
-    <Layout style={{ minHeight: 'calc(100vh - 64px)', position: 'relative' }}>
+    <Layout style={{ height: 'calc(100vh - 64px)', overflow: 'hidden', position: 'relative' }}>
       <Sider
         width={240}
         collapsedWidth={0}
         collapsed={siderCollapsed}
         trigger={null}
-        style={{ background: '#fff', borderRight: '1px solid #f0f0f0', transition: 'all 0.2s', overflow: 'hidden' }}
+        style={{ background: '#fff', borderRight: '1px solid #f0f0f0', transition: 'all 0.2s', overflow: 'hidden', height: '100%' }}
       >
         <DashboardList
           dashboards={dashboards}
@@ -322,7 +340,8 @@ const DashboardsPage: React.FC = () => {
             {parsedLayout.length > 0 ? parsedLayout.map((item, index) => {
               const chart = charts.find(c => c.id === item.chartId);
               const cfg = chartConfigs[item.chartId] || {};
-              const isLarge = item.width >= 8;
+              const isLarge = isWide(item);
+              const chartH = chartAreaHeight(resolveH(item));
               const chartMenuItems = [
                 { key: 'refresh', label: '刷新数据', onClick: () => refetchSingleChart(item.chartId) },
                 { key: 'sql', label: '查看SQL', icon: <CodeOutlined />, onClick: () => { setCurrentSQLChartId(item.chartId); setSqlModalVisible(true); } },
@@ -358,6 +377,7 @@ const DashboardsPage: React.FC = () => {
                       yAxisFields={extractNames(cfg.yAxisFields)}
                       groupFields={extractNames(cfg.groupFields)}
                       indicatorFields={extractNames(cfg.indicatorFields)}
+                      containerHeight={chartH}
                     />
                   )}
                 </Card>

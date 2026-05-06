@@ -80,6 +80,7 @@ export interface CreateDatasetRequest {
   sql: string;
   fieldsConfig: FieldConfig[];
   dataSourceId: string;
+  description?: string;
 }
 
 /** 更新数据集请求 */
@@ -88,6 +89,7 @@ export interface UpdateDatasetRequest {
   sql: string;
   fieldsConfig: FieldConfig[];
   dataSourceId: string;
+  description?: string;
 }
 
 /** 数据集列表响应 */

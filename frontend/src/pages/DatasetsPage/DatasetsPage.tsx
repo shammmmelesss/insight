@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Button, Card, Table, Modal, Drawer, Form, Input, message, Tabs, Row, Col, Select } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import axios from 'axios';
-import { Dataset, CreateDatasetRequest, UpdateDatasetRequest, FieldConfig } from '@shared/api.interface';
+import { Dataset, CreateDatasetRequest, UpdateDatasetRequest, FieldConfig, DataType } from '@shared/api.interface';
 
 const { Option } = Select;
 
@@ -35,7 +35,6 @@ const DatasetsPage: React.FC = () => {
   
   // 图表列表相关状态
   const [chartModalVisible, setChartModalVisible] = useState(false);
-  const [selectedDatasetId, setSelectedDatasetId] = useState<string>('');
   const [datasetCharts, setDatasetCharts] = useState<any[]>([]);
   const [loadingCharts, setLoadingCharts] = useState(false);
 
@@ -112,11 +111,11 @@ const DatasetsPage: React.FC = () => {
       const autoFieldsConfig: FieldConfig[] = (response.data.columns || []).map((col: any) => {
         const dataType = mapDbTypeToDataType(col.type);
         // 字段类型默认逻辑：数字类型默认指标，其他默认维度
-        const fieldType = dataType === 'number' ? 'measure' : 'dimension';
+        const fieldType: FieldConfig['type'] = dataType === 'number' ? 'measure' : 'dimension';
         return {
           originalName: col.name,
           displayName: col.name,
-          type: fieldType as const,
+          type: fieldType,
           dataType: dataType,
         };
       });
@@ -135,7 +134,7 @@ const DatasetsPage: React.FC = () => {
   // 更新字段配置
   const updateFieldConfig = (index: number, key: keyof FieldConfig, value: any) => {
     const newFieldsConfig = [...fieldsConfig];
-    newFieldsConfig[index][key] = value;
+    (newFieldsConfig[index] as any)[key] = value;
     setFieldsConfig(newFieldsConfig);
   };
   
@@ -313,7 +312,6 @@ const DatasetsPage: React.FC = () => {
   
   // 打开图表列表模态框
   const showChartModal = (datasetId: string) => {
-    setSelectedDatasetId(datasetId);
     fetchDatasetCharts(datasetId);
     setChartModalVisible(true);
   };

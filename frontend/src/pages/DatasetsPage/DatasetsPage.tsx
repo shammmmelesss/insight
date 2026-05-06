@@ -107,10 +107,15 @@ const DatasetsPage: React.FC = () => {
       setSqlResult(response.data.data || []);
       setSqlColumns(response.data.columns || []);
       
-      // 自动生成字段配置
-      const autoFieldsConfig: FieldConfig[] = (response.data.columns || []).map((col: any) => {
+      // 生成字段配置：复用已有普通字段的用户配置，追加保留计算字段
+      const existingMap = new Map(
+        fieldsConfig.filter(f => !f.isCalculated).map(f => [f.originalName, f])
+      );
+      const calculatedFields = fieldsConfig.filter(f => f.isCalculated);
+      const sqlFields: FieldConfig[] = (response.data.columns || []).map((col: any) => {
+        const existing = existingMap.get(col.name);
+        if (existing) return existing;
         const dataType = mapDbTypeToDataType(col.type);
-        // 字段类型默认逻辑：数字类型默认指标，其他默认维度
         const fieldType: FieldConfig['type'] = dataType === 'number' ? 'measure' : 'dimension';
         return {
           originalName: col.name,
@@ -119,7 +124,7 @@ const DatasetsPage: React.FC = () => {
           dataType: dataType,
         };
       });
-      setFieldsConfig(autoFieldsConfig);
+      setFieldsConfig([...sqlFields, ...calculatedFields]);
       
       message.success('SQL运行成功');
       setActiveTab('fields');

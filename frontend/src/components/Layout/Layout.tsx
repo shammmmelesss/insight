@@ -26,11 +26,11 @@ const menuItems = [
     icon: <HomeOutlined />,
     label: <Link to="/">首页</Link>,
   },
-  {
-    key: '/data-sources',
-    icon: <DatabaseOutlined />,
-    label: <Link to="/data-sources">数据源</Link>,
-  },
+  // {
+  //   key: '/data-sources',
+  //   icon: <DatabaseOutlined />,
+  //   label: <Link to="/data-sources">数据源</Link>,
+  // },
   {
     key: '/datasets',
     icon: <TableOutlined />,

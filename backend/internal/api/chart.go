@@ -586,11 +586,11 @@ func buildAggField(f fieldConfig) (string, error) {
 		return "", fmt.Errorf("非法字段名: %s", f.OriginalName)
 	}
 
-	aggLabel := "计数"
+	aggLabel := "count"
 	if f.Config != nil && f.Config.Aggregation != "" {
-		aggLabel = f.Config.Aggregation
+		aggLabel = chineseAggToAlias(f.Config.Aggregation)
 	}
-	alias := sanitizeAlias(f.OriginalName + "_" + aggLabel)
+	alias := f.OriginalName + "_" + aggLabel
 
 	// 计算字段直接使用表达式，校验后不包裹聚合函数
 	if f.IsCalculated && f.Expression != "" {
@@ -612,7 +612,7 @@ func buildAggField(f fieldConfig) (string, error) {
 		case "最小值":
 			agg = "MIN"
 		case "去重计数":
-			return fmt.Sprintf("COUNT(DISTINCT %s) AS %s", f.OriginalName, sanitizeAlias(f.OriginalName+"_去重计数")), nil
+			return fmt.Sprintf("COUNT(DISTINCT %s) AS %s", f.OriginalName, f.OriginalName+"_count_distinct"), nil
 		case "计数":
 			agg = "COUNT"
 		}
@@ -639,17 +639,34 @@ func sanitizeAlias(alias string) string {
 func getAggLabel(agg string) string {
 	switch agg {
 	case "SUM":
-		return "求和"
+		return "sum"
 	case "AVG":
-		return "平均值"
+		return "avg"
 	case "MAX":
-		return "最大值"
+		return "max"
 	case "MIN":
-		return "最小值"
+		return "min"
 	case "COUNT":
-		return "计数"
+		return "count"
 	default:
-		return "计数"
+		return "count"
+	}
+}
+
+func chineseAggToAlias(agg string) string {
+	switch agg {
+	case "求和":
+		return "sum"
+	case "平均值":
+		return "avg"
+	case "最大值":
+		return "max"
+	case "最小值":
+		return "min"
+	case "去重计数":
+		return "count_distinct"
+	default:
+		return "count"
 	}
 }
 

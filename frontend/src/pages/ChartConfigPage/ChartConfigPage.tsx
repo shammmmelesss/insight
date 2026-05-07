@@ -828,11 +828,11 @@ const ChartConfigPage: React.FC = () => {
               chartData={chartData}
               rowFields={rowFields.map(f => f.originalName)}
               colFields={colFields.map(f => f.originalName)}
-              measureFields={measureFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
+              measureFields={measureFields.map(f => `${f.originalName}_${mapAggregationToAlias(f.config?.aggregation || '计数')}`)}
               xAxisFields={xAxisFields.map(f => f.originalName)}
-              yAxisFields={yAxisFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
+              yAxisFields={yAxisFields.map(f => `${f.originalName}_${mapAggregationToAlias(f.config?.aggregation || '计数')}`)}
               groupFields={groupFields.map(f => f.originalName)}
-              indicatorFields={indicatorFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
+              indicatorFields={indicatorFields.map(f => `${f.originalName}_${mapAggregationToAlias(f.config?.aggregation || '计数')}`)}
             />
           </div>
         </div>

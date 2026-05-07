@@ -253,6 +253,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           label: {
             style: { textWrap: { width: 80, method: 'wrap' } },
             align: 'center',
+            transform: [],
           },
           title: false,
         });
@@ -320,6 +321,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           label: {
             style: { textWrap: { width: 80, method: 'wrap' } },
             align: 'center',
+            transform: [],
           },
           title: false,
         });
@@ -407,6 +409,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           label: {
             style: { textWrap: { width: 80, method: 'wrap' } },
             align: 'center',
+            transform: [],
           },
           title: false,
         });
@@ -481,6 +484,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           label: {
             style: { textWrap: { width: 80, method: 'wrap' } },
             align: 'center',
+            transform: [],
           },
           title: false,
         });

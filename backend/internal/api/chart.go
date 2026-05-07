@@ -436,7 +436,15 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 
 	var selectFields []string
 	var groupByFields []string
+	var orderByFields []string
 	seen := make(map[string]bool)
+
+	sortDir := func(f fieldConfig) string {
+		if f.Config != nil && f.Config.Sort == "降序" {
+			return "DESC"
+		}
+		return "ASC"
+	}
 
 	addDimension := func(name string) error {
 		if !isValidIdentifier(name) {
@@ -457,6 +465,7 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 			if err = addDimension(f.OriginalName); err != nil {
 				return "", err
 			}
+			orderByFields = append(orderByFields, fmt.Sprintf("%s %s", f.OriginalName, sortDir(f)))
 		}
 		for _, f := range config.ColFields {
 			if err = addDimension(f.OriginalName); err != nil {
@@ -475,6 +484,7 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 			if err = addDimension(f.OriginalName); err != nil {
 				return "", err
 			}
+			orderByFields = append(orderByFields, fmt.Sprintf("%s %s", f.OriginalName, sortDir(f)))
 		}
 		for _, f := range config.YAxisFields {
 			agg, e := buildAggField(f)
@@ -516,11 +526,14 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 	}
 
 	// 构建外层 SQL：图表聚合字段 + 看板级筛选
-	// 结构：SELECT <fields> FROM (<innerSQL>) AS dataset WHERE <看板筛选> GROUP BY ...
+	// 结构：SELECT <fields> FROM (<innerSQL>) AS dataset WHERE <看板筛选> GROUP BY ... ORDER BY ...
 	sql := buildFilteredSQL(fmt.Sprintf("SELECT %s FROM (%s) AS dataset", strings.Join(selectFields, ", "), innerSQL), filters)
 
 	if len(groupByFields) > 0 {
 		sql += fmt.Sprintf(" GROUP BY %s", strings.Join(groupByFields, ", "))
+	}
+	if len(orderByFields) > 0 {
+		sql += fmt.Sprintf(" ORDER BY %s", strings.Join(orderByFields, ", "))
 	}
 	return sql, nil
 }
@@ -579,6 +592,7 @@ type fieldConfig struct {
 	Expression   string `json:"expression"`
 	Config       *struct {
 		Aggregation string `json:"aggregation"`
+		Sort        string `json:"sort"`
 	} `json:"config"`
 }
 

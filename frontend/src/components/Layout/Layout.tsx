@@ -3,7 +3,6 @@ import { Layout as AntLayout, Menu, Typography, Select, Button, Modal, Form, Inp
 import { Link, useLocation } from 'react-router-dom';
 import {
   HomeOutlined,
-  DatabaseOutlined,
   TableOutlined,
   BarChartOutlined,
   LayoutOutlined,

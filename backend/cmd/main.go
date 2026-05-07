@@ -54,6 +54,13 @@ func main() {
 	// 注册API路由
 	api.RegisterRoutes(r)
 
+	// 服务前端静态文件
+	r.Static("/assets", "./frontend/dist/assets")
+	r.StaticFile("/favicon.ico", "./frontend/dist/favicon.ico")
+	r.NoRoute(func(c *gin.Context) {
+		c.File("./frontend/dist/index.html")
+	})
+
 	// 启动服务器
 	port := cfg.Server.Port
 	log.Printf("Server is running on port %s", port)

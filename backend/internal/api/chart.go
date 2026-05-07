@@ -7,9 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"data-analysis-platform/internal/database"
 	"data-analysis-platform/internal/models"
+
+	"github.com/gin-gonic/gin"
 )
 
 // RegisterChartRoutes 注册图表路由
@@ -129,9 +130,9 @@ func CreateChart(c *gin.Context) {
 	chart := models.Chart{
 		WorkspaceID: GetWorkspaceID(c),
 		Name:        req.Name,
-		DatasetID: datasetUUID,
-		Type:      chartType,
-		Config:    req.Config,
+		DatasetID:   datasetUUID,
+		Type:        chartType,
+		Config:      req.Config,
 	}
 
 	result := database.DB.Create(&chart)
@@ -371,15 +372,15 @@ type chartFilterFieldConfig struct {
 // buildChartSQL 根据图表配置生成聚合SQL，带输入校验防止SQL注入
 func buildChartSQL(configJSON string, chartType string, datasetSQL string, filters []FilterCondition) (string, error) {
 	var config struct {
-		RowFields       []fieldConfig                      `json:"rowFields"`
-		ColFields       []fieldConfig                      `json:"colFields"`
-		MeasureFields   []fieldConfig                      `json:"measureFields"`
-		XAxisFields     []fieldConfig                      `json:"xAxisFields"`
-		YAxisFields     []fieldConfig                      `json:"yAxisFields"`
-		GroupFields     []fieldConfig                      `json:"groupFields"`
-		IndicatorFields []fieldConfig                      `json:"indicatorFields"`
-		FilterFields    []chartFilterFieldConfig           `json:"filterFields"`
-		FilterValues    map[string]json.RawMessage         `json:"filterValues"`
+		RowFields       []fieldConfig              `json:"rowFields"`
+		ColFields       []fieldConfig              `json:"colFields"`
+		MeasureFields   []fieldConfig              `json:"measureFields"`
+		XAxisFields     []fieldConfig              `json:"xAxisFields"`
+		YAxisFields     []fieldConfig              `json:"yAxisFields"`
+		GroupFields     []fieldConfig              `json:"groupFields"`
+		IndicatorFields []fieldConfig              `json:"indicatorFields"`
+		FilterFields    []chartFilterFieldConfig   `json:"filterFields"`
+		FilterValues    map[string]json.RawMessage `json:"filterValues"`
 	}
 
 	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
@@ -586,11 +587,11 @@ func buildAggField(f fieldConfig) (string, error) {
 		return "", fmt.Errorf("非法字段名: %s", f.OriginalName)
 	}
 
-	aggLabel := "计数"
+	aggLabel := "count"
 	if f.Config != nil && f.Config.Aggregation != "" {
-		aggLabel = f.Config.Aggregation
+		aggLabel = chineseAggToAlias(f.Config.Aggregation)
 	}
-	alias := fmt.Sprintf("`%s_%s`", f.OriginalName, aggLabel)
+	alias := sanitizeAlias(fmt.Sprintf("%s_%s", f.OriginalName, aggLabel))
 
 	// 计算字段直接使用表达式，校验后不包裹聚合函数
 	if f.IsCalculated && f.Expression != "" {
@@ -612,7 +613,8 @@ func buildAggField(f fieldConfig) (string, error) {
 		case "最小值":
 			agg = "MIN"
 		case "去重计数":
-			return fmt.Sprintf("COUNT(DISTINCT %s) AS `%s_去重计数`", f.OriginalName, f.OriginalName), nil
+			alias = sanitizeAlias(fmt.Sprintf("%s_count_distinct", f.OriginalName))
+			return fmt.Sprintf("COUNT(DISTINCT %s) AS %s", f.OriginalName, alias), nil
 		case "计数":
 			agg = "COUNT"
 		}

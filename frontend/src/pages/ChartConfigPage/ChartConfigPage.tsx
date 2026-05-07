@@ -249,7 +249,7 @@ const ChartConfigPage: React.FC = () => {
 
   const buildAggField = (field: FieldConfig) => {
     const aggregation = field.config?.aggregation || '计数';
-    const alias = `\`${field.originalName}_${aggregation}\``;
+    const alias = `"${field.originalName}_${aggregation}"`;
     if (field.isCalculated && field.expression) {
       return `${field.expression} AS ${alias}`;
     }
@@ -531,7 +531,7 @@ const ChartConfigPage: React.FC = () => {
           value={chartName}
           onChange={(e) => setChartName(e.target.value)}
           style={{ width: 260, marginLeft: 4 }}
-          bordered
+          variant="outlined"
         />
         <div style={{ flex: 1 }} />
         <Button icon={<CodeOutlined />} onClick={openSQLModal}>SQL</Button>

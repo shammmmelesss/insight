@@ -247,29 +247,17 @@ const ChartConfigPage: React.FC = () => {
     return map[aggregation] ?? 'COUNT';
   };
 
-  const mapAggregationToAlias = (aggregation: string): string => {
-    const map: Record<string, string> = {
-      '求和': 'sum',
-      '平均值': 'avg',
-      '最大值': 'max',
-      '最小值': 'min',
-      '计数': 'count',
-      '去重计数': 'count_distinct',
-    };
-    return map[aggregation] ?? 'count';
-  };
-
   const buildAggField = (field: FieldConfig) => {
     const aggregation = field.config?.aggregation || '计数';
-    const aliasLabel = mapAggregationToAlias(aggregation);
+    const alias = `\`${field.originalName}_${aggregation}\``;
     if (field.isCalculated && field.expression) {
-      return `${field.expression} AS ${field.originalName}_${aliasLabel}`;
+      return `${field.expression} AS ${alias}`;
     }
     if (aggregation === '去重计数') {
-      return `COUNT(DISTINCT ${field.originalName}) AS ${field.originalName}_${aliasLabel}`;
+      return `COUNT(DISTINCT ${field.originalName}) AS ${alias}`;
     }
     const fn = mapAggregationToSQL(aggregation);
-    return `${fn}(${field.originalName}) AS ${field.originalName}_${aliasLabel}`;
+    return `${fn}(${field.originalName}) AS ${alias}`;
   };
 
   const generateSQL = useCallback(() => {
@@ -828,11 +816,11 @@ const ChartConfigPage: React.FC = () => {
               chartData={chartData}
               rowFields={rowFields.map(f => f.originalName)}
               colFields={colFields.map(f => f.originalName)}
-              measureFields={measureFields.map(f => `${f.originalName}_${mapAggregationToAlias(f.config?.aggregation || '计数')}`)}
+              measureFields={measureFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
               xAxisFields={xAxisFields.map(f => f.originalName)}
-              yAxisFields={yAxisFields.map(f => `${f.originalName}_${mapAggregationToAlias(f.config?.aggregation || '计数')}`)}
+              yAxisFields={yAxisFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
               groupFields={groupFields.map(f => f.originalName)}
-              indicatorFields={indicatorFields.map(f => `${f.originalName}_${mapAggregationToAlias(f.config?.aggregation || '计数')}`)}
+              indicatorFields={indicatorFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
             />
           </div>
         </div>

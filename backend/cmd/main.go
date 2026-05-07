@@ -58,6 +58,7 @@ func main() {
 	r.Static("/assets", "./frontend/dist/assets")
 	r.StaticFile("/favicon.ico", "./frontend/dist/favicon.ico")
 	r.NoRoute(func(c *gin.Context) {
+		c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
 		c.File("./frontend/dist/index.html")
 	})
 

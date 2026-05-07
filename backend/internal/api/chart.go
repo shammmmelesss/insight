@@ -586,11 +586,11 @@ func buildAggField(f fieldConfig) (string, error) {
 		return "", fmt.Errorf("非法字段名: %s", f.OriginalName)
 	}
 
-	aggLabel := "count"
+	aggLabel := "计数"
 	if f.Config != nil && f.Config.Aggregation != "" {
-		aggLabel = chineseAggToAlias(f.Config.Aggregation)
+		aggLabel = f.Config.Aggregation
 	}
-	alias := f.OriginalName + "_" + aggLabel
+	alias := fmt.Sprintf("`%s_%s`", f.OriginalName, aggLabel)
 
 	// 计算字段直接使用表达式，校验后不包裹聚合函数
 	if f.IsCalculated && f.Expression != "" {
@@ -612,12 +612,12 @@ func buildAggField(f fieldConfig) (string, error) {
 		case "最小值":
 			agg = "MIN"
 		case "去重计数":
-			return fmt.Sprintf("COUNT(DISTINCT %s) AS %s", f.OriginalName, f.OriginalName+"_count_distinct"), nil
+			return fmt.Sprintf("COUNT(DISTINCT %s) AS `%s_去重计数`", f.OriginalName, f.OriginalName), nil
 		case "计数":
 			agg = "COUNT"
 		}
 	}
-	return fmt.Sprintf("%s(%s) AS %s", agg, f.OriginalName, sanitizeAlias(f.OriginalName+"_"+getAggLabel(agg))), nil
+	return fmt.Sprintf("%s(%s) AS %s", agg, f.OriginalName, alias), nil
 }
 
 // sanitizeAlias 将别名中的非法字符替换为下划线

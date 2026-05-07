@@ -55,9 +55,6 @@ func LoadConfig() (*Config, error) {
 	if v := os.Getenv("DB_SSLMODE"); v != "" {
 		cfg.Database.SSLMode = v
 	}
-	if v := os.Getenv("SERVER_PORT"); v != "" {
-		cfg.Server.Port = v
-	}
 	// ALLOWED_ORIGINS 逗号分隔，如: http://app.example.com,https://app.example.com
 	if v := os.Getenv("ALLOWED_ORIGINS"); v != "" {
 		cfg.Server.AllowedOrigins = strings.Split(v, ",")

@@ -251,12 +251,12 @@ const ChartConfigPage: React.FC = () => {
   // 根据数据源类型获取标识符引号
   const getIdentifierQuote = (): string => {
     const dsType = dataSourceType.toLowerCase();
-    // BigQuery 和 MySQL 使用反引号
-    if (dsType === 'bigquery' || dsType === 'mysql') {
-      return '`';
-    }
     // PostgreSQL、SQL Server、Oracle 使用双引号
-    return '"';
+    if (dsType === 'postgresql' || dsType === 'sqlserver' || dsType === 'oracle') {
+      return '"';
+    }
+    // BigQuery、MySQL 及未知类型默认使用反引号（避免 dataSourceType 未加载时用双引号报错）
+    return '`';
   };
 
   const buildAggField = (field: FieldConfig) => {

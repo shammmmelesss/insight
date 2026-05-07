@@ -8,7 +8,7 @@ logfile
 
 # Frontend
 frontend/node_modules/
-frontend/dist/
+# frontend/dist/
 frontend/.vite/
 frontend/tsconfig.tsbuildinfo
 frontend/tsconfig.node.tsbuildinfo
@@ -48,3 +48,20 @@ config.local.yml
 frontend/.trae/
 # Docker
 docker-compose.override.yml
+
+
+
+# 前端常见日志/缓存
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# 后端/Go 常见
+coverage.out
+.coverage/
+
+# 其他临时/备份
+*.bak
+*.tmp
+*.temp

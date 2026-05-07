@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"data-analysis-platform/internal/database"
 	"data-analysis-platform/internal/models"
+
+	"github.com/gin-gonic/gin"
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
@@ -236,12 +237,20 @@ func UpdateDataSource(c *gin.Context) {
 // DeleteDataSource 删除数据源
 func DeleteDataSource(c *gin.Context) {
 	id := c.Param("id")
+
+	// 检查是否有数据集引用该数据源
+	var datasetCount int64
+	database.DB.Model(&models.Dataset{}).Where("data_source_id = ?", id).Count(&datasetCount)
+	if datasetCount > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("该数据源被 %d 个数据集引用，无法删除", datasetCount)})
+		return
+	}
+
 	result := database.DB.Delete(&models.DataSource{}, "id = ?", id)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 

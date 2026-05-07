@@ -1,4 +1,4 @@
-import { ConfigProvider } from 'antd';
+import { App as AntdApp, ConfigProvider } from 'antd';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import HomePage from './pages/HomePage/HomePage';
 import DataSourcesPage from './pages/DataSourcesPage/DataSourcesPage';
@@ -47,13 +47,15 @@ function App() {
           },
         }}
       >
-        <Router>
-          <WorkspaceProvider>
-            <Layout>
-              <AppRoutes />
-            </Layout>
-          </WorkspaceProvider>
-        </Router>
+        <AntdApp>
+          <Router>
+            <WorkspaceProvider>
+              <Layout>
+                <AppRoutes />
+              </Layout>
+            </WorkspaceProvider>
+          </Router>
+        </AntdApp>
       </ConfigProvider>
     </ErrorBoundary>
   );

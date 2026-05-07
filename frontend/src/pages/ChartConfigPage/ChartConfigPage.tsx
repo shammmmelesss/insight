@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Button, Input, Select, message, Modal, Tag, Tooltip, Space, Radio, DatePicker } from 'antd';
+import { App, Button, Input, Select, Modal, Tag, Tooltip, Space, Radio, DatePicker } from 'antd';
 import {
   ArrowLeftOutlined,
   SettingOutlined,
@@ -181,6 +181,7 @@ const DropZone: React.FC<DropZoneProps> = ({
 
 // --- 主组件 ---
 const ChartConfigPage: React.FC = () => {
+  const { message } = App.useApp();
   const [chartName, setChartName] = useState('');
   const [searchParams] = useSearchParams();
   const chartId = searchParams.get('chartId');
@@ -251,12 +252,12 @@ const ChartConfigPage: React.FC = () => {
   // 根据数据源类型获取标识符引号
   const getIdentifierQuote = (): string => {
     const dsType = dataSourceType.toLowerCase();
-    // PostgreSQL、SQL Server、Oracle 使用双引号
-    if (dsType === 'postgresql' || dsType === 'sqlserver' || dsType === 'oracle') {
-      return '"';
+    // MySQL、BigQuery 使用反引号
+    if (dsType === 'mysql' || dsType === 'bigquery') {
+      return '`';
     }
-    // BigQuery、MySQL 及未知类型默认使用反引号（避免 dataSourceType 未加载时用双引号报错）
-    return '`';
+    // 其余（PostgreSQL、SQLite、BigQuery、Oracle、SQLServer、未知）均使用双引号（ANSI SQL 标准）
+    return '"';
   };
 
   const buildAggField = (field: FieldConfig) => {

@@ -231,15 +231,34 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       actualGroupField = getActualField(groupFields[0], dataFields);
     }
 
+    // 根据数据量决定X轴标签展示策略：少量数据水平展示，大量数据旋转+稀疏
+    const dataCount = chartData.length;
+    const isDense = dataCount > 20;
+    const labelStep = isDense ? Math.ceil(dataCount / 20) : 1;
+    const xAxisConfig = isDense
+      ? {
+          labelTransform: 'rotate(-20)',
+          label: { style: { fontSize: 11, textAnchor: 'end' } },
+          tickFilter: (_: any, i: number) => i % labelStep === 0,
+          tick: false,
+          title: false,
+        }
+      : {
+          labelTransform: 'rotate(0)',
+          label: { style: { fontSize: 11, textAnchor: 'middle' } },
+          tick: false,
+          title: false,
+        };
+
     if (actualYFields.length === 1) {
       // 单Y轴：保持原有逻辑
       const actualYField = actualYFields[0];
-      
+
       const cleanedData = chartData.map(item => ({
         ...item,
         [actualYField]: Number(item[actualYField]) || 0,
       })).filter(item => !isNaN(item[actualYField]));
-      
+
       if (cleanedData.length === 0) {
         if (chartRef.current) {
           chartRef.current.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">Y轴字段无有效数值</div>';
@@ -248,15 +267,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       }
 
       createAndRenderG2Chart((chart) => {
-        chart.axis('x', { title: false });
-        chart.axis(actualXField, {
-          label: {
-            style: { textWrap: { width: 80, method: 'wrap' } },
-            align: 'center',
-            transform: [],
-          },
-          title: false,
-        });
+        chart.axis('x', xAxisConfig);
         chart.axis(actualYField, {
           title: { text: actualYField, style: { fontSize: 12 } },
           label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
@@ -299,7 +310,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           }
         });
       });
-      
+
       if (longData.length === 0) {
         if (chartRef.current) {
           chartRef.current.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">Y轴字段无有效数值</div>';
@@ -316,15 +327,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       });
 
       createAndRenderG2Chart((chart) => {
-        chart.axis('x', { title: false });
-        chart.axis(actualXField, {
-          label: {
-            style: { textWrap: { width: 80, method: 'wrap' } },
-            align: 'center',
-            transform: [],
-          },
-          title: false,
-        });
+        chart.axis('x', xAxisConfig);
         chart.axis('_value', {
           title: { text: '值', style: { fontSize: 12 } },
           label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
@@ -387,15 +390,35 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       actualGroupField = getActualField(groupFields[0], dataFields);
     }
 
+    // 根据数据量决定X轴标签展示策略：少量数据水平展示，大量数据旋转+稀疏
+    const dataCount = chartData.length;
+    const isDense = dataCount > 20;
+    // 大量数据时每隔 N 个只显示一个标签
+    const labelStep = isDense ? Math.ceil(dataCount / 20) : 1;
+    const xAxisConfig = isDense
+      ? {
+          labelTransform: 'rotate(-20)',
+          label: { style: { fontSize: 11, textAnchor: 'end' } },
+          tickFilter: (_: any, i: number) => i % labelStep === 0,
+          tick: false,
+          title: false,
+        }
+      : {
+          labelTransform: 'rotate(0)',
+          label: { style: { fontSize: 11, textAnchor: 'middle' } },
+          tick: false,
+          title: false,
+        };
+
     if (actualYFields.length === 1) {
       // 单Y轴：保持原有逻辑
       const actualYField = actualYFields[0];
-      
+
       const cleanedData = chartData.map(item => ({
         ...item,
         [actualYField]: Number(item[actualYField]) || 0,
       })).filter(item => !isNaN(item[actualYField]));
-      
+
       if (cleanedData.length === 0) {
         if (chartRef.current) {
           chartRef.current.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">Y轴字段无有效数值</div>';
@@ -404,15 +427,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       }
 
       createAndRenderG2Chart((chart) => {
-        chart.axis('x', { title: false });
-        chart.axis(actualXField, {
-          label: {
-            style: { textWrap: { width: 80, method: 'wrap' } },
-            align: 'center',
-            transform: [],
-          },
-          title: false,
-        });
+        chart.axis('x', xAxisConfig);
         chart.axis(actualYField, {
           title: { text: actualYField, style: { fontSize: 12 } },
           label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
@@ -470,7 +485,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           }
         });
       });
-      
+
       if (longData.length === 0) {
         if (chartRef.current) {
           chartRef.current.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">Y轴字段无有效数值</div>';
@@ -479,15 +494,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       }
 
       createAndRenderG2Chart((chart) => {
-        chart.axis('x', { title: false });
-        chart.axis(actualXField, {
-          label: {
-            style: { textWrap: { width: 80, method: 'wrap' } },
-            align: 'center',
-            transform: [],
-          },
-          title: false,
-        });
+        chart.axis('x', xAxisConfig);
         chart.axis('_value', {
           title: { text: '值', style: { fontSize: 12 } },
           label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },

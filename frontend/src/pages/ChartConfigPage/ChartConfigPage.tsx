@@ -247,16 +247,29 @@ const ChartConfigPage: React.FC = () => {
     return map[aggregation] ?? 'COUNT';
   };
 
+  const mapAggregationToAlias = (aggregation: string): string => {
+    const map: Record<string, string> = {
+      '求和': 'sum',
+      '平均值': 'avg',
+      '最大值': 'max',
+      '最小值': 'min',
+      '计数': 'count',
+      '去重计数': 'count_distinct',
+    };
+    return map[aggregation] ?? 'count';
+  };
+
   const buildAggField = (field: FieldConfig) => {
     const aggregation = field.config?.aggregation || '计数';
+    const aliasLabel = mapAggregationToAlias(aggregation);
     if (field.isCalculated && field.expression) {
-      return `${field.expression} AS ${field.originalName}_${aggregation}`;
+      return `${field.expression} AS ${field.originalName}_${aliasLabel}`;
     }
     if (aggregation === '去重计数') {
-      return `COUNT(DISTINCT ${field.originalName}) AS ${field.originalName}_${aggregation}`;
+      return `COUNT(DISTINCT ${field.originalName}) AS ${field.originalName}_${aliasLabel}`;
     }
     const fn = mapAggregationToSQL(aggregation);
-    return `${fn}(${field.originalName}) AS ${field.originalName}_${aggregation}`;
+    return `${fn}(${field.originalName}) AS ${field.originalName}_${aliasLabel}`;
   };
 
   const generateSQL = useCallback(() => {

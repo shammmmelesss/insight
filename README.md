@@ -99,16 +99,20 @@ Insight 是一个现代化的数据分析平台，支持多数据源接入、SQL
 ## 快速开始
 
 ### 环境要求
-- Go 1.25+
+- Go 1.21+
 - Node.js 18+
 - PostgreSQL 15+
 
-### 启动数据库
+---
+
+## 本地开发启动
+
+### 1. 启动数据库
 ```bash
 docker compose up -d
 ```
 
-### 启动后端
+### 2. 启动后端
 ```bash
 cd backend
 go mod download
@@ -116,7 +120,7 @@ go run cmd/main.go
 # 服务运行在 http://localhost:8080
 ```
 
-### 启动前端
+### 3. 启动前端
 ```bash
 cd frontend
 npm install
@@ -124,7 +128,77 @@ npm run dev
 # 服务运行在 http://localhost:3000
 ```
 
-前端开发服务器会自动将 `/api` 请求代理到后端 `http://localhost:8080`。
+前端开发服务器会自动将 `/api` 请求代理到后端 `http://localhost:8080`，修改源码后页面自动热更新。
+
+---
+
+## 服务器部署（持久化服务）
+
+服务器上前后端均通过 **systemd** 管理，开机自启，崩溃自动重启。
+
+### 服务地址
+
+| 服务 | 地址 | 说明 |
+|------|------|------|
+| 前端（Vite dev server） | `http://172.31.16.190:3000` | 实时编译，改代码自动热更新 |
+| 后端 API | `http://172.31.16.190:8080` | Go 编译后的二进制 |
+
+### 服务管理
+
+```bash
+# 查看状态
+sudo systemctl status insight          # 后端
+sudo systemctl status insight-frontend # 前端
+
+# 启动 / 停止 / 重启
+sudo systemctl start insight
+sudo systemctl restart insight
+sudo systemctl stop insight
+
+sudo systemctl restart insight-frontend
+```
+
+### 更新部署
+
+拉取代码后，根据改动范围执行以下步骤：
+
+**只改了前端代码**（`frontend/src/` 下）：
+```bash
+# Vite dev server 会自动热更新，无需任何操作
+# 如果热更新失效，重启前端服务即可
+sudo systemctl restart insight-frontend
+```
+
+**改了后端代码**（`backend/` 下）：
+```bash
+# 重新编译
+cd /home/ubuntu/dev/insight/backend
+/usr/local/go/bin/go build -o /home/ubuntu/insight-backend ./cmd/...
+
+# 重启服务
+sudo systemctl restart insight
+```
+
+**同时改了前后端**（或需要对外发布前端静态构建版）：
+```bash
+# 编译后端
+cd /home/ubuntu/dev/insight/backend
+/usr/local/go/bin/go build -o /home/ubuntu/insight-backend ./cmd/...
+
+# 构建前端（生成 frontend/dist/）
+cd /home/ubuntu/dev/insight/frontend
+node_modules/.bin/vite build
+
+# 重启后端（后端同时服务 frontend/dist/ 静态文件，通过 :8080 访问）
+sudo systemctl restart insight
+```
+
+### 日志查看
+
+```bash
+tail -f /home/ubuntu/insight-backend.log  # 后端日志
+tail -f /home/ubuntu/vite.log             # 前端日志
+```
 
 ### 配置
 

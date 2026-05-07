@@ -192,6 +192,7 @@ const ChartConfigPage: React.FC = () => {
   const [chartData, setChartData] = useState<any[]>([]);
   const [datasetSQL, setDatasetSQL] = useState('');
   const [dataSourceId, setDataSourceId] = useState('');
+  const [dataSourceType, setDataSourceType] = useState('');
 
   const [droppableArea, setDroppableArea] = useState<string | null>(null);
   const [draggedField, setDraggedField] = useState<FieldConfig | null>(null);
@@ -247,9 +248,21 @@ const ChartConfigPage: React.FC = () => {
     return map[aggregation] ?? 'COUNT';
   };
 
+  // 根据数据源类型获取标识符引号
+  const getIdentifierQuote = (): string => {
+    const dsType = dataSourceType.toLowerCase();
+    // BigQuery 和 MySQL 使用反引号
+    if (dsType === 'bigquery' || dsType === 'mysql') {
+      return '`';
+    }
+    // PostgreSQL、SQL Server、Oracle 使用双引号
+    return '"';
+  };
+
   const buildAggField = (field: FieldConfig) => {
     const aggregation = field.config?.aggregation || '计数';
-    const alias = `"${field.originalName}_${aggregation}"`;
+    const quote = getIdentifierQuote();
+    const alias = `${quote}${field.originalName}_${aggregation}${quote}`;
     if (field.isCalculated && field.expression) {
       return `${field.expression} AS ${alias}`;
     }
@@ -319,7 +332,7 @@ const ChartConfigPage: React.FC = () => {
       return `SELECT ${agg.join(', ')} FROM (${innerSQL}) AS dataset WHERE 1=1`;
     }
     return innerSQL;
-  }, [datasetSQL, selectedDataset, chartType, rowFields, colFields, measureFields, xAxisFields, yAxisFields, groupFields, indicatorFields, filterFields, filterValues]);
+  }, [datasetSQL, selectedDataset, chartType, rowFields, colFields, measureFields, xAxisFields, yAxisFields, groupFields, indicatorFields, filterFields, filterValues, dataSourceType]);
 
   useEffect(() => {
     if (!chartId) return;
@@ -382,9 +395,18 @@ const ChartConfigPage: React.FC = () => {
         setFilterValues(pendingFilterValues.current);
         pendingFilterValues.current = null;
       }
+      // 获取数据源类型
+      const dsId = res.data.dataSourceId;
+      if (dsId) {
+        axios.get(`/api/data-sources/${dsId}`).then(dsRes => {
+          setDataSourceType(dsRes.data.type || '');
+        }).catch(() => setDataSourceType(''));
+      } else {
+        setDataSourceType('');
+      }
     }).catch(() => {
       message.error('获取数据集字段失败');
-      setDatasetFields([]); setDatasetSQL(''); setDataSourceId('');
+      setDatasetFields([]); setDatasetSQL(''); setDataSourceId(''); setDataSourceType('');
     });
   }, [selectedDataset]);
 

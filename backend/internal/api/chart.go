@@ -377,6 +377,7 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 		MeasureFields   []fieldConfig              `json:"measureFields"`
 		XAxisFields     []fieldConfig              `json:"xAxisFields"`
 		YAxisFields     []fieldConfig              `json:"yAxisFields"`
+		Y2AxisFields    []fieldConfig              `json:"y2AxisFields"`
 		GroupFields     []fieldConfig              `json:"groupFields"`
 		IndicatorFields []fieldConfig              `json:"indicatorFields"`
 		FilterFields    []chartFilterFieldConfig   `json:"filterFields"`
@@ -513,6 +514,27 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 		}
 	case "indicator":
 		for _, f := range config.IndicatorFields {
+			agg, e := buildAggField(f)
+			if e != nil {
+				return "", e
+			}
+			selectFields = append(selectFields, agg)
+		}
+	case "dualAxis":
+		for _, f := range config.XAxisFields {
+			if err = addDimension(f.OriginalName); err != nil {
+				return "", err
+			}
+			orderByFields = append(orderByFields, fmt.Sprintf("%s %s", f.OriginalName, sortDir(f)))
+		}
+		for _, f := range config.YAxisFields {
+			agg, e := buildAggField(f)
+			if e != nil {
+				return "", e
+			}
+			selectFields = append(selectFields, agg)
+		}
+		for _, f := range config.Y2AxisFields {
 			agg, e := buildAggField(f)
 			if e != nil {
 				return "", e
@@ -689,7 +711,7 @@ func chineseAggToAlias(agg string) string {
 // isValidChartType 校验图表类型
 func isValidChartType(t models.ChartType) bool {
 	switch t {
-	case models.ChartTypeCrossTable, models.ChartTypeBar, models.ChartTypeLine, models.ChartTypePie, models.ChartTypeIndicator:
+	case models.ChartTypeCrossTable, models.ChartTypeBar, models.ChartTypeLine, models.ChartTypePie, models.ChartTypeIndicator, models.ChartTypeDualAxis:
 		return true
 	}
 	return false

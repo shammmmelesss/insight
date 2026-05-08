@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 
 // 图表类型
-type ChartType = 'crossTable' | 'bar' | 'line' | 'pie' | 'indicator';
+type ChartType = 'crossTable' | 'bar' | 'line' | 'pie' | 'indicator' | 'dualAxis';
 import {
   S2Options,
   PivotSheet,
@@ -16,6 +16,7 @@ interface ChartRendererProps {
   measureFields?: string[];
   xAxisFields?: string[];
   yAxisFields?: string[];
+  y2AxisFields?: string[];
   groupFields?: string[];
   indicatorFields?: string[];
   containerHeight?: number;
@@ -29,6 +30,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   measureFields = [],
   xAxisFields = [],
   yAxisFields = [],
+  y2AxisFields = [],
   groupFields = [],
   indicatorFields = [],
   containerHeight,
@@ -112,6 +114,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         renderPieChart();
       } else if (chartType === 'indicator') {
         renderIndicatorCard();
+      } else if (chartType === 'dualAxis') {
+        renderDualAxisChart();
       } else {
         renderDefault();
       }
@@ -519,6 +523,159 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         chart.legend('color', { position: 'bottom', layout: { justifyContent: 'center' } });
       });
     }
+  };
+
+  // 渲染双Y轴图（左柱右线）
+  const renderDualAxisChart = () => {
+    if (chartData.length === 0) {
+      if (chartRef.current) {
+        chartRef.current.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">暂无数据</div>';
+      }
+      return;
+    }
+
+    const dataFields = Object.keys(chartData[0]);
+
+    let actualXField = '';
+    if (Array.isArray(xAxisFields) && xAxisFields.length > 0 && xAxisFields[0]) {
+      actualXField = getActualField(xAxisFields[0], dataFields);
+    }
+
+    const actualLeftFields = (yAxisFields || [])
+      .filter(f => f)
+      .map(f => getActualField(f, dataFields));
+
+    const actualRightFields = (y2AxisFields || [])
+      .filter(f => f)
+      .map(f => getActualField(f, dataFields));
+
+    if (!actualXField || (actualLeftFields.length === 0 && actualRightFields.length === 0)) {
+      if (chartRef.current) {
+        chartRef.current.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">请配置有效的X轴、左Y轴或右Y轴字段</div>';
+      }
+      return;
+    }
+
+    const dataCount = chartData.length;
+    const isDense = dataCount > 20;
+    const labelStep = isDense ? Math.ceil(dataCount / 20) : 1;
+    const xAxisConfig = isDense
+      ? {
+          labelTransform: 'rotate(-20)',
+          label: { style: { fontSize: 11, textAnchor: 'end' } },
+          tickFilter: (_: any, i: number) => i % labelStep === 0,
+          tick: false,
+          title: false,
+        }
+      : {
+          labelTransform: 'rotate(0)',
+          label: { style: { fontSize: 11, textAnchor: 'middle' } },
+          tick: false,
+          title: false,
+        };
+
+    // 构建左轴长格式数据（柱状）
+    const leftLongData: any[] = [];
+    if (actualLeftFields.length > 0) {
+      chartData.forEach(item => {
+        actualLeftFields.forEach(f => {
+          const value = Number(item[f]);
+          if (!isNaN(value)) {
+            leftLongData.push({ ...item, _metricL: f, _valueL: value });
+          }
+        });
+      });
+    }
+
+    // 构建右轴长格式数据（折线）
+    const rightLongData: any[] = [];
+    if (actualRightFields.length > 0) {
+      chartData.forEach(item => {
+        actualRightFields.forEach(f => {
+          const value = Number(item[f]);
+          if (!isNaN(value)) {
+            rightLongData.push({ ...item, _metricR: f, _valueR: value });
+          }
+        });
+      });
+    }
+
+    // 构建 tooltip 用的 x→全指标 查找表
+    const xMetricsMap: Record<string, Record<string, number>> = {};
+    [...leftLongData, ...rightLongData].forEach(item => {
+      const xKey = String(item[actualXField] ?? '');
+      if (!xMetricsMap[xKey]) xMetricsMap[xKey] = {};
+      if (item._metricL !== undefined) xMetricsMap[xKey][item._metricL] = item._valueL;
+      if (item._metricR !== undefined) xMetricsMap[xKey][item._metricR] = item._valueR;
+    });
+
+    const allMetrics = [...actualLeftFields, ...actualRightFields];
+
+    createAndRenderG2Chart((chart) => {
+      chart.axis('x', xAxisConfig);
+
+      if (leftLongData.length > 0) {
+        const useStack = actualLeftFields.length > 1;
+        const bar = chart
+          .interval()
+          .data(leftLongData)
+          .encode('x', actualXField)
+          .encode('y', '_valueL')
+          .style({ fillOpacity: 0.85, lineWidth: 0 })
+          .interaction('elementHighlight')
+          .axis('y', {
+            position: 'left',
+            title: actualLeftFields.join(' / '),
+            label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
+          })
+          .tooltip({
+            title: (d: any) => String(d[actualXField] ?? ''),
+            items: allMetrics.map(m => (d: any) => ({
+              name: m,
+              value: xMetricsMap[String(d[actualXField] ?? '')]?.[m] ?? '-',
+            })),
+          });
+
+        if (actualLeftFields.length > 1) {
+          bar.encode('color', '_metricL');
+          if (useStack) bar.transform({ type: 'stackY' });
+        }
+      }
+
+      if (rightLongData.length > 0) {
+        const line = chart
+          .line()
+          .data(rightLongData)
+          .encode('x', actualXField)
+          .encode('y', '_valueR')
+          .encode('shape', 'smooth')
+          .style({ lineWidth: 2 })
+          .scale('y', { independent: true })
+          .axis('y', {
+            position: 'right',
+            title: actualRightFields.join(' / '),
+            label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
+          })
+          .tooltip(false);
+
+        if (actualRightFields.length > 1) {
+          line.encode('color', '_metricR');
+        }
+
+        chart
+          .point()
+          .data(rightLongData)
+          .encode('x', actualXField)
+          .encode('y', '_valueR')
+          .encode('shape', 'circle')
+          .style({ r: 3, fill: 'white', stroke: 'currentColor', lineWidth: 1.5 })
+          .scale('y', { independent: true })
+          .axis('y', false)
+          .tooltip(false);
+      }
+
+      chart.legend('color', { position: 'bottom', layout: { justifyContent: 'center' } });
+    });
   };
 
   // 渲染饼图

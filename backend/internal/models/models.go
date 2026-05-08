@@ -62,6 +62,7 @@ const (
 	ChartTypeLine       ChartType = "line"
 	ChartTypePie        ChartType = "pie"
 	ChartTypeIndicator  ChartType = "indicator"
+	ChartTypeDualAxis   ChartType = "dualAxis"
 )
 
 // Chart 图表模型

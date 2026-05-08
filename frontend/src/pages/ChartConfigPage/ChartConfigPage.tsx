@@ -9,6 +9,7 @@ import {
   LineChartOutlined,
   PieChartOutlined,
   DashboardOutlined,
+  FundOutlined,
   SearchOutlined,
   DragOutlined,
   SaveOutlined,
@@ -18,7 +19,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import ChartRenderer from '../../components/ChartRenderer';
 
-type ChartType = 'crossTable' | 'bar' | 'line' | 'pie' | 'indicator';
+type ChartType = 'crossTable' | 'bar' | 'line' | 'pie' | 'indicator' | 'dualAxis';
 
 const { Option } = Select;
 
@@ -216,6 +217,7 @@ const ChartConfigPage: React.FC = () => {
   const [measureFields, setMeasureFields] = useState<FieldConfig[]>([]);
   const [xAxisFields, setXAxisFields] = useState<FieldConfig[]>([]);
   const [yAxisFields, setYAxisFields] = useState<FieldConfig[]>([]);
+  const [y2AxisFields, setY2AxisFields] = useState<FieldConfig[]>([]);
   const [groupFields, setGroupFields] = useState<FieldConfig[]>([]);
   const [indicatorFields, setIndicatorFields] = useState<FieldConfig[]>([]);
   const [filterFields, setFilterFields] = useState<FieldConfig[]>([]);
@@ -232,6 +234,7 @@ const ChartConfigPage: React.FC = () => {
     measure: setMeasureFields,
     xAxis: setXAxisFields,
     yAxis: setYAxisFields,
+    y2Axis: setY2AxisFields,
     group: setGroupFields,
     indicator: setIndicatorFields,
     filter: setFilterFields,
@@ -323,6 +326,10 @@ const ChartConfigPage: React.FC = () => {
       const gs = groupFields.map(f => f.originalName);
       return wrap([...xs, ...gs], yAxisFields.map(buildAggField), [...xs, ...gs], xs);
     }
+    if (chartType === 'dualAxis') {
+      const xs = xAxisFields.map(f => f.originalName);
+      return wrap(xs, [...yAxisFields.map(buildAggField), ...y2AxisFields.map(buildAggField)], xs, xs);
+    }
     if (chartType === 'pie') {
       const gs = groupFields.map(f => f.originalName);
       return wrap(gs, measureFields.map(buildAggField), gs, []);
@@ -333,7 +340,7 @@ const ChartConfigPage: React.FC = () => {
       return `SELECT ${agg.join(', ')} FROM (${innerSQL}) AS dataset WHERE 1=1`;
     }
     return innerSQL;
-  }, [datasetSQL, selectedDataset, chartType, rowFields, colFields, measureFields, xAxisFields, yAxisFields, groupFields, indicatorFields, filterFields, filterValues, dataSourceType]);
+  }, [datasetSQL, selectedDataset, chartType, rowFields, colFields, measureFields, xAxisFields, yAxisFields, y2AxisFields, groupFields, indicatorFields, filterFields, filterValues, dataSourceType]);
 
   useEffect(() => {
     if (!chartId) return;
@@ -348,6 +355,7 @@ const ChartConfigPage: React.FC = () => {
       setMeasureFields(config.measureFields || []);
       setXAxisFields(config.xAxisFields || []);
       setYAxisFields(config.yAxisFields || []);
+      setY2AxisFields(config.y2AxisFields || []);
       setGroupFields(config.groupFields || []);
       setIndicatorFields(config.indicatorFields || []);
       setFilterFields(config.filterFields || []);
@@ -359,7 +367,7 @@ const ChartConfigPage: React.FC = () => {
   const handleSaveChart = async () => {
     if (!chartName) { message.error('请输入图表名称'); return; }
     if (!selectedDataset) { message.error('请选择数据集'); return; }
-    const config = JSON.stringify({ rowFields, colFields, measureFields, xAxisFields, yAxisFields, groupFields, indicatorFields, filterFields, filterValues });
+    const config = JSON.stringify({ rowFields, colFields, measureFields, xAxisFields, yAxisFields, y2AxisFields, groupFields, indicatorFields, filterFields, filterValues });
     try {
       if (chartId) {
         await axios.put(`/api/charts/${chartId}`, { name: chartName, datasetId: selectedDataset, type: chartType, config });
@@ -503,6 +511,7 @@ const ChartConfigPage: React.FC = () => {
     { label: '折线图', value: 'line', icon: <LineChartOutlined /> },
     { label: '饼图', value: 'pie', icon: <PieChartOutlined /> },
     { label: '指标卡', value: 'indicator', icon: <DashboardOutlined /> },
+    { label: '双Y轴图', value: 'dualAxis', icon: <FundOutlined /> },
   ];
 
   const filteredFields = datasetFields.filter(f =>
@@ -768,6 +777,16 @@ const ChartConfigPage: React.FC = () => {
             {chartType === 'indicator' && (
               <DropZone {...dropZoneProps} areaKey="indicator" label="指标" fields={indicatorFields} isOver={droppableArea === 'indicator'} showAggregation />
             )}
+
+            {/* 双Y轴图 */}
+            {chartType === 'dualAxis' && (
+              <>
+                <DropZone {...dropZoneProps} areaKey="xAxis" label="X 轴（维度）" fields={xAxisFields} isOver={droppableArea === 'xAxis'} />
+                <DropZone {...dropZoneProps} areaKey="yAxis" label="左Y轴（柱，指标）" fields={yAxisFields} isOver={droppableArea === 'yAxis'} showAggregation />
+                <DropZone {...dropZoneProps} areaKey="y2Axis" label="右Y轴（线，指标）" fields={y2AxisFields} isOver={droppableArea === 'y2Axis'} showAggregation />
+                <DropZone {...dropZoneProps} areaKey="filter" label="筛选" fields={filterFields} isOver={droppableArea === 'filter'} />
+              </>
+            )}
           </div>
         </div>
 
@@ -842,6 +861,7 @@ const ChartConfigPage: React.FC = () => {
               measureFields={measureFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
               xAxisFields={xAxisFields.map(f => f.originalName)}
               yAxisFields={yAxisFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
+              y2AxisFields={y2AxisFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
               groupFields={groupFields.map(f => f.originalName)}
               indicatorFields={indicatorFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
             />
@@ -908,6 +928,7 @@ const ChartConfigPage: React.FC = () => {
                 {(currentField.type !== 'dimension' ||
                   currentField.area === 'measure' ||
                   currentField.area === 'yAxis' ||
+                  currentField.area === 'y2Axis' ||
                   currentField.area === 'indicator') && (
                   <div style={{ marginBottom: 16 }}>
                     <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>聚合方式</div>
@@ -928,6 +949,7 @@ const ChartConfigPage: React.FC = () => {
 
                 {((chartType === 'crossTable' && currentField.area === 'measure') ||
                   ((chartType === 'bar' || chartType === 'line') && currentField.area === 'yAxis') ||
+                  (chartType === 'dualAxis' && (currentField.area === 'yAxis' || currentField.area === 'y2Axis')) ||
                   (chartType === 'pie' && currentField.area === 'measure') ||
                   (chartType === 'indicator' && currentField.area === 'indicator')) && (
                   <div style={{ marginBottom: 16 }}>

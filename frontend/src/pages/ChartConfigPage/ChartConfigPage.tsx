@@ -23,16 +23,6 @@ type ChartType = 'crossTable' | 'bar' | 'line' | 'pie' | 'indicator' | 'dualAxis
 
 const { Option } = Select;
 
-const chineseAggToAlias = (agg: string): string => {
-  switch (agg) {
-    case '求和': return 'sum';
-    case '平均值': return 'avg';
-    case '最大值': return 'max';
-    case '最小值': return 'min';
-    case '去重计数': return 'count_distinct';
-    default: return 'count';
-  }
-};
 
 interface FieldConfig {
   originalName: string;
@@ -892,9 +882,8 @@ const ChartConfigPage: React.FC = () => {
               });
               [...measureFields, ...yAxisFields, ...y2AxisFields, ...indicatorFields].forEach(f => {
                 const chineseAgg = f.config?.aggregation || '计数';
-                const englishAlias = chineseAggToAlias(chineseAgg);
-                const key = `${f.originalName}_${englishAlias}`;
-                fieldLabelMap[key] = `${f.displayName || f.originalName} · ${chineseAgg}`;
+                const key = `${f.originalName}_${chineseAgg}`;
+                fieldLabelMap[key] = f.displayName || f.originalName;
                 if (f.config?.dataFormat && f.config.dataFormat !== '原始值') {
                   fieldFormats[f.originalName] = f.config.dataFormat;
                 }

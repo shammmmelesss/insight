@@ -287,7 +287,7 @@ const DashboardsPage: React.FC = () => {
       if (f.originalName) {
         const chineseAgg = f.config?.aggregation || '计数';
         const englishAlias = chineseAggToAlias(chineseAgg);
-        map[`${f.originalName}_${englishAlias}`] = `${f.displayName || f.originalName} · ${chineseAgg}`;
+        map[`${f.originalName}_${englishAlias}`] = f.displayName || f.originalName;
       }
     });
     return map;

@@ -7,6 +7,7 @@ import ChartsPage from './pages/ChartsPage/ChartsPage';
 import ChartConfigPage from './pages/ChartConfigPage/ChartConfigPage';
 import DashboardsPage from './pages/DashboardsPage/DashboardsPage';
 import DashboardEditPage from './pages/DashboardEditPage/DashboardEditPage';
+import MonitorPage from './pages/MonitorPage/MonitorPage';
 import NotFound from './pages/NotFound/NotFound';
 import Layout from './components/Layout/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -30,6 +31,7 @@ function AppRoutes() {
         <Route path="/dashboards" element={<DashboardsPage />} />
         <Route path="/dashboards/create" element={<DashboardEditPage />} />
         <Route path="/dashboards/edit/:id" element={<DashboardEditPage />} />
+        <Route path="/monitor" element={<MonitorPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>

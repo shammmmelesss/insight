@@ -27,6 +27,10 @@ type Config struct {
 		Password string `default:""`
 		DBName   string `default:"insight"`
 	}
+	Lark struct {
+		AppID     string `default:""`
+		AppSecret string `default:""`
+	}
 }
 
 func LoadConfig() (*Config, error) {
@@ -69,6 +73,13 @@ func LoadConfig() (*Config, error) {
 
 	if len(cfg.Server.AllowedOrigins) == 0 {
 		cfg.Server.AllowedOrigins = []string{"http://localhost:3000", "http://127.0.0.1:3000"}
+	}
+
+	if v := os.Getenv("LARK_APP_ID"); v != "" {
+		cfg.Lark.AppID = v
+	}
+	if v := os.Getenv("LARK_APP_SECRET"); v != "" {
+		cfg.Lark.AppSecret = v
 	}
 
 	return &cfg, nil

@@ -407,6 +407,68 @@ export interface FilterField {
   charts: string[];
 }
 
+// ==================== 监控模块 ====================
+
+/** 监控触发运算符 */
+export type MonitorOperator = '>' | '>=' | '<' | '<=' | '=' | '!=';
+
+export type MonitorScheduleFrequency = 'daily' | 'weekly' | 'monthly';
+
+/** 触发时间配置 */
+export interface MonitorSchedule {
+  frequency: MonitorScheduleFrequency;
+  time: string;       // "HH:mm"
+  weekday?: number;   // 0=周日…6=周六，仅 weekly 生效
+  day?: number;       // 1-31，仅 monthly 生效
+}
+
+export type MonitorNotifyChannel = 'email' | 'lark';
+
+export interface LarkUser {
+  openId: string;
+  name: string;
+  avatar?: string;
+}
+
+/** 监控 */
+export interface Monitor {
+  id: string;
+  name: string;
+  workspaceId: string;
+  datasetId: string;
+  timeField: string;
+  whereClause: string;
+  triggerAggFunc: string;
+  triggerMetric: string;
+  triggerOperator: MonitorOperator;
+  triggerThreshold: string;
+  triggerSchedule: MonitorSchedule | string;
+  notifyChannels: MonitorNotifyChannel[] | string;
+  notifyEmails: string[] | string;
+  notifyLarkUsers: LarkUser[] | string;
+  createdBy: string;
+  updatedBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 创建/更新监控请求 */
+export interface MonitorRequest {
+  name: string;
+  datasetId?: string;
+  timeField?: string;
+  triggerMetric?: string;
+  triggerOperator?: MonitorOperator;
+  triggerThreshold?: string;
+  triggerSchedule?: string;
+  notifyChannels?: string;
+  createdBy?: string;
+  updatedBy?: string;
+}
+
+/** 监控列表响应 */
+export type MonitorListResponse = PaginationResult<Monitor>;
+
 // ==================== 通用响应 ====================
 
 /** 通用成功响应 */

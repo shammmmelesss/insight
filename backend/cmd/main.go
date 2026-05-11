@@ -39,6 +39,7 @@ func main() {
 		&models.Dataset{},
 		&models.Chart{},
 		&models.Dashboard{},
+		&models.Monitor{},
 	)
 
 	// 将 workspace_id 为空的历史数据迁移到第一个项目空间

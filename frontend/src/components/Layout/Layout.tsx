@@ -11,6 +11,7 @@ import {
   EditOutlined,
   DeleteOutlined,
   SettingOutlined,
+  MonitorOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
@@ -44,6 +45,11 @@ const menuItems = [
     key: '/dashboards',
     icon: <LayoutOutlined />,
     label: <Link to="/dashboards">看板</Link>,
+  },
+  {
+    key: '/monitor',
+    icon: <MonitorOutlined />,
+    label: <Link to="/monitor">监控</Link>,
   },
 ];
 
@@ -112,8 +118,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           await axios.delete(`/api/workspaces/${ws.id}`);
           message.success('项目空间删除成功');
           await refreshWorkspaces();
-        } catch (error) {
-          message.error('删除失败');
+        } catch (error: any) {
+          const msg = error?.response?.data?.error || '删除失败';
+          message.error(msg);
         }
       },
     });
@@ -151,6 +158,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               mode="horizontal"
               selectedKeys={[location.pathname]}
               items={menuItems}
+              disabledOverflow
               style={{ background: 'transparent', borderBottom: 0 }}
             />
           </div>

@@ -18,6 +18,10 @@ func RegisterRoutes(r *gin.Engine) {
 		RegisterChartRoutes(api)
 		// 看板路由
 		RegisterDashboardRoutes(api)
+		// 监控路由
+		RegisterMonitorRoutes(api)
+		// 飞书路由
+		RegisterLarkRoutes(api)
 		// 首页最近更新路由
 		RegisterHomeRoutes(api)
 	}

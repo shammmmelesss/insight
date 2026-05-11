@@ -101,6 +101,17 @@ func UpdateWorkspace(c *gin.Context) {
 // DeleteWorkspace 删除项目空间
 func DeleteWorkspace(c *gin.Context) {
 	id := c.Param("id")
+
+	var count int64
+	if err := database.DB.Model(&models.Dataset{}).Where("workspace_id = ?", id).Count(&count).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if count > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "该项目空间下存在数据集，无法删除"})
+		return
+	}
+
 	result := database.DB.Delete(&models.Workspace{}, "id = ?", id)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})

@@ -17,6 +17,7 @@ frontend/vite.config.js
 
 # Backend
 backend/server
+backend/insight_backend
 backend/node_modules/
 *.exe
 *.exe~

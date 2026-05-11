@@ -287,7 +287,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     const labelStep = isDense ? Math.ceil(dataCount / 20) : 1;
     const xAxisConfig = isDense
       ? {
-          labelTransform: 'rotate(-20)',
+          labelTransform: 'rotate(0)',
           label: { style: { fontSize: 11, textAnchor: 'end' } },
           tickFilter: (_: any, i: number) => i % labelStep === 0,
           tick: false,
@@ -325,7 +325,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           label: { style: { fontSize: 11 }, formatter: (v: any) => formatValue(v, yFormatLookup[actualYField], true) },
         });
         if (dataCount > 50) {
-          chart.slider('x', { values: [1 - 50 / dataCount, 1], style: { trackSize: 10, handleIconSize: 10 }, showLabelOnInteraction: true });
+          chart.slider('x', { values: [0, 1], style: { trackSize: 6, handleIconSize: 4 }, showLabelOnInteraction: true });
         }
 
         const bar = chart
@@ -390,7 +390,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           label: { style: { fontSize: 11 }, formatter: (v: any) => formatAxisValue(v) },
         });
         if (dataCount > 50) {
-          chart.slider('x', { values: [1 - 50 / dataCount, 1], style: { trackSize: 10, handleIconSize: 10 }, showLabelOnInteraction: true });
+          chart.slider('x', { values: [0, 1], style: { trackSize: 6, handleIconSize: 4 }, showLabelOnInteraction: true });
         }
 
         chart
@@ -457,7 +457,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     const labelStep = isDense ? Math.ceil(dataCount / 20) : 1;
     const xAxisConfig = isDense
       ? {
-          labelTransform: 'rotate(-10)',
+          labelTransform: 'rotate(0)',
           label: { style: { fontSize: 11, textAnchor: 'end' } },
           tickFilter: (_: any, i: number) => i % labelStep === 0,
           tick: false,
@@ -495,7 +495,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           label: { style: { fontSize: 11 }, formatter: (v: any) => formatValue(v, yFormatLookup[actualYField], true) },
         });
         if (dataCount > 50) {
-          chart.slider('x', { values: [1 - 50 / dataCount, 1], style: { trackSize: 10, handleIconSize: 10 }, showLabelOnInteraction: true });
+          chart.slider('x', { values: [0, 1], style: { trackSize: 6, handleIconSize: 4 }, showLabelOnInteraction: true });
         }
 
         const area = chart
@@ -575,7 +575,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           label: { style: { fontSize: 11 }, formatter: (v: any) => formatAxisValue(v) },
         });
         if (dataCount > 50) {
-          chart.slider('x', { values: [1 - 50 / dataCount, 1], style: { trackSize: 10, handleIconSize: 10 }, showLabelOnInteraction: true });
+          chart.slider('x', { values: [0, 1], style: { trackSize: 6, handleIconSize: 4 }, showLabelOnInteraction: true });
         }
 
         chart
@@ -636,7 +636,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     const labelStep = isDense ? Math.ceil(dataCount / 20) : 1;
     const xAxisConfig = isDense
       ? {
-          labelTransform: 'rotate(-20)',
+          labelTransform: 'rotate(0)',
           label: { style: { fontSize: 11, textAnchor: 'end' } },
           tickFilter: (_: any, i: number) => i % labelStep === 0,
           tick: false,
@@ -691,7 +691,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     createAndRenderG2Chart((chart) => {
       chart.axis('x', xAxisConfig);
       if (dataCount > 50) {
-        chart.slider('x', { values: [1 - 50 / dataCount, 1], style: { trackSize: 10, handleIconSize: 10 }, showLabelOnInteraction: true });
+        chart.slider('x', { values: [0, 1], style: { trackSize: 6, handleIconSize: 4 }, showLabelOnInteraction: true });
       }
 
       if (leftLongData.length > 0) {

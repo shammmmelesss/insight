@@ -20,6 +20,8 @@ interface ChartRendererProps {
   groupFields?: string[];
   indicatorFields?: string[];
   containerHeight?: number;
+  fieldFormats?: Record<string, string>;
+  fieldLabelMap?: Record<string, string>;
 }
 
 const ChartRenderer: React.FC<ChartRendererProps> = ({
@@ -34,7 +36,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   groupFields = [],
   indicatorFields = [],
   containerHeight,
+  fieldFormats = {},
+  fieldLabelMap = {},
 }) => {
+  const getFieldLabel = (key: string): string => fieldLabelMap[key] || key;
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<PivotSheet | Chart | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -53,6 +58,30 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   // 获取多个数据中的实际字段名
   const getActualFields = (fields: string[], dataFields: string[]): string[] => {
     return fields.map(field => getActualField(field, dataFields));
+  };
+
+  // 根据数据格式设置格式化数值
+  const formatValue = (value: any, format?: string): string => {
+    const num = Number(value);
+    if (isNaN(num)) return String(value ?? '');
+    switch (format) {
+      case '百分比': return num.toFixed(2) + '%';
+      case '千分比': return num.toFixed(2) + '‰';
+      case '小数': return num.toFixed(2);
+      case '整数': return Math.round(num).toLocaleString();
+      default: return num.toLocaleString();
+    }
+  };
+
+  // 构建 实际字段名 → 数据格式 的映射表
+  const buildFormatLookup = (propFields: string[], dataFields: string[]): Record<string, string> => {
+    const map: Record<string, string> = {};
+    propFields.filter(f => f).forEach(f => {
+      if (fieldFormats[f]) {
+        map[getActualField(f, dataFields)] = fieldFormats[f];
+      }
+    });
+    return map;
   };
 
   // 创建并渲染G2图表的公共函数
@@ -157,7 +186,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         chartInstanceRef.current = null;
       }
     };
-  }, [chartType, chartData, rowFields, colFields, measureFields, xAxisFields, yAxisFields, groupFields, indicatorFields]);
+  }, [chartType, chartData, rowFields, colFields, measureFields, xAxisFields, yAxisFields, y2AxisFields, groupFields, indicatorFields, fieldFormats]);
 
   // 渲染交叉表
   const renderCrossTable = () => {
@@ -169,12 +198,22 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     // 处理度量字段，使用数据中的实际字段名（可能是聚合后的字段名）
     const actualMeasureFields = getActualFields(measureFields, dataFields);
 
+    const measureFormatLookup = buildFormatLookup(measureFields, dataFields);
     const s2DataConfig = {
       fields: {
         rows: rowFields,
         columns: colFields,
         values: actualMeasureFields,
       },
+      meta: [
+        ...rowFields.map(field => ({ field, name: getFieldLabel(field) })),
+        ...colFields.map(field => ({ field, name: getFieldLabel(field) })),
+        ...actualMeasureFields.map(field => ({
+          field,
+          name: getFieldLabel(field),
+          formatter: (v: any) => formatValue(v, measureFormatLookup[field]),
+        })),
+      ],
       data: chartData,
     };
 
@@ -254,6 +293,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           title: false,
         };
 
+    const yFormatLookup = buildFormatLookup(yAxisFields.filter(f => f), dataFields);
+
     if (actualYFields.length === 1) {
       // 单Y轴：保持原有逻辑
       const actualYField = actualYFields[0];
@@ -273,8 +314,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       createAndRenderG2Chart((chart) => {
         chart.axis('x', xAxisConfig);
         chart.axis(actualYField, {
-          title: { text: actualYField, style: { fontSize: 12 } },
-          label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
+          title: { text: getFieldLabel(actualYField), style: { fontSize: 12 } },
+          label: { style: { fontSize: 11 }, formatter: (v: any) => formatValue(v, yFormatLookup[actualYField]) },
         });
 
         const bar = chart
@@ -288,8 +329,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
             title: (d: any) => String(d[actualXField] ?? ''),
             items: [
               (d: any) => ({
-                name: actualGroupField ? String(d[actualGroupField] ?? actualYField) : actualYField,
-                value: d[actualYField] ?? 0,
+                name: actualGroupField ? String(d[actualGroupField] ?? getFieldLabel(actualYField)) : getFieldLabel(actualYField),
+                value: formatValue(d[actualYField], yFormatLookup[actualYField]),
               }),
             ],
           });
@@ -308,7 +349,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           if (!isNaN(value)) {
             longData.push({
               ...item,
-              _metric: yField,
+              _metric: getFieldLabel(yField),
               _value: value,
             });
           }
@@ -322,12 +363,14 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         return;
       }
 
-      // 构建 X 值 → 各指标值的查找表，用于 tooltip 展示全部指标
+      // 构建 X 值 → 各指标值的查找表（以原始字段名为键）
       const xMetricsMap: Record<string, Record<string, number>> = {};
-      longData.forEach(item => {
+      chartData.forEach(item => {
         const xKey = String(item[actualXField] ?? '');
         if (!xMetricsMap[xKey]) xMetricsMap[xKey] = {};
-        xMetricsMap[xKey][item._metric] = item._value;
+        actualYFields.forEach(yField => {
+          xMetricsMap[xKey][yField] = Number(item[yField]) || 0;
+        });
       });
 
       createAndRenderG2Chart((chart) => {
@@ -349,8 +392,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .tooltip({
             title: (d: any) => String(d[actualXField] ?? ''),
             items: actualYFields.map(yField => (d: any) => ({
-              name: yField,
-              value: xMetricsMap[String(d[actualXField] ?? '')]?.[yField] ?? 0,
+              name: getFieldLabel(yField),
+              value: formatValue(xMetricsMap[String(d[actualXField] ?? '')]?.[yField], yFormatLookup[yField]),
             })),
           });
 
@@ -414,6 +457,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           title: false,
         };
 
+    const yFormatLookup = buildFormatLookup(yAxisFields.filter(f => f), dataFields);
+
     if (actualYFields.length === 1) {
       // 单Y轴：保持原有逻辑
       const actualYField = actualYFields[0];
@@ -433,8 +478,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       createAndRenderG2Chart((chart) => {
         chart.axis('x', xAxisConfig);
         chart.axis(actualYField, {
-          title: { text: actualYField, style: { fontSize: 12 } },
-          label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
+          title: { text: getFieldLabel(actualYField), style: { fontSize: 12 } },
+          label: { style: { fontSize: 11 }, formatter: (v: any) => formatValue(v, yFormatLookup[actualYField]) },
         });
 
         const area = chart
@@ -462,8 +507,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
             title: (d: any) => String(d[actualXField] ?? ''),
             items: [
               (d: any) => ({
-                name: actualGroupField ? String(d[actualGroupField] ?? actualYField) : actualYField,
-                value: d[actualYField] ?? 0,
+                name: actualGroupField ? String(d[actualGroupField] ?? getFieldLabel(actualYField)) : getFieldLabel(actualYField),
+                value: formatValue(d[actualYField], yFormatLookup[actualYField]),
               }),
             ],
           });
@@ -483,7 +528,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           if (!isNaN(value)) {
             longData.push({
               ...item,
-              _metric: yField,
+              _metric: getFieldLabel(yField),
               _value: value,
             });
           }
@@ -496,6 +541,16 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         }
         return;
       }
+
+      // 构建 X 值 → 各指标值的查找表（以原始字段名为键）
+      const lineXMetricsMap: Record<string, Record<string, number>> = {};
+      chartData.forEach(item => {
+        const xKey = String(item[actualXField] ?? '');
+        if (!lineXMetricsMap[xKey]) lineXMetricsMap[xKey] = {};
+        actualYFields.forEach(yField => {
+          lineXMetricsMap[xKey][yField] = Number(item[yField]) || 0;
+        });
+      });
 
       createAndRenderG2Chart((chart) => {
         chart.axis('x', xAxisConfig);
@@ -515,9 +570,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .interaction('elementHighlight')
           .tooltip({
             title: (d: any) => String(d[actualXField] ?? ''),
-            items: [
-              (d: any) => ({ name: String(d._metric ?? ''), value: d._value ?? 0 }),
-            ],
+            items: actualYFields.map(yField => (d: any) => ({
+              name: getFieldLabel(yField),
+              value: formatValue(lineXMetricsMap[String(d[actualXField] ?? '')]?.[yField], yFormatLookup[yField]),
+            })),
           });
 
         chart.legend('color', { position: 'bottom', layout: { justifyContent: 'center' } });
@@ -581,7 +637,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         actualLeftFields.forEach(f => {
           const value = Number(item[f]);
           if (!isNaN(value)) {
-            leftLongData.push({ ...item, _metricL: f, _valueL: value });
+            leftLongData.push({ ...item, _metricL: getFieldLabel(f), _rawMetricL: f, _valueL: value });
           }
         });
       });
@@ -594,22 +650,24 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         actualRightFields.forEach(f => {
           const value = Number(item[f]);
           if (!isNaN(value)) {
-            rightLongData.push({ ...item, _metricR: f, _valueR: value });
+            rightLongData.push({ ...item, _metricR: getFieldLabel(f), _rawMetricR: f, _valueR: value });
           }
         });
       });
     }
 
-    // 构建 tooltip 用的 x→全指标 查找表
+    // 构建 tooltip 用的 x→全指标 查找表（以原始字段名为键）
     const xMetricsMap: Record<string, Record<string, number>> = {};
-    [...leftLongData, ...rightLongData].forEach(item => {
+    chartData.forEach(item => {
       const xKey = String(item[actualXField] ?? '');
       if (!xMetricsMap[xKey]) xMetricsMap[xKey] = {};
-      if (item._metricL !== undefined) xMetricsMap[xKey][item._metricL] = item._valueL;
-      if (item._metricR !== undefined) xMetricsMap[xKey][item._metricR] = item._valueR;
+      [...actualLeftFields, ...actualRightFields].forEach(f => {
+        xMetricsMap[xKey][f] = Number(item[f]) || 0;
+      });
     });
 
     const allMetrics = [...actualLeftFields, ...actualRightFields];
+    const dualFormatLookup = buildFormatLookup([...yAxisFields, ...y2AxisFields].filter(f => f), dataFields);
 
     createAndRenderG2Chart((chart) => {
       chart.axis('x', xAxisConfig);
@@ -625,14 +683,14 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .interaction('elementHighlight')
           .axis('y', {
             position: 'left',
-            title: actualLeftFields.join(' / '),
+            title: actualLeftFields.map(f => getFieldLabel(f)).join(' / '),
             label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
           })
           .tooltip({
             title: (d: any) => String(d[actualXField] ?? ''),
             items: allMetrics.map(m => (d: any) => ({
-              name: m,
-              value: xMetricsMap[String(d[actualXField] ?? '')]?.[m] ?? '-',
+              name: getFieldLabel(m),
+              value: formatValue(xMetricsMap[String(d[actualXField] ?? '')]?.[m], dualFormatLookup[m]),
             })),
           });
 
@@ -653,7 +711,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .scale('y', { independent: true })
           .axis('y', {
             position: 'right',
-            title: actualRightFields.join(' / '),
+            title: actualRightFields.map(f => getFieldLabel(f)).join(' / '),
             label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
           })
           .tooltip(false);
@@ -727,6 +785,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       return;
     }
 
+    const measureFormatLookup = buildFormatLookup(measureFields, dataFields);
+
     createAndRenderG2Chart((chart) => {
       chart.coordinate({ type: 'theta', outerRadius: 0.8 });
 
@@ -752,7 +812,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           const percentage = ((value / total) * 100).toFixed(2);
           return {
             name: d[actualGroupField],
-            value: `${value}`,
+            value: formatValue(value, measureFormatLookup[actualMeasureField]),
             percentage: `${percentage}%`,
           };
         });
@@ -770,9 +830,13 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
     const dataFields = Object.keys(chartData[0]);
     const row = chartData[0];
+    const indicatorFormatLookup = buildFormatLookup(indicatorFields, dataFields);
 
     const cards = indicatorFields
-      .map(field => ({ label: field, actualField: getActualField(field, dataFields) }))
+      .map(field => {
+        const actualField = getActualField(field, dataFields);
+        return { label: getFieldLabel(actualField) || getFieldLabel(field), actualField };
+      })
       .filter(({ actualField }) => actualField && actualField in row);
 
     if (cards.length === 0) {
@@ -782,7 +846,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
     const cardHTML = cards.map(({ label, actualField }) => {
       const value = row[actualField];
-      const display = value === null || value === undefined ? '-' : Number(value).toLocaleString();
+      const display = value === null || value === undefined ? '-' : formatValue(value, indicatorFormatLookup[actualField]);
       return `
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
           min-width:120px;padding:16px 24px;background:#f0f5ff;border-radius:8px;">

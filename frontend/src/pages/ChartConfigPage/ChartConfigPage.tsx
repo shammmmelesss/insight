@@ -313,6 +313,8 @@ const ChartConfigPage: React.FC = () => {
       return sql;
     };
 
+    const sortDir = (f: FieldConfig) => f.config?.sort === '降序' ? 'DESC' : 'ASC';
+
     if (chartType === 'crossTable') {
       const rows = rowFields.map(f => f.originalName);
       const cols = colFields.map(f => f.originalName);
@@ -320,17 +322,17 @@ const ChartConfigPage: React.FC = () => {
         [...rows, ...cols],
         measureFields.map(buildAggField),
         [...rows, ...cols],
-        rows,
+        rowFields.map(f => `${f.originalName} ${sortDir(f)}`),
       );
     }
     if (chartType === 'bar' || chartType === 'line') {
       const xs = xAxisFields.map(f => f.originalName);
       const gs = groupFields.map(f => f.originalName);
-      return wrap([...xs, ...gs], yAxisFields.map(buildAggField), [...xs, ...gs], xs);
+      return wrap([...xs, ...gs], yAxisFields.map(buildAggField), [...xs, ...gs], xAxisFields.map(f => `${f.originalName} ${sortDir(f)}`));
     }
     if (chartType === 'dualAxis') {
       const xs = xAxisFields.map(f => f.originalName);
-      return wrap(xs, [...yAxisFields.map(buildAggField), ...y2AxisFields.map(buildAggField)], xs, xs);
+      return wrap(xs, [...yAxisFields.map(buildAggField), ...y2AxisFields.map(buildAggField)], xs, xAxisFields.map(f => `${f.originalName} ${sortDir(f)}`));
     }
     if (chartType === 'pie') {
       const gs = groupFields.map(f => f.originalName);
@@ -871,18 +873,37 @@ const ChartConfigPage: React.FC = () => {
           )}
 
           <div style={{ flex: 1, padding: 12, overflow: 'hidden', minHeight: 0 }}>
-            <ChartRenderer
-              chartType={chartType}
-              chartData={chartData}
-              rowFields={rowFields.map(f => f.originalName)}
-              colFields={colFields.map(f => f.originalName)}
-              measureFields={measureFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
-              xAxisFields={xAxisFields.map(f => f.originalName)}
-              yAxisFields={yAxisFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
-              y2AxisFields={y2AxisFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
-              groupFields={groupFields.map(f => f.originalName)}
-              indicatorFields={indicatorFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
-            />
+            {(() => {
+              const fieldFormats: Record<string, string> = {};
+              const fieldLabelMap: Record<string, string> = {};
+              [...rowFields, ...colFields, ...xAxisFields, ...groupFields].forEach(f => {
+                fieldLabelMap[f.originalName] = f.displayName || f.originalName;
+              });
+              [...measureFields, ...yAxisFields, ...y2AxisFields, ...indicatorFields].forEach(f => {
+                const agg = f.config?.aggregation || '计数';
+                const key = `${f.originalName}_${agg}`;
+                fieldLabelMap[key] = `${f.displayName || f.originalName} · ${agg}`;
+                if (f.config?.dataFormat && f.config.dataFormat !== '原始值') {
+                  fieldFormats[key] = f.config.dataFormat;
+                }
+              });
+              return (
+                <ChartRenderer
+                  chartType={chartType}
+                  chartData={chartData}
+                  rowFields={rowFields.map(f => f.originalName)}
+                  colFields={colFields.map(f => f.originalName)}
+                  measureFields={measureFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
+                  xAxisFields={xAxisFields.map(f => f.originalName)}
+                  yAxisFields={yAxisFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
+                  y2AxisFields={y2AxisFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
+                  groupFields={groupFields.map(f => f.originalName)}
+                  indicatorFields={indicatorFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
+                  fieldFormats={fieldFormats}
+                  fieldLabelMap={fieldLabelMap}
+                />
+              );
+            })()}
           </div>
         </div>
       </div>

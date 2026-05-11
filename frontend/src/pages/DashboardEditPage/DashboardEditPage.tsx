@@ -408,6 +408,28 @@ const DashboardEditPage: React.FC = () => {
                 const chart = charts.find(c => c.id === item.chartId);
                 const cfg = chartConfigs[item.chartId] || {};
                 const extractNames = (fields: any[]) => (fields || []).map((f: any) => f.originalName);
+                const buildFieldFormats = (): Record<string, string> => {
+                  const result: Record<string, string> = {};
+                  [...(cfg.measureFields || []), ...(cfg.yAxisFields || []), ...(cfg.y2AxisFields || []), ...(cfg.indicatorFields || [])].forEach((f: any) => {
+                    if (f.originalName && f.config?.dataFormat && f.config.dataFormat !== '原始值') {
+                      result[f.originalName] = f.config.dataFormat;
+                    }
+                  });
+                  return result;
+                };
+                const buildFieldLabelMap = (): Record<string, string> => {
+                  const map: Record<string, string> = {};
+                  [...(cfg.rowFields || []), ...(cfg.colFields || []), ...(cfg.xAxisFields || []), ...(cfg.groupFields || [])].forEach((f: any) => {
+                    if (f.originalName) map[f.originalName] = f.displayName || f.originalName;
+                  });
+                  [...(cfg.measureFields || []), ...(cfg.yAxisFields || []), ...(cfg.y2AxisFields || []), ...(cfg.indicatorFields || [])].forEach((f: any) => {
+                    if (f.originalName) {
+                      const agg = f.config?.aggregation || '计数';
+                      map[`${f.originalName}_${agg}`] = `${f.displayName || f.originalName} · ${agg}`;
+                    }
+                  });
+                  return map;
+                };
                 const layoutItem = rglLayout.find(l => l.i === item.chartId);
                 const h = layoutItem?.h ?? DEFAULT_H;
                 const chartH = chartAreaHeight(h);
@@ -459,9 +481,12 @@ const DashboardEditPage: React.FC = () => {
                         measureFields={extractNames(cfg.measureFields)}
                         xAxisFields={extractNames(cfg.xAxisFields)}
                         yAxisFields={extractNames(cfg.yAxisFields)}
+                        y2AxisFields={extractNames(cfg.y2AxisFields)}
                         groupFields={extractNames(cfg.groupFields)}
                         indicatorFields={extractNames(cfg.indicatorFields)}
                         containerHeight={chartH}
+                        fieldLabelMap={buildFieldLabelMap()}
+                        fieldFormats={buildFieldFormats()}
                       />
                     </Card>
                   </div>

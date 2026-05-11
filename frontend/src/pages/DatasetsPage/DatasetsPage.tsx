@@ -11,7 +11,7 @@ const { Option } = Select;
 const { TextArea } = Input;
 
 const DatasetsPage: React.FC = () => {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [loading, setLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -301,7 +301,7 @@ const DatasetsPage: React.FC = () => {
 
   // 删除数据集
   const handleDelete = (id: string) => {
-    Modal.confirm({
+    modal.confirm({
       title: '确认删除',
       content: '删除后不可恢复，确认删除该数据集吗？',
       okText: '确认删除',

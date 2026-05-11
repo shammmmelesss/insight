@@ -56,7 +56,6 @@ type monitorRequest struct {
 	TriggerThreshold string `json:"triggerThreshold"`
 	TriggerSchedule  string `json:"triggerSchedule"`
 	NotifyChannels   string `json:"notifyChannels"`
-	NotifyEmails     string `json:"notifyEmails"`
 	NotifyLarkUsers  string `json:"notifyLarkUsers"`
 	CreatedBy        string `json:"createdBy"`
 	UpdatedBy        string `json:"updatedBy"`
@@ -76,10 +75,6 @@ func CreateMonitor(c *gin.Context) {
 	if notifyChannels == "" {
 		notifyChannels = "[]"
 	}
-	notifyEmails := req.NotifyEmails
-	if notifyEmails == "" {
-		notifyEmails = "[]"
-	}
 	notifyLarkUsers := req.NotifyLarkUsers
 	if notifyLarkUsers == "" {
 		notifyLarkUsers = "[]"
@@ -96,7 +91,6 @@ func CreateMonitor(c *gin.Context) {
 		TriggerThreshold: req.TriggerThreshold,
 		TriggerSchedule:  triggerSchedule,
 		NotifyChannels:   notifyChannels,
-		NotifyEmails:     notifyEmails,
 		NotifyLarkUsers:  notifyLarkUsers,
 		CreatedBy:        req.CreatedBy,
 		UpdatedBy:        req.CreatedBy,
@@ -151,9 +145,6 @@ func UpdateMonitor(c *gin.Context) {
 	}
 	if req.NotifyChannels != "" {
 		monitor.NotifyChannels = req.NotifyChannels
-	}
-	if req.NotifyEmails != "" {
-		monitor.NotifyEmails = req.NotifyEmails
 	}
 	if req.NotifyLarkUsers != "" {
 		monitor.NotifyLarkUsers = req.NotifyLarkUsers
@@ -314,12 +305,14 @@ func TriggerMonitor(c *gin.Context) {
 		triggered = currentValue != threshold
 	}
 
+	notifyErrors := []string{}
 	if triggered {
 		title := fmt.Sprintf("⚠️ 监控告警：%s", monitor.Name)
 		content := fmt.Sprintf("指标 %s（%s）当前值 %.4g，满足条件 %s %.4g，已触发告警。",
 			monitor.TriggerMetric, aggFunc, currentValue, monitor.TriggerOperator, threshold)
-		SendLarkWebhookMessage(title, content)
-		// 发私信给飞书接收人
+		if sendErr := SendLarkWebhookMessage(title, content); sendErr != nil {
+			notifyErrors = append(notifyErrors, "webhook: "+sendErr.Error())
+		}
 		if monitor.NotifyLarkUsers != "" && monitor.NotifyLarkUsers != "[]" {
 			var larkUsers []struct {
 				OpenID string `json:"openId"`
@@ -327,7 +320,9 @@ func TriggerMonitor(c *gin.Context) {
 			if jsonErr := json.Unmarshal([]byte(monitor.NotifyLarkUsers), &larkUsers); jsonErr == nil {
 				for _, u := range larkUsers {
 					if u.OpenID != "" {
-						SendLarkDirectMessage(u.OpenID, title, content)
+						if sendErr := SendLarkDirectMessage(u.OpenID, title, content); sendErr != nil {
+							notifyErrors = append(notifyErrors, "direct("+u.OpenID+"): "+sendErr.Error())
+						}
 					}
 				}
 			}
@@ -342,6 +337,7 @@ func TriggerMonitor(c *gin.Context) {
 		"metric":       monitor.TriggerMetric,
 		"aggFunc":      aggFunc,
 		"sql":          aggSQL,
+		"notifyErrors": notifyErrors,
 	})
 }
 

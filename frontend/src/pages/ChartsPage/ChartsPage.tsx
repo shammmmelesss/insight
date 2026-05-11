@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Table, Space, message, Modal } from 'antd';
+import { App, Button, Card, Table, Space, message, Modal } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +11,7 @@ const ChartsPage: React.FC = () => {
   const [dashboardModalVisible, setDashboardModalVisible] = useState(false);
   const [chartDashboards, setChartDashboards] = useState<any[]>([]);
   const [loadingDashboards, setLoadingDashboards] = useState(false);
+  const { modal } = App.useApp();
   const navigate = useNavigate();
 
   // 获取图表列表
@@ -58,7 +59,7 @@ const ChartsPage: React.FC = () => {
 
   // 删除图表
   const handleDelete = (id: string) => {
-    Modal.confirm({
+    modal.confirm({
       title: '确认删除',
       content: '删除后不可恢复，确认删除该图表吗？',
       okText: '确认删除',

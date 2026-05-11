@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Layout as AntLayout, Menu, Typography, Select, Button, Modal, Form, Input, message, Space, Dropdown } from 'antd';
+import { App, Layout as AntLayout, Menu, Typography, Select, Button, Modal, Form, Input, message, Space, Dropdown } from 'antd';
 import { Link, useLocation } from 'react-router-dom';
 import {
   HomeOutlined,
@@ -59,6 +59,7 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
+  const { modal } = App.useApp();
   const { workspaces, currentWorkspace, setCurrentWorkspace, refreshWorkspaces } = useWorkspace();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
@@ -107,7 +108,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       message.warning('至少保留一个项目空间');
       return;
     }
-    Modal.confirm({
+    modal.confirm({
       title: '确认删除',
       content: `确定要删除项目空间「${ws.name}」吗？此操作不可恢复。`,
       okText: '确认删除',

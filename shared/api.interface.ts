@@ -422,7 +422,7 @@ export interface MonitorSchedule {
   day?: number;       // 1-31，仅 monthly 生效
 }
 
-export type MonitorNotifyChannel = 'email' | 'lark';
+export type MonitorNotifyChannel = 'lark';
 
 export interface LarkUser {
   openId: string;
@@ -444,7 +444,6 @@ export interface Monitor {
   triggerThreshold: string;
   triggerSchedule: MonitorSchedule | string;
   notifyChannels: MonitorNotifyChannel[] | string;
-  notifyEmails: string[] | string;
   notifyLarkUsers: LarkUser[] | string;
   createdBy: string;
   updatedBy: string;

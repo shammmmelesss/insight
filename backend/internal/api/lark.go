@@ -104,12 +104,17 @@ func SendLarkWebhookMessage(title, content string) error {
 	}
 	defer resp.Body.Close()
 	var result struct {
-		Code int    `json:"StatusCode"`
-		Msg  string `json:"StatusMessage"`
+		Code       int    `json:"code"`
+		Msg        string `json:"msg"`
+		StatusCode int    `json:"StatusCode"`
+		StatusMsg  string `json:"StatusMessage"`
 	}
 	json.NewDecoder(resp.Body).Decode(&result)
 	if result.Code != 0 {
-		return fmt.Errorf("lark webhook error: %s", result.Msg)
+		return fmt.Errorf("lark webhook error (code=%d): %s", result.Code, result.Msg)
+	}
+	if result.StatusCode != 0 {
+		return fmt.Errorf("lark webhook error (StatusCode=%d): %s", result.StatusCode, result.StatusMsg)
 	}
 	return nil
 }

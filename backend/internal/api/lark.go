@@ -73,12 +73,17 @@ func larkWebhookSign(secret string, ts int64) string {
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
 
-// SendLarkWebhookMessage 通过 Webhook 发送飞书群消息
-func SendLarkWebhookMessage(title, content string) error {
+// SendLarkWebhookMessage 通过 Webhook 发送飞书群消息，lines 中每个元素单独一行
+func SendLarkWebhookMessage(title string, lines []string) error {
 	webhookURL := os.Getenv("LARK_WEBHOOK_URL")
 	secret := os.Getenv("LARK_WEBHOOK_SECRET")
 	if webhookURL == "" || secret == "" {
 		return fmt.Errorf("LARK_WEBHOOK_URL or LARK_WEBHOOK_SECRET not configured")
+	}
+
+	paragraphs := make([][]map[string]interface{}, len(lines))
+	for i, line := range lines {
+		paragraphs[i] = []map[string]interface{}{{"tag": "text", "text": line}}
 	}
 
 	ts := time.Now().Unix()
@@ -89,10 +94,8 @@ func SendLarkWebhookMessage(title, content string) error {
 		"content": map[string]interface{}{
 			"post": map[string]interface{}{
 				"zh_cn": map[string]interface{}{
-					"title": title,
-					"content": [][]map[string]interface{}{
-						{{"tag": "text", "text": content}},
-					},
+					"title":   title,
+					"content": paragraphs,
 				},
 			},
 		},

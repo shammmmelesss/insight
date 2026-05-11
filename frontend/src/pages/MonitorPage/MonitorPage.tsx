@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Table, Space, message, Modal, Form, Input, Select, TimePicker, Checkbox, Row, Col, Tag, Avatar, Tooltip } from 'antd';
+import { App, Button, Card, Table, Space, message, Modal, Form, Input, Select, TimePicker, Row, Col, Tooltip} from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import {
-  Monitor, MonitorOperator, MonitorScheduleFrequency, MonitorNotifyChannel,
-  DatasetOption, FieldConfig, LarkUser,
+  Monitor, MonitorOperator, MonitorScheduleFrequency,
+  DatasetOption, FieldConfig,
 } from '@shared/api.interface';
 
 const OPERATORS: { label: string; value: MonitorOperator }[] = [
@@ -30,6 +30,7 @@ function parseJson<T>(raw: T | string, fallback: T): T {
 }
 
 const MonitorPage: React.FC = () => {
+  const { modal } = App.useApp();
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -37,11 +38,8 @@ const MonitorPage: React.FC = () => {
   const [datasets, setDatasets] = useState<DatasetOption[]>([]);
   const [fields, setFields] = useState<FieldConfig[]>([]);
   const [scheduleFrequency, setScheduleFrequency] = useState<MonitorScheduleFrequency>('daily');
-  const [notifyChannels, setNotifyChannels] = useState<MonitorNotifyChannel[]>([]);
-  const [larkSearching, setLarkSearching] = useState(false);
-  const [larkOptions, setLarkOptions] = useState<LarkUser[]>([]);
   const [triggering, setTriggering] = useState(false);
-  const [triggerResult, setTriggerResult] = useState<{ triggered: boolean; currentValue: number; threshold: number; operator: string; metric: string; aggFunc: string; sql: string } | null>(null);
+  const [triggerResult, setTriggerResult] = useState<{ triggered: boolean; currentValue: number; threshold: number; operator: string; metric: string; aggFunc: string; sql: string; notifyErrors?: string[] } | null>(null);
   const [form] = Form.useForm();
 
   const fetchMonitors = async () => {
@@ -74,8 +72,6 @@ const MonitorPage: React.FC = () => {
     setEditingMonitor(null);
     setFields([]);
     setScheduleFrequency('daily');
-    setNotifyChannels([]);
-    setLarkOptions([]);
     setTriggerResult(null);
     form.resetFields();
     setModalVisible(true);
@@ -84,13 +80,7 @@ const MonitorPage: React.FC = () => {
   const openEdit = (record: Monitor) => {
     setEditingMonitor(record);
     const schedule = parseJson(record.triggerSchedule, { frequency: 'daily' as MonitorScheduleFrequency, time: '09:00' });
-    const channels = parseJson<MonitorNotifyChannel[]>(record.notifyChannels, []);
-    const emails = parseJson<string[]>(record.notifyEmails, []);
-    const larkUsers = parseJson<LarkUser[]>(record.notifyLarkUsers, []);
     setScheduleFrequency(schedule.frequency || 'daily');
-    setNotifyChannels(channels);
-    // 把飞书用户作为选项预填
-    setLarkOptions(larkUsers);
     form.setFieldsValue({
       name: record.name,
       datasetId: record.datasetId,
@@ -104,9 +94,6 @@ const MonitorPage: React.FC = () => {
       scheduleTime: schedule.time ? dayjs(schedule.time, 'HH:mm') : undefined,
       scheduleWeekday: schedule.weekday,
       scheduleDay: schedule.day,
-      notifyChannels: channels,
-      notifyEmails: emails,
-      notifyLarkUsers: larkUsers.map(u => u.openId),
     });
     if (record.datasetId) fetchFields(record.datasetId);
     setTriggerResult(null);
@@ -132,16 +119,6 @@ const MonitorPage: React.FC = () => {
     fetchFields(datasetId);
   };
 
-  const handleLarkSearch = async (keyword: string) => {
-    if (!keyword) return;
-    setLarkSearching(true);
-    try {
-      const res = await axios.get(`/api/lark/users/search?keyword=${encodeURIComponent(keyword)}`);
-      setLarkOptions(res.data.items || []);
-    } catch { /* ignore */ }
-    finally { setLarkSearching(false); }
-  };
-
   const handleOk = async () => {
     const values = await form.validateFields();
     const schedule = {
@@ -150,11 +127,6 @@ const MonitorPage: React.FC = () => {
       ...(values.scheduleFrequency === 'weekly' ? { weekday: values.scheduleWeekday } : {}),
       ...(values.scheduleFrequency === 'monthly' ? { day: values.scheduleDay } : {}),
     };
-    // 把选中的飞书 openId 映射回完整对象
-    const selectedLarkUsers = (values.notifyLarkUsers || []).map((id: string) => {
-      const found = larkOptions.find(u => u.openId === id);
-      return found || { openId: id, name: id };
-    });
     const payload = {
       name: values.name,
       datasetId: values.datasetId,
@@ -165,9 +137,7 @@ const MonitorPage: React.FC = () => {
       triggerOperator: values.triggerOperator,
       triggerThreshold: values.triggerThreshold,
       triggerSchedule: JSON.stringify(schedule),
-      notifyChannels: JSON.stringify(values.notifyChannels || []),
-      notifyEmails: JSON.stringify(values.notifyEmails || []),
-      notifyLarkUsers: JSON.stringify(selectedLarkUsers),
+      notifyChannels: JSON.stringify(['lark']),
       ...(editingMonitor ? { updatedBy: values.updatedBy } : { createdBy: values.createdBy }),
     };
     try {
@@ -184,7 +154,7 @@ const MonitorPage: React.FC = () => {
   };
 
   const handleDelete = (id: string) => {
-    Modal.confirm({
+    modal.confirm({
       title: '确认删除', content: '删除后不可恢复，确认删除该监控吗？',
       okText: '确认删除', okButtonProps: { danger: true }, cancelText: '取消',
       onOk: async () => {
@@ -199,8 +169,6 @@ const MonitorPage: React.FC = () => {
 
   const timeFields = fields.filter(f => f.dataType === 'date');
   const measureFields = fields.filter(f => f.type === 'measure');
-  const showEmail = notifyChannels.includes('email');
-  const showLark = notifyChannels.includes('lark');
 
   const columns = [
     { title: '监控名称', dataIndex: 'name', key: 'name' },
@@ -250,16 +218,23 @@ const MonitorPage: React.FC = () => {
                 </Button>
               )}
               {triggerResult && (
-                <Tooltip title={`${triggerResult.aggFunc}(${triggerResult.metric}) = ${triggerResult.currentValue}，阈值 ${triggerResult.operator} ${triggerResult.threshold}\nSQL: ${triggerResult.sql}`}>
-                  <Space size={4}>
-                    {triggerResult.triggered
-                      ? <CheckCircleOutlined style={{ color: '#ff4d4f' }} />
-                      : <CloseCircleOutlined style={{ color: '#52c41a' }} />}
-                    <span style={{ fontSize: 12, color: triggerResult.triggered ? '#ff4d4f' : '#52c41a' }}>
-                      {triggerResult.triggered ? '已触发告警' : '未触发'}（当前值：{triggerResult.currentValue}）
-                    </span>
-                  </Space>
-                </Tooltip>
+                <Space direction="vertical" size={2}>
+                  <Tooltip title={`${triggerResult.aggFunc}(${triggerResult.metric}) = ${triggerResult.currentValue}，阈值 ${triggerResult.operator} ${triggerResult.threshold}\nSQL: ${triggerResult.sql}`}>
+                    <Space size={4}>
+                      {triggerResult.triggered
+                        ? <CheckCircleOutlined style={{ color: '#ff4d4f' }} />
+                        : <CloseCircleOutlined style={{ color: '#52c41a' }} />}
+                      <span style={{ fontSize: 12, color: triggerResult.triggered ? '#ff4d4f' : '#52c41a' }}>
+                        {triggerResult.triggered ? '已触发告警' : '未触发'}（当前值：{triggerResult.currentValue}）
+                      </span>
+                    </Space>
+                  </Tooltip>
+                  {triggerResult.notifyErrors && triggerResult.notifyErrors.length > 0 && (
+                    <Tooltip title={triggerResult.notifyErrors.join('\n')}>
+                      <span style={{ fontSize: 12, color: '#faad14', cursor: 'pointer' }}>⚠️ 通知发送失败，点击查看详情</span>
+                    </Tooltip>
+                  )}
+                </Space>
               )}
             </Space>
             <Space>
@@ -269,7 +244,7 @@ const MonitorPage: React.FC = () => {
           </div>
         }
       >
-        <Form form={form} layout="vertical" initialValues={{ scheduleFrequency: 'daily', notifyChannels: [], notifyEmails: [], notifyLarkUsers: [] }}>
+        <Form form={form} layout="vertical" initialValues={{ scheduleFrequency: 'daily', notifyLarkUsers: [] }}>
           <Form.Item name="name" label="监控名称" rules={[{ required: true, message: '请输入监控名称' }]}>
             <Input placeholder="请输入监控名称" />
           </Form.Item>
@@ -354,62 +329,6 @@ const MonitorPage: React.FC = () => {
             </Row>
           </Form.Item>
 
-          <Form.Item
-            name="notifyChannels" label="发送方式"
-            style={{ marginTop: 16, marginBottom: showEmail || showLark ? 8 : 24 }}
-            rules={[{ required: true, message: '请选择发送方式' }]}
-          >
-            <Checkbox.Group onChange={(vals) => setNotifyChannels(vals as MonitorNotifyChannel[])}>
-              <Checkbox value="email">邮件</Checkbox>
-              <Checkbox value="lark">飞书</Checkbox>
-            </Checkbox.Group>
-          </Form.Item>
-
-          {showEmail && (
-            <Form.Item
-              name="notifyEmails" label="收件邮箱"
-              rules={[{ required: true, message: '请输入至少一个邮箱' }]}
-            >
-              <Select
-                mode="tags"
-                placeholder="输入邮箱后按回车添加"
-                tokenSeparators={[',', ' ']}
-                open={false}
-                tagRender={({ label, onClose }) => (
-                  <Tag closable onClose={onClose} style={{ marginRight: 4 }}>{label}</Tag>
-                )}
-              />
-            </Form.Item>
-          )}
-
-          {showLark && (
-            <Form.Item
-              name="notifyLarkUsers" label="飞书接收人"
-              rules={[{ required: true, message: '请选择至少一个飞书用户' }]}
-            >
-              <Select
-                mode="multiple"
-                placeholder="输入姓名搜索飞书用户"
-                filterOption={false}
-                loading={larkSearching}
-                onSearch={handleLarkSearch}
-                notFoundContent={larkSearching ? '搜索中...' : '暂无用户，请输入关键词搜索'}
-                optionLabelProp="label"
-              >
-                {larkOptions.map(u => (
-                  <Select.Option key={u.openId} value={u.openId} label={u.name}>
-                    <Space>
-                      {u.avatar
-                        ? <Avatar src={u.avatar} size={20} />
-                        : <Avatar size={20}>{u.name?.[0]}</Avatar>
-                      }
-                      {u.name}
-                    </Space>
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-          )}
         </Form>
       </Modal>
     </div>

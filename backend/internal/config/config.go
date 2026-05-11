@@ -28,10 +28,10 @@ type Config struct {
 		DBName   string `default:"insight"`
 	}
 	Lark struct {
-		AppID          string `default:""`
-		AppSecret      string `default:""`
-		WebhookURL     string `default:""`
-		WebhookSecret  string `default:""`
+		AppID         string `yaml:"app_id"      default:""`
+		AppSecret     string `yaml:"app_secret"   default:""`
+		WebhookURL    string `yaml:"webhook_url"  default:""`
+		WebhookSecret string `yaml:"webhook_secret" default:""`
 	}
 }
 

@@ -712,6 +712,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       }
 
       if (rightLongData.length > 0) {
+        const orangeColors = ['#FA8C16', '#F5222D', '#FADB14', '#52C41A', '#722ED1', '#13C2C2'];
         const line = chart
           .line()
           .data(rightLongData)
@@ -728,7 +729,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .tooltip(false);
 
         if (actualRightFields.length > 1) {
-          line.encode('color', '_metricR');
+          line.encode('color', '_metricR').scale('color', { range: orangeColors });
+        } else {
+          line.style({ stroke: '#FA8C16' });
         }
 
         chart
@@ -737,7 +740,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .encode('x', actualXField)
           .encode('y', '_valueR')
           .encode('shape', 'circle')
-          .style({ r: 3, fill: 'white', stroke: 'currentColor', lineWidth: 1.5 })
+          .style({ r: 0 })
           .scale('y', { independent: true })
           .axis('y', false)
           .tooltip(false);

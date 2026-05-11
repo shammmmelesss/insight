@@ -60,8 +60,19 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     return fields.map(field => getActualField(field, dataFields));
   };
 
-  // 根据数据格式设置格式化数值
-  const formatValue = (value: any, format?: string): string => {
+  // 将大数字缩写为 k/w 形式用于 y 轴标签
+  const formatAxisValue = (value: any): string => {
+    const num = Number(value);
+    if (isNaN(num)) return String(value ?? '');
+    const abs = Math.abs(num);
+    if (abs >= 100_000_000) return (num / 100_000_000).toFixed(abs % 100_000_000 === 0 ? 0 : 1) + '亿';
+    if (abs >= 10_000) return (num / 10_000).toFixed(abs % 10_000 === 0 ? 0 : 1) + 'w';
+    if (abs >= 1_000) return (num / 1_000).toFixed(abs % 1_000 === 0 ? 0 : 1) + 'k';
+    return num.toLocaleString();
+  };
+
+  // 根据数据格式设置格式化数值，axis=true 时无特殊格式则用缩写
+  const formatValue = (value: any, format?: string, axis = false): string => {
     const num = Number(value);
     if (isNaN(num)) return String(value ?? '');
     switch (format) {
@@ -69,7 +80,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       case '千分比': return (num*1000).toFixed(2) + '‰';
       case '小数': return num.toFixed(2);
       case '整数': return Math.round(num).toLocaleString();
-      default: return num.toLocaleString();
+      default: return axis ? formatAxisValue(num) : num.toLocaleString();
     }
   };
 
@@ -311,7 +322,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         chart.axis('x', xAxisConfig);
         chart.axis(actualYField, {
           title: { text: getFieldLabel(actualYField), style: { fontSize: 12 } },
-          label: { style: { fontSize: 11 }, formatter: (v: any) => formatValue(v, yFormatLookup[actualYField]) },
+          label: { style: { fontSize: 11 }, formatter: (v: any) => formatValue(v, yFormatLookup[actualYField], true) },
         });
         if (dataCount > 50) {
           chart.slider('x', { values: [1 - 50 / dataCount, 1], style: { trackSize: 10, handleIconSize: 10 }, showLabelOnInteraction: true });
@@ -376,7 +387,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         chart.axis('x', xAxisConfig);
         chart.axis('_value', {
           title: { text: '值', style: { fontSize: 12 } },
-          label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
+          label: { style: { fontSize: 11 }, formatter: (v: any) => formatAxisValue(v) },
         });
         if (dataCount > 50) {
           chart.slider('x', { values: [1 - 50 / dataCount, 1], style: { trackSize: 10, handleIconSize: 10 }, showLabelOnInteraction: true });
@@ -481,7 +492,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         chart.axis('x', xAxisConfig);
         chart.axis(actualYField, {
           title: { text: getFieldLabel(actualYField), style: { fontSize: 12 } },
-          label: { style: { fontSize: 11 }, formatter: (v: any) => formatValue(v, yFormatLookup[actualYField]) },
+          label: { style: { fontSize: 11 }, formatter: (v: any) => formatValue(v, yFormatLookup[actualYField], true) },
         });
         if (dataCount > 50) {
           chart.slider('x', { values: [1 - 50 / dataCount, 1], style: { trackSize: 10, handleIconSize: 10 }, showLabelOnInteraction: true });
@@ -561,7 +572,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         chart.axis('x', xAxisConfig);
         chart.axis('_value', {
           title: { text: '值', style: { fontSize: 12 } },
-          label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
+          label: { style: { fontSize: 11 }, formatter: (v: any) => formatAxisValue(v) },
         });
         if (dataCount > 50) {
           chart.slider('x', { values: [1 - 50 / dataCount, 1], style: { trackSize: 10, handleIconSize: 10 }, showLabelOnInteraction: true });
@@ -695,7 +706,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .axis('y', {
             position: 'left',
             title: actualLeftFields.map(f => getFieldLabel(f)).join(' / '),
-            label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
+            label: { style: { fontSize: 11 }, formatter: (v: any) => formatAxisValue(v) },
           })
           .tooltip({
             title: (d: any) => String(d[actualXField] ?? ''),
@@ -724,7 +735,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .axis('y', {
             position: 'right',
             title: actualRightFields.map(f => getFieldLabel(f)).join(' / '),
-            label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
+            label: { style: { fontSize: 11 }, formatter: (v: any) => formatAxisValue(v) },
           })
           .tooltip(false);
 

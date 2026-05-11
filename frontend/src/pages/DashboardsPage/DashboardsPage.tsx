@@ -239,6 +239,60 @@ const DashboardsPage: React.FC = () => {
   const extractNames = (fields: Array<{ originalName: string }> | unknown) =>
     (Array.isArray(fields) ? fields : []).map((f: { originalName: string }) => f.originalName);
 
+  const chineseAggToAlias = (agg: string): string => {
+    switch (agg) {
+      case '求和': return 'sum';
+      case '平均值': return 'avg';
+      case '最大值': return 'max';
+      case '最小值': return 'min';
+      case '去重计数': return 'count_distinct';
+      default: return 'count';
+    }
+  };
+
+  const buildFieldFormats = (cfg: Record<string, unknown>): Record<string, string> => {
+    const result: Record<string, string> = {};
+    const measureLike = [
+      ...((cfg.measureFields as any[]) || []),
+      ...((cfg.yAxisFields as any[]) || []),
+      ...((cfg.y2AxisFields as any[]) || []),
+      ...((cfg.indicatorFields as any[]) || []),
+    ];
+    measureLike.forEach((f: any) => {
+      if (f.originalName && f.config?.dataFormat && f.config.dataFormat !== '原始值') {
+        result[f.originalName] = f.config.dataFormat;
+      }
+    });
+    return result;
+  };
+
+  const buildFieldLabelMap = (cfg: Record<string, unknown>): Record<string, string> => {
+    const map: Record<string, string> = {};
+    const dimFields = [
+      ...((cfg.rowFields as any[]) || []),
+      ...((cfg.colFields as any[]) || []),
+      ...((cfg.xAxisFields as any[]) || []),
+      ...((cfg.groupFields as any[]) || []),
+    ];
+    dimFields.forEach((f: any) => {
+      if (f.originalName) map[f.originalName] = f.displayName || f.originalName;
+    });
+    const measureLike = [
+      ...((cfg.measureFields as any[]) || []),
+      ...((cfg.yAxisFields as any[]) || []),
+      ...((cfg.y2AxisFields as any[]) || []),
+      ...((cfg.indicatorFields as any[]) || []),
+    ];
+    measureLike.forEach((f: any) => {
+      if (f.originalName) {
+        const chineseAgg = f.config?.aggregation || '计数';
+        const englishAlias = chineseAggToAlias(chineseAgg);
+        map[`${f.originalName}_${englishAlias}`] = `${f.displayName || f.originalName} · ${chineseAgg}`;
+      }
+    });
+    return map;
+  };
+
   return (
     <Layout style={{ height: 'calc(100vh - 64px)', overflow: 'hidden', position: 'relative' }}>
       <Sider
@@ -375,9 +429,12 @@ const DashboardsPage: React.FC = () => {
                       measureFields={extractNames(cfg.measureFields)}
                       xAxisFields={extractNames(cfg.xAxisFields)}
                       yAxisFields={extractNames(cfg.yAxisFields)}
+                      y2AxisFields={extractNames(cfg.y2AxisFields)}
                       groupFields={extractNames(cfg.groupFields)}
                       indicatorFields={extractNames(cfg.indicatorFields)}
                       containerHeight={chartH}
+                      fieldFormats={buildFieldFormats(cfg)}
+                      fieldLabelMap={buildFieldLabelMap(cfg)}
                     />
                   )}
                 </Card>

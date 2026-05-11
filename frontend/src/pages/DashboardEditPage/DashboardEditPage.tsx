@@ -23,6 +23,17 @@ import ChartRenderer from '../../components/ChartRenderer';
 import FilterConfigModal from '../../components/FilterConfigModal/FilterConfigModal';
 
 const ReactGridLayout = WidthProvider(RGL);
+
+const chineseAggToAlias = (agg: string): string => {
+  switch (agg) {
+    case '求和': return 'sum';
+    case '平均值': return 'avg';
+    case '最大值': return 'max';
+    case '最小值': return 'min';
+    case '去重计数': return 'count_distinct';
+    default: return 'count';
+  }
+};
 const { RangePicker } = DatePicker;
 const { Sider, Content } = Layout;
 
@@ -424,8 +435,9 @@ const DashboardEditPage: React.FC = () => {
                   });
                   [...(cfg.measureFields || []), ...(cfg.yAxisFields || []), ...(cfg.y2AxisFields || []), ...(cfg.indicatorFields || [])].forEach((f: any) => {
                     if (f.originalName) {
-                      const agg = f.config?.aggregation || '计数';
-                      map[`${f.originalName}_${agg}`] = `${f.displayName || f.originalName} · ${agg}`;
+                      const chineseAgg = f.config?.aggregation || '计数';
+                      const englishAlias = chineseAggToAlias(chineseAgg);
+                      map[`${f.originalName}_${englishAlias}`] = `${f.displayName || f.originalName} · ${chineseAgg}`;
                     }
                   });
                   return map;

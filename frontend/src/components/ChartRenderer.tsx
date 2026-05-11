@@ -65,8 +65,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     const num = Number(value);
     if (isNaN(num)) return String(value ?? '');
     switch (format) {
-      case '百分比': return num.toFixed(2) + '%';
-      case '千分比': return num.toFixed(2) + '‰';
+      case '百分比': return (num * 100).toFixed(2) + '%';
+      case '千分比': return (num*1000).toFixed(2) + '‰';
       case '小数': return num.toFixed(2);
       case '整数': return Math.round(num).toLocaleString();
       default: return num.toLocaleString();
@@ -217,10 +217,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       data: chartData,
     };
 
-    chartRef.current.style.height = containerHeight ? `${containerHeight}px` : '100%';
     const detectedHeight = containerHeight || chartRef.current.clientHeight;
     const crossTableHeight = detectedHeight > 80 ? detectedHeight : 300;
     chartRef.current.style.height = `${crossTableHeight}px`;
+    chartRef.current.style.overflow = 'hidden';
 
     const s2Options: S2Options = {
       width: chartRef.current.clientWidth,
@@ -229,10 +229,6 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         hoverHighlight: true,
       },
       seriesNumber: { enable: false },
-      pagination: {
-        current: 1,
-        pageSize: 10,
-      },
     };
 
     chartInstanceRef.current = new PivotSheet(chartRef.current, s2DataConfig, s2Options);

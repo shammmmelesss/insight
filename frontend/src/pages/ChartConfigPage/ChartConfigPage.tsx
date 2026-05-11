@@ -23,6 +23,17 @@ type ChartType = 'crossTable' | 'bar' | 'line' | 'pie' | 'indicator' | 'dualAxis
 
 const { Option } = Select;
 
+const chineseAggToAlias = (agg: string): string => {
+  switch (agg) {
+    case '求和': return 'sum';
+    case '平均值': return 'avg';
+    case '最大值': return 'max';
+    case '最小值': return 'min';
+    case '去重计数': return 'count_distinct';
+    default: return 'count';
+  }
+};
+
 interface FieldConfig {
   originalName: string;
   displayName: string;
@@ -880,11 +891,12 @@ const ChartConfigPage: React.FC = () => {
                 fieldLabelMap[f.originalName] = f.displayName || f.originalName;
               });
               [...measureFields, ...yAxisFields, ...y2AxisFields, ...indicatorFields].forEach(f => {
-                const agg = f.config?.aggregation || '计数';
-                const key = `${f.originalName}_${agg}`;
-                fieldLabelMap[key] = `${f.displayName || f.originalName} · ${agg}`;
+                const chineseAgg = f.config?.aggregation || '计数';
+                const englishAlias = chineseAggToAlias(chineseAgg);
+                const key = `${f.originalName}_${englishAlias}`;
+                fieldLabelMap[key] = `${f.displayName || f.originalName} · ${chineseAgg}`;
                 if (f.config?.dataFormat && f.config.dataFormat !== '原始值') {
-                  fieldFormats[key] = f.config.dataFormat;
+                  fieldFormats[f.originalName] = f.config.dataFormat;
                 }
               });
               return (
@@ -893,12 +905,12 @@ const ChartConfigPage: React.FC = () => {
                   chartData={chartData}
                   rowFields={rowFields.map(f => f.originalName)}
                   colFields={colFields.map(f => f.originalName)}
-                  measureFields={measureFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
+                  measureFields={measureFields.map(f => f.originalName)}
                   xAxisFields={xAxisFields.map(f => f.originalName)}
-                  yAxisFields={yAxisFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
-                  y2AxisFields={y2AxisFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
+                  yAxisFields={yAxisFields.map(f => f.originalName)}
+                  y2AxisFields={y2AxisFields.map(f => f.originalName)}
                   groupFields={groupFields.map(f => f.originalName)}
-                  indicatorFields={indicatorFields.map(f => `${f.originalName}_${f.config?.aggregation || '计数'}`)}
+                  indicatorFields={indicatorFields.map(f => f.originalName)}
                   fieldFormats={fieldFormats}
                   fieldLabelMap={fieldLabelMap}
                 />

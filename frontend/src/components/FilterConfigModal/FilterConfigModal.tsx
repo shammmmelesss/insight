@@ -61,6 +61,18 @@ const FilterConfigModal: React.FC<FilterConfigModalProps> = ({ visible, onCancel
     }
   }, [visible]);
   
+  // 当 datasetFields 加载后，自动将筛选字段名同步为数据集字段名
+  useEffect(() => {
+    setFields(prev => prev.map(field => {
+      if (field.dataset && field.field && datasetFields[field.dataset]) {
+        const df = datasetFields[field.dataset].find(f => f.id === field.field);
+        const autoName = df?.displayName || df?.name || field.name;
+        return { ...field, name: autoName };
+      }
+      return field;
+    }));
+  }, [datasetFields]);
+
   // 获取数据集字段
   const fetchDatasetFields = async (datasetId: string) => {
     if (!datasetId) return;

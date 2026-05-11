@@ -43,53 +43,71 @@ interface FieldConfig {
 interface FieldTagProps {
   field: FieldConfig;
   area: string;
+  index: number;
   onSettings: (field: FieldConfig, area: string) => void;
   onRemove: (area: string, originalName: string) => void;
   showAggregation?: boolean;
+  onReorderDragStart: (e: React.DragEvent, area: string, index: number) => void;
+  insertBefore?: boolean;
+  insertAfter?: boolean;
 }
 
-const FieldTag: React.FC<FieldTagProps> = ({ field, area, onSettings, onRemove, showAggregation }) => {
+const FieldTag: React.FC<FieldTagProps> = ({
+  field, area, index, onSettings, onRemove, showAggregation,
+  onReorderDragStart, insertBefore, insertAfter,
+}) => {
   const aggLabel = field.config?.aggregation;
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 4,
-        padding: '3px 8px',
-        backgroundColor: '#f0f5ff',
-        border: '1px solid #adc6ff',
-        borderRadius: 4,
-        fontSize: 12,
-        color: '#2f54eb',
-        width: '100%',
-        boxSizing: 'border-box',
-      }}
-    >
-      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {field.displayName || field.originalName}
-        {showAggregation && aggLabel && (
-          <span style={{ color: '#8c8c8c', marginLeft: 4, fontWeight: 400 }}>· {aggLabel}</span>
-        )}
-      </span>
-      <Tooltip title="字段设置">
-        <Button
-          size="small"
-          type="text"
-          icon={<SettingOutlined />}
-          style={{ color: '#595959', padding: 0, minWidth: 'auto', height: 'auto', flexShrink: 0 }}
-          onClick={() => onSettings(field, area)}
-        />
-      </Tooltip>
-      <Tooltip title="移除">
-        <Button
-          size="small"
-          type="text"
-          icon={<DeleteOutlined />}
-          style={{ color: '#ff4d4f', padding: 0, minWidth: 'auto', height: 'auto', flexShrink: 0 }}
-          onClick={() => onRemove(area, field.originalName)}
-        />
-      </Tooltip>
+    <div style={{ position: 'relative' }}>
+      {insertBefore && (
+        <div style={{ height: 2, backgroundColor: '#1677ff', borderRadius: 1, marginBottom: 2 }} />
+      )}
+      <div
+        draggable
+        onDragStart={(e) => { e.stopPropagation(); onReorderDragStart(e, area, index); }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          padding: '3px 8px',
+          backgroundColor: '#f0f5ff',
+          border: '1px solid #adc6ff',
+          borderRadius: 4,
+          fontSize: 12,
+          color: '#2f54eb',
+          width: '100%',
+          boxSizing: 'border-box',
+          cursor: 'grab',
+        }}
+      >
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {field.displayName || field.originalName}
+          {showAggregation && aggLabel && (
+            <span style={{ color: '#8c8c8c', marginLeft: 4, fontWeight: 400 }}>· {aggLabel}</span>
+          )}
+        </span>
+        <Tooltip title="字段设置">
+          <Button
+            size="small"
+            type="text"
+            icon={<SettingOutlined />}
+            style={{ color: '#595959', padding: 0, minWidth: 'auto', height: 'auto', flexShrink: 0 }}
+            onClick={(e) => { e.stopPropagation(); onSettings(field, area); }}
+          />
+        </Tooltip>
+        <Tooltip title="移除">
+          <Button
+            size="small"
+            type="text"
+            icon={<DeleteOutlined />}
+            style={{ color: '#ff4d4f', padding: 0, minWidth: 'auto', height: 'auto', flexShrink: 0 }}
+            onClick={(e) => { e.stopPropagation(); onRemove(area, field.originalName); }}
+          />
+        </Tooltip>
+      </div>
+      {insertAfter && (
+        <div style={{ height: 2, backgroundColor: '#1677ff', borderRadius: 1, marginTop: 2 }} />
+      )}
     </div>
   );
 };
@@ -107,79 +125,136 @@ interface DropZoneProps {
   onDrop: (e: React.DragEvent, area: string) => void;
   onSettings: (field: FieldConfig, area: string) => void;
   onRemove: (area: string, originalName: string) => void;
+  onReorder: (area: string, fromIndex: number, toIndex: number) => void;
 }
 
 const DropZone: React.FC<DropZoneProps> = ({
   areaKey, label, fields, isOver, showAggregation,
-  onDragEnter, onDragOver, onDragLeave, onDrop, onSettings, onRemove,
-}) => (
-  <div
-    style={{
-      marginBottom: 10,
-      border: '1px solid #f0f0f0',
-      borderRadius: 6,
-      overflow: 'hidden',
-    }}
-  >
+  onDragEnter, onDragOver, onDragLeave, onDrop, onSettings, onRemove, onReorder,
+}) => {
+  const [reorderFromIndex, setReorderFromIndex] = useState<number | null>(null);
+  const [insertIndex, setInsertIndex] = useState<number | null>(null);
+
+  const handleReorderDragStart = (e: React.DragEvent, area: string, index: number) => {
+    e.dataTransfer.setData('application/insight-reorder', JSON.stringify({ area, index }));
+    e.dataTransfer.effectAllowed = 'move';
+    setReorderFromIndex(index);
+  };
+
+  const handleItemDragOver = (e: React.DragEvent, index: number) => {
+    if (reorderFromIndex === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const mid = rect.top + rect.height / 2;
+    setInsertIndex(e.clientY < mid ? index : index + 1);
+  };
+
+  const handleZoneDrop = (e: React.DragEvent) => {
+    const reorderData = e.dataTransfer.getData('application/insight-reorder');
+    if (reorderData) {
+      e.preventDefault();
+      e.stopPropagation();
+      const { area, index: fromIndex } = JSON.parse(reorderData);
+      if (area === areaKey && insertIndex !== null && insertIndex !== fromIndex && insertIndex !== fromIndex + 1) {
+        onReorder(areaKey, fromIndex, insertIndex);
+      }
+      setReorderFromIndex(null);
+      setInsertIndex(null);
+      return;
+    }
+    setReorderFromIndex(null);
+    setInsertIndex(null);
+    onDrop(e, areaKey);
+  };
+
+  const handleZoneDragLeave = (e: React.DragEvent) => {
+    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
+      setReorderFromIndex(null);
+      setInsertIndex(null);
+      onDragLeave();
+    }
+  };
+
+  const isReordering = reorderFromIndex !== null;
+
+  return (
     <div
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '6px 10px',
-        backgroundColor: '#fafafa',
-        borderBottom: '1px solid #f0f0f0',
+        marginBottom: 10,
+        border: '1px solid #f0f0f0',
+        borderRadius: 6,
+        overflow: 'hidden',
       }}
     >
-      <span style={{ fontSize: 12, fontWeight: 500, color: '#595959', flex: 1 }}>{label}</span>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          padding: '6px 10px',
+          backgroundColor: '#fafafa',
+          borderBottom: '1px solid #f0f0f0',
+        }}
+      >
+        <span style={{ fontSize: 12, fontWeight: 500, color: '#595959', flex: 1 }}>{label}</span>
+      </div>
+      <div
+        style={{
+          minHeight: 44,
+          padding: '8px 10px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          border: isOver && !isReordering ? '2px dashed #4096ff' : '2px solid transparent',
+          backgroundColor: isOver && !isReordering ? '#e6f4ff' : 'transparent',
+          borderRadius: 4,
+          transition: 'all 0.15s',
+        }}
+        onDragEnter={(e) => { if (!isReordering) onDragEnter(e, areaKey); }}
+        onDragOver={(e) => { if (!isReordering) onDragOver(e); else e.preventDefault(); }}
+        onDragLeave={handleZoneDragLeave}
+        onDrop={handleZoneDrop}
+      >
+        {fields.length > 0 ? (
+          fields.map((field, idx) => (
+            <div
+              key={field.originalName}
+              onDragOver={(e) => handleItemDragOver(e, idx)}
+            >
+              <FieldTag
+                field={field}
+                area={areaKey}
+                index={idx}
+                onSettings={onSettings}
+                onRemove={onRemove}
+                showAggregation={showAggregation}
+                onReorderDragStart={handleReorderDragStart}
+                insertBefore={insertIndex === idx && reorderFromIndex !== null && reorderFromIndex !== idx}
+                insertAfter={insertIndex === idx + 1 && reorderFromIndex !== null && reorderFromIndex !== idx}
+              />
+            </div>
+          ))
+        ) : (
+          <div
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
+              color: '#bfbfbf',
+              fontSize: 12,
+              userSelect: 'none',
+            }}
+          >
+            <DragOutlined style={{ fontSize: 12 }} />
+            <span>拖入字段</span>
+          </div>
+        )}
+      </div>
     </div>
-    <div
-      style={{
-        minHeight: 44,
-        padding: '8px 10px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 6,
-        border: isOver ? '2px dashed #4096ff' : '2px solid transparent',
-        backgroundColor: isOver ? '#e6f4ff' : 'transparent',
-        borderRadius: 4,
-        transition: 'all 0.15s',
-      }}
-      onDragEnter={(e) => onDragEnter(e, areaKey)}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={(e) => onDrop(e, areaKey)}
-    >
-      {fields.length > 0 ? (
-        fields.map((field) => (
-          <FieldTag
-            key={field.originalName}
-            field={field}
-            area={areaKey}
-            onSettings={onSettings}
-            onRemove={onRemove}
-            showAggregation={showAggregation}
-          />
-        ))
-      ) : (
-        <div
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 4,
-            color: '#bfbfbf',
-            fontSize: 12,
-            userSelect: 'none',
-          }}
-        >
-          <DragOutlined style={{ fontSize: 12 }} />
-          <span>拖入字段</span>
-        </div>
-      )}
-    </div>
-  </div>
-);
+  );
+};
 
 // --- 主组件 ---
 const ChartConfigPage: React.FC = () => {
@@ -201,6 +276,8 @@ const ChartConfigPage: React.FC = () => {
 
   const [droppableArea, setDroppableArea] = useState<string | null>(null);
   const [draggedField, setDraggedField] = useState<FieldConfig | null>(null);
+  const [draggedFields, setDraggedFields] = useState<FieldConfig[]>([]);
+  const [selectedFields, setSelectedFields] = useState<Set<string>>(new Set());
 
   const [isFieldSettingsModalVisible, setIsFieldSettingsModalVisible] = useState(false);
   const [currentField, setCurrentField] = useState<FieldConfig & { area?: string } | null>(null);
@@ -472,13 +549,29 @@ const ChartConfigPage: React.FC = () => {
     }
   }, [selectedDataset, loadedDatasetId, datasetSQL, dataSourceId, datasetType, generateSQL]);
 
-  const handleDragStart = (e: React.DragEvent, field: FieldConfig) => {
-    setDraggedField(field);
-    e.dataTransfer.effectAllowed = 'copy';
-    e.dataTransfer.setData('text/plain', JSON.stringify(field));
+  const handleFieldClick = (field: FieldConfig) => {
+    setSelectedFields(prev => {
+      const next = new Set(prev);
+      if (next.has(field.originalName)) {
+        next.delete(field.originalName);
+      } else {
+        next.add(field.originalName);
+      }
+      return next;
+    });
   };
 
-  const handleDragEnd = () => { setDraggedField(null); setDroppableArea(null); };
+  const handleDragStart = (e: React.DragEvent, field: FieldConfig) => {
+    const toSend = selectedFields.has(field.originalName) && selectedFields.size > 1
+      ? datasetFields.filter(f => selectedFields.has(f.originalName))
+      : [field];
+    setDraggedField(field);
+    setDraggedFields(toSend);
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('text/plain', JSON.stringify(toSend));
+  };
+
+  const handleDragEnd = () => { setDraggedField(null); setDraggedFields([]); setDroppableArea(null); };
   const handleDragEnter = (e: React.DragEvent, area: string) => { e.preventDefault(); setDroppableArea(area); };
   const handleDragLeave = () => setDroppableArea(null);
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; };
@@ -486,14 +579,28 @@ const ChartConfigPage: React.FC = () => {
   const handleDrop = (e: React.DragEvent, area: string) => {
     e.preventDefault();
     setDroppableArea(null);
-    if (!draggedField) return;
-    const fieldConfig: FieldConfig = {
-      ...draggedField,
-      config: area === 'filter'
-        ? { filterType: 'multiple', filterDefault: [] }
-        : { aggregation: '计数', dataFormat: '原始值', sort: '升序' },
-    };
-    fieldSetters[area]?.(prev => [...prev, fieldConfig]);
+    const fields = draggedFields.length > 0 ? draggedFields : (draggedField ? [draggedField] : []);
+    if (fields.length === 0) return;
+    fieldSetters[area]?.(prev => {
+      const existing = new Set(prev.map(f => f.originalName));
+      const toAdd = fields.filter(f => !existing.has(f.originalName)).map(f => ({
+        ...f,
+        config: area === 'filter'
+          ? { filterType: 'multiple' as const, filterDefault: [] }
+          : { aggregation: '计数', dataFormat: '原始值', sort: '升序' },
+      }));
+      return [...prev, ...toAdd];
+    });
+  };
+
+  const handleReorder = (area: string, fromIndex: number, toIndex: number) => {
+    fieldSetters[area]?.(prev => {
+      const arr = [...prev];
+      const [item] = arr.splice(fromIndex, 1);
+      const insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex;
+      arr.splice(insertAt, 0, item);
+      return arr;
+    });
   };
 
   const handleRemoveField = (area: string, originalName: string) => {
@@ -552,6 +659,7 @@ const ChartConfigPage: React.FC = () => {
     onDrop: handleDrop,
     onSettings: openFieldSettingsModal,
     onRemove: handleRemoveField,
+    onReorder: handleReorder,
   };
 
   return (
@@ -644,21 +752,25 @@ const ChartConfigPage: React.FC = () => {
                       维度 ({dimensionFields.length})
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
-                      {dimensionFields.map((field, i) => (
+                      {dimensionFields.map((field, i) => {
+                        const isSelected = selectedFields.has(field.originalName);
+                        return (
                         <div
                           key={i}
                           draggable
+                          onClick={() => handleFieldClick(field)}
                           onDragStart={(e) => handleDragStart(e, field)}
                           onDragEnd={handleDragEnd}
                           style={{
                             padding: '5px 8px',
-                            backgroundColor: '#f0f5ff',
-                            border: '1px solid #d6e4ff',
+                            backgroundColor: isSelected ? '#d6e4ff' : '#f0f5ff',
+                            border: isSelected ? '1px solid #1677ff' : '1px solid #d6e4ff',
                             borderRadius: 4,
                             cursor: 'grab',
                             display: 'flex',
                             alignItems: 'center',
                             gap: 6,
+                            userSelect: 'none',
                           }}
                         >
                           <Tag
@@ -676,7 +788,8 @@ const ChartConfigPage: React.FC = () => {
                             </div>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </>
                 )}
@@ -686,21 +799,25 @@ const ChartConfigPage: React.FC = () => {
                       指标 ({metricFields.length})
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {metricFields.map((field, i) => (
+                      {metricFields.map((field, i) => {
+                        const isSelected = selectedFields.has(field.originalName);
+                        return (
                         <div
                           key={i}
                           draggable
+                          onClick={() => handleFieldClick(field)}
                           onDragStart={(e) => handleDragStart(e, field)}
                           onDragEnd={handleDragEnd}
                           style={{
                             padding: '5px 8px',
-                            backgroundColor: '#fff7e6',
-                            border: '1px solid #ffd591',
+                            backgroundColor: isSelected ? '#ffe7ba' : '#fff7e6',
+                            border: isSelected ? '1px solid #fa8c16' : '1px solid #ffd591',
                             borderRadius: 4,
                             cursor: 'grab',
                             display: 'flex',
                             alignItems: 'center',
                             gap: 6,
+                            userSelect: 'none',
                           }}
                         >
                           <Tag
@@ -718,7 +835,8 @@ const ChartConfigPage: React.FC = () => {
                             </div>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </>
                 )}

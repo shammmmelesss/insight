@@ -32,7 +32,7 @@ interface FilterConfigModalProps {
 const FilterConfigModal: React.FC<FilterConfigModalProps> = ({ visible, onCancel, onOk, datasets, charts, dashboardChartIds, initialFilters }) => {
   const [fields, setFields] = useState<FilterField[]>([]);
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
-  const [datasetFields, setDatasetFields] = useState<Record<string, Array<{ id: string; name: string }>>>({});
+  const [datasetFields, setDatasetFields] = useState<Record<string, Array<{ id: string; name: string; displayName?: string }>>>({});
   const [fieldValues, setFieldValues] = useState<Record<string, any[]>>({});
   const [loadingValues, setLoadingValues] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -68,11 +68,12 @@ const FilterConfigModal: React.FC<FilterConfigModalProps> = ({ visible, onCancel
     try {
       setLoading(true);
       const response = await axios.get(`/api/datasets/${datasetId}/fields`);
-      // 确保返回的数据格式正确，只包含id和name字段
+      // 确保返回的数据格式正确，保留 displayName 用于展示
       const fields = response.data.items || [];
       const formattedFields = fields.map((field: any) => ({
         id: field.id || field.name || `field-${Math.random()}`,
-        name: field.name || field.id || `字段${Math.random()}`
+        name: field.name || field.id || `字段${Math.random()}`,
+        displayName: field.displayName || field.name || field.id || '',
       })).filter((field: any) => field.id && field.name);
       setDatasetFields(prev => ({
         ...prev,
@@ -273,7 +274,9 @@ const FilterConfigModal: React.FC<FilterConfigModalProps> = ({ visible, onCancel
                   style={{ width: 200 }}
                   value={selectedField.field}
                   onChange={(value) => {
-                    updateField(selectedField.id, { field: value, defaultValue: [] });
+                    const matchedField = datasetFields[selectedField.dataset]?.find(f => f.id === value);
+                    const autoName = matchedField?.displayName || matchedField?.name || value;
+                    updateField(selectedField.id, { field: value, defaultValue: [], name: autoName });
                     if (selectedField.dataset) {
                       fetchFieldValues(selectedField.dataset, value);
                     }
@@ -282,7 +285,7 @@ const FilterConfigModal: React.FC<FilterConfigModalProps> = ({ visible, onCancel
                   loading={loading}
                 >
                   {selectedField.dataset && datasetFields[selectedField.dataset]?.map(field => (
-                    <Option key={field.id} value={field.id}>{field.name}</Option>
+                    <Option key={field.id} value={field.id}>{field.displayName || field.name}</Option>
                   ))}
                 </Select>
               </Form.Item>

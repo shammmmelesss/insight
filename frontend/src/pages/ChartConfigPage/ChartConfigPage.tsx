@@ -66,7 +66,7 @@ const FieldTag: React.FC<FieldTagProps> = ({ field, area, onSettings, onRemove, 
       }}
     >
       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {field.displayName}
+        {field.displayName || field.originalName}
         {showAggregation && aggLabel && (
           <span style={{ color: '#8c8c8c', marginLeft: 4, fontWeight: 400 }}>· {aggLabel}</span>
         )}
@@ -666,7 +666,7 @@ const ChartConfigPage: React.FC = () => {
                           </Tag>
                           <div style={{ flex: 1, overflow: 'hidden' }}>
                             <div style={{ fontSize: 12, color: '#1d39c4', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {field.displayName}
+                              {field.displayName || field.originalName}
                             </div>
                             <div style={{ fontSize: 10, color: '#8c8c8c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {field.originalName}
@@ -708,7 +708,7 @@ const ChartConfigPage: React.FC = () => {
                           </Tag>
                           <div style={{ flex: 1, overflow: 'hidden' }}>
                             <div style={{ fontSize: 12, color: '#d46b08', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {field.displayName}
+                              {field.displayName || field.originalName}
                             </div>
                             <div style={{ fontSize: 10, color: '#8c8c8c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {field.originalName}
@@ -839,7 +839,7 @@ const ChartConfigPage: React.FC = () => {
                 const value = filterValues[f.originalName] ?? f.config?.filterDefault;
                 return (
                   <div key={f.originalName} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 160, maxWidth: 240 }}>
-                    <span style={{ fontSize: 12, color: '#595959' }}>{f.displayName}</span>
+                    <span style={{ fontSize: 12, color: '#595959' }}>{f.displayName || f.originalName}</span>
                     {filterType === 'dateRange' ? (
                       <DatePicker.RangePicker
                         size="small"
@@ -899,7 +899,7 @@ const ChartConfigPage: React.FC = () => {
           <div style={{ paddingTop: 8 }}>
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>字段名称</div>
-              <Input value={currentField.displayName} disabled />
+              <Input value={currentField.displayName || currentField.originalName} disabled />
             </div>
 
             {currentField.area === 'filter' ? (

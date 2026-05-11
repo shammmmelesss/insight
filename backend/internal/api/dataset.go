@@ -325,22 +325,54 @@ func GetDatasetFields(c *gin.Context) {
 		fieldsConfig = []map[string]interface{}{}
 	}
 
+	// 构建 originalName -> displayName 映射
+	displayNameMap := make(map[string]string)
+	for _, field := range fieldsConfig {
+		origName, _ := field["originalName"].(string)
+		if origName == "" {
+			continue
+		}
+		if dispName, ok := field["displayName"].(string); ok {
+			displayNameMap[origName] = dispName
+		}
+	}
+
 	items := make([]map[string]interface{}, 0)
 	for i, field := range fieldsFromDB {
+		colName, _ := field["name"].(string)
+		displayName := displayNameMap[colName]
+		if displayName == "" {
+			displayName = colName
+		}
 		item := map[string]interface{}{
-			"id":    field["id"],
-			"name":  field["name"],
-			"type":  field["type"],
-			"index": i,
+			"id":          field["id"],
+			"name":        field["name"],
+			"displayName": displayName,
+			"type":        field["type"],
+			"index":       i,
 		}
 		items = append(items, item)
 	}
 
 	if len(items) == 0 {
 		for i, field := range fieldsConfig {
+			origName, _ := field["originalName"].(string)
+			if origName == "" {
+				origName, _ = field["name"].(string)
+			}
+			displayName := displayNameMap[origName]
+			if displayName == "" {
+				if dn, ok := field["displayName"].(string); ok {
+					displayName = dn
+				}
+			}
+			if displayName == "" {
+				displayName = origName
+			}
 			item := map[string]interface{}{
-				"id":   field["name"],
-				"name": field["name"],
+				"id":          origName,
+				"name":        origName,
+				"displayName": displayName,
 			}
 			if id, ok := field["id"]; ok {
 				item["id"] = id

@@ -9,6 +9,7 @@ Insight 是一个现代化的数据分析平台，支持多数据源接入、SQL
 ### 后端
 - Go 1.25 / Gin / GORM
 - PostgreSQL（主存储，UUID 主键，JSONB 字段）
+- ClickHouse（抽取类型数据集的目标存储）
 - 多数据库驱动：MySQL、PostgreSQL、SQL Server、Oracle、BigQuery
 
 ### 前端
@@ -29,7 +30,14 @@ Insight 是一个现代化的数据分析平台，支持多数据源接入、SQL
 支持 PostgreSQL、MySQL、Oracle、SQL Server、BigQuery 等数据库类型。提供连接测试、激活/停用管理，密码在 API 响应中自动脱敏。
 
 ### 2. 数据集管理（`/datasets`）
-基于 SQL 查询创建数据集，自动检测字段类型（维度/度量），支持字段预览和数据预览。
+基于 SQL 查询创建数据集，自动检测字段类型（维度/度量），支持字段预览和数据预览。支持两种模式：
+
+| 模式 | 说明 |
+|------|------|
+| **直连** | 图表查询时实时访问原始数据源 |
+| **抽取** | 将数据定期抽取到 ClickHouse，图表查询 ClickHouse 表，支持手动触发和按频率调度（每小时/每天/每周） |
+
+抽取任务异步执行，页面轮询状态直至完成，全程按钮置灰防止重复触发。
 
 ### 3. 图表配置（`/charts`、`/chart-config`）
 支持 5 种图表类型：
@@ -63,13 +71,15 @@ Insight 是一个现代化的数据分析平台，支持多数据源接入、SQL
 │       ├── api/                   # 路由与处理函数
 │       │   ├── routes.go          # 路由注册
 │       │   ├── datasource.go      # 数据源 API
-│       │   ├── dataset.go         # 数据集 API
-│       │   ├── chart.go           # 图表 API（含动态 SQL 生成）
+│       │   ├── dataset.go         # 数据集 API（含抽取到 ClickHouse 逻辑）
+│       │   ├── chart.go           # 图表 API（含动态 SQL 生成，按数据集类型路由到 CK 或原始库）
 │       │   ├── dashboard.go       # 看板 API
 │       │   ├── home.go            # 首页 API
 │       │   └── utils.go           # SQL 安全工具函数
 │       ├── config/config.go       # 配置加载（文件 + 环境变量）
-│       ├── database/database.go   # 数据库连接
+│       ├── database/
+│       │   ├── database.go        # PostgreSQL 连接
+│       │   └── clickhouse.go      # ClickHouse 连接（可选，未配置时降级跳过）
 │       └── models/models.go       # 数据模型
 ├── frontend/
 │   └── src/
@@ -102,6 +112,7 @@ Insight 是一个现代化的数据分析平台，支持多数据源接入、SQL
 - Go 1.21+
 - Node.js 18+
 - PostgreSQL 15+
+- ClickHouse 23+（可选，仅抽取类型数据集需要）
 
 ---
 
@@ -208,12 +219,17 @@ tail -f /home/ubuntu/vite.log             # 前端日志
 | 环境变量 | 默认值 | 说明 |
 |---------|--------|------|
 | `SERVER_PORT` | 8080 | 服务端口 |
-| `DB_HOST` | localhost | 数据库地址 |
-| `DB_PORT` | 5432 | 数据库端口 |
-| `DB_USER` | postgres | 数据库用户 |
-| `DB_PASSWORD` | （空） | 数据库密码 |
-| `DB_NAME` | data_analysis | 数据库名 |
+| `DB_HOST` | localhost | PostgreSQL 地址 |
+| `DB_PORT` | 5432 | PostgreSQL 端口 |
+| `DB_USER` | postgres | PostgreSQL 用户 |
+| `DB_PASSWORD` | （空） | PostgreSQL 密码 |
+| `DB_NAME` | data_analysis | PostgreSQL 数据库名 |
 | `DB_SSLMODE` | disable | SSL 模式 |
+| `CLICKHOUSE_HOST` | localhost | ClickHouse 地址（可选） |
+| `CLICKHOUSE_PORT` | 9000 | ClickHouse 端口 |
+| `CLICKHOUSE_USER` | default | ClickHouse 用户 |
+| `CLICKHOUSE_PASSWORD` | （空） | ClickHouse 密码 |
+| `CLICKHOUSE_DBNAME` | insight | ClickHouse 数据库名 |
 
 ## API 接口
 
@@ -221,7 +237,8 @@ tail -f /home/ubuntu/vite.log             # 前端日志
 |------|------|------|
 | 数据源 | `/api/data-sources` | CRUD + 连接测试 |
 | 数据集 | `/api/datasets` | CRUD + 字段查询 + 数据预览 |
-| 图表 | `/api/charts` | CRUD + 图表数据（含筛选） |
+| 数据集抽取 | `/api/datasets/:id/extract` | 手动触发抽取到 ClickHouse |
+| 图表 | `/api/charts` | CRUD + 图表数据（含筛选，按数据集类型路由查询目标） |
 | 看板 | `/api/dashboards` | CRUD（含布局和筛选器持久化） |
 | 首页 | `/api/recent-updates` | 最近更新 |
 

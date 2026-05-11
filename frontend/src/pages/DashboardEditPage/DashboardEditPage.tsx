@@ -273,7 +273,8 @@ const DashboardEditPage: React.FC = () => {
         const key = `${datasetId}:${item.id || item.name}`;
         const dbType = (item.type || '').toUpperCase();
         const isNumber = ['INT', 'INTEGER', 'BIGINT', 'SMALLINT', 'TINYINT', 'FLOAT', 'DOUBLE', 'DECIMAL', 'NUMERIC', 'REAL'].some(t => dbType.includes(t));
-        setDatasetFieldTypes(prev => ({ ...prev, [key]: isNumber ? 'number' : 'text' }));
+        const isDate = ['DATE', 'DATETIME', 'TIMESTAMP'].some(t => dbType.includes(t));
+        setDatasetFieldTypes(prev => ({ ...prev, [key]: isNumber ? 'number' : isDate ? 'date' : 'text' }));
       });
     } catch (error) {
       console.error('获取字段类型失败:', error);

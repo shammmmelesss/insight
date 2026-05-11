@@ -27,7 +27,7 @@ func isValidIdentifier(name string) bool {
 // 只允许：标识符、数字、算术运算符、括号、空白、点、逗号。
 // 拒绝：分号、引号、注释符（-- 和 /* */）。
 var (
-	validExpressionCharsRegex = regexp.MustCompile(`^[a-zA-Z0-9_\s\+\-\*\/\(\)\.,]+$`)
+	validExpressionCharsRegex = regexp.MustCompile(`^[a-zA-Z0-9_\s\+\-\*\/\(\)\.,=<>!]+$`)
 	dangerousExpressionRegex  = regexp.MustCompile(`--|/\*|\*/|;|'|"`)
 )
 

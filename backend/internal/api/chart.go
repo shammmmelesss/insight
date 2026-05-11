@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -351,10 +352,12 @@ func GetChartData(c *gin.Context) {
 				if intVal, err := strconv.ParseInt(s, 10, 64); err == nil {
 					row[colName] = intVal
 				} else if floatVal, err := strconv.ParseFloat(s, 64); err == nil {
-					row[colName] = floatVal
+					row[colName] = safeFloat(floatVal)
 				} else {
 					row[colName] = s
 				}
+			} else if floatVal, ok := val.(float64); ok {
+				row[colName] = safeFloat(floatVal)
 			} else {
 				row[colName] = val
 			}
@@ -595,8 +598,8 @@ func buildFilteredSQL(base string, filters []FilterCondition) string {
 		switch f.Type {
 		case "dateRange":
 			if len(f.Values) == 2 && f.Values[0] != "" && f.Values[1] != "" {
-				start := sanitizeSQLString(f.Values[0])
-				end := sanitizeSQLString(f.Values[1])
+				start := truncateISODatetime(sanitizeSQLString(f.Values[0]))
+				end := truncateISODatetime(sanitizeSQLString(f.Values[1]))
 				sql += fmt.Sprintf(" AND %s BETWEEN '%s' AND '%s'", f.Field, start, end)
 			}
 		case "single", "multiple":
@@ -614,7 +617,8 @@ func buildFilteredSQL(base string, filters []FilterCondition) string {
 			} else {
 				quoted := make([]string, len(f.Values))
 				for i, v := range f.Values {
-					quoted[i] = fmt.Sprintf("'%s'", sanitizeSQLString(v))
+					val := truncateISODatetime(sanitizeSQLString(v))
+					quoted[i] = fmt.Sprintf("'%s'", val)
 				}
 				sql += fmt.Sprintf(" AND %s IN (%s)", f.Field, strings.Join(quoted, ", "))
 			}
@@ -626,6 +630,24 @@ func buildFilteredSQL(base string, filters []FilterCondition) string {
 // sanitizeSQLString 转义SQL字符串中的单引号，防止注入
 func sanitizeSQLString(s string) string {
 	return strings.ReplaceAll(s, "'", "''")
+}
+
+// truncateISODatetime 将 ISO 8601 datetime 截断为日期部分 (YYYY-MM-DD)
+// 兼容 ClickHouse Date 类型不接受带时间的字符串的问题
+func truncateISODatetime(v string) string {
+	if len(v) > 10 && v[10] == 'T' {
+		return v[:10]
+	}
+	return v
+}
+
+// safeFloat 将 NaN/Inf 替换为 nil，避免 JSON 序列化失败
+// ClickHouse 计算字段除以零时会返回 NaN 或 Inf
+func safeFloat(f float64) interface{} {
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return nil
+	}
+	return f
 }
 
 type fieldConfig struct {

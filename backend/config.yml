@@ -8,3 +8,9 @@ database:
   password: ""
   dbname: "data_analysis"
   sslmode: "disable"
+clickhouse:
+  host: "localhost"
+  port: "9000"
+  user: "default"
+  password: ""
+  dbname: "insight"

@@ -118,6 +118,7 @@ cd backend
 go mod download
 go run cmd/main.go
 # 服务运行在 http://localhost:8080
+# lsof -ti:8080 | xargs kill -9 2>/dev/null; cd backend; go mod download; go run cmd/main.go
 ```
 
 ### 3. 启动前端

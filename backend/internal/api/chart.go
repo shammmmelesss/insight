@@ -1,6 +1,7 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -280,22 +281,43 @@ func GetChartData(c *gin.Context) {
 		}
 	}
 
-	// 根据图表配置生成聚合SQL
-	querySQL, err := buildChartSQL(chart.Config, string(chart.Type), dataset.SQL, filterConditions)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
-		return
+	// 抽取类型数据集使用 ClickHouse 表，直连类型使用原始数据源
+	var querySQL string
+	var db *sql.DB
+	var err error
+	if dataset.Type == models.DatasetTypeExtract {
+		if database.ClickHouseDB == nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ClickHouse 未连接，请检查配置"})
+			return
+		}
+		if dataset.ExtractStatus != models.ExtractStatusSuccess {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "数据尚未抽取成功，请先执行抽取"})
+			return
+		}
+		ckTable := "ds_" + strings.ReplaceAll(dataset.ID.String(), "-", "_")
+		ckSQL := fmt.Sprintf("SELECT * FROM insight.%s", ckTable)
+		querySQL, err = buildChartSQL(chart.Config, string(chart.Type), ckSQL, filterConditions)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
+			return
+		}
+		db = database.ClickHouseDB
+	} else {
+		querySQL, err = buildChartSQL(chart.Config, string(chart.Type), dataset.SQL, filterConditions)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
+			return
+		}
+		db, err = connectToDataSource(dataSource)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "连接数据源失败: " + err.Error()})
+			return
+		}
+		defer db.Close()
 	}
 
-	// 连接数据源执行查询
-	db, err := connectToDataSource(dataSource)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "连接数据源失败: " + err.Error()})
-		return
-	}
-	defer db.Close()
-
-	rows, err := db.Query(querySQL)
+	var rows *sql.Rows
+	rows, err = db.Query(querySQL)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "执行SQL失败: " + err.Error()})
 		return

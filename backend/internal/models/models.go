@@ -41,16 +41,39 @@ func (ds DataSource) GetPassword() string {
 	return ds.Password
 }
 
+// DatasetType 数据集类型
+type DatasetType string
+
+const (
+	DatasetTypeDirect  DatasetType = "direct"  // 直连：图表直接查询原始SQL
+	DatasetTypeExtract DatasetType = "extract" // 抽取：数据抽取到ClickHouse，图表查询ClickHouse
+)
+
+// ExtractStatus 抽取状态
+type ExtractStatus string
+
+const (
+	ExtractStatusIdle    ExtractStatus = "idle"
+	ExtractStatusRunning ExtractStatus = "running"
+	ExtractStatusSuccess ExtractStatus = "success"
+	ExtractStatusFailed  ExtractStatus = "failed"
+)
+
 // Dataset 数据集模型
 type Dataset struct {
 	BaseModel
-	WorkspaceID  string  `json:"workspaceId" gorm:"column:workspace_id;type:uuid;index"`
-	Name         string  `json:"name"`
-	SQL          string  `json:"sql"`
-	Description  string  `json:"description"`
-	FieldsConfig string  `json:"fieldsConfig" gorm:"type:jsonb;default:'[]'"`
-	DataSourceID string  `json:"dataSourceId" gorm:"column:data_source_id;type:uuid"`
-	Charts       []Chart `json:"-" gorm:"foreignKey:DatasetID"`
+	WorkspaceID     string        `json:"workspaceId" gorm:"column:workspace_id;type:uuid;index"`
+	Name            string        `json:"name"`
+	SQL             string        `json:"sql"`
+	Description     string        `json:"description"`
+	FieldsConfig    string        `json:"fieldsConfig" gorm:"type:jsonb;default:'[]'"`
+	DataSourceID    string        `json:"dataSourceId" gorm:"column:data_source_id;type:uuid"`
+	Type            DatasetType   `json:"type" gorm:"default:'direct'"`
+	ExtractSchedule string        `json:"extractSchedule" gorm:"type:jsonb;default:'{}'"`
+	ExtractStatus   ExtractStatus `json:"extractStatus" gorm:"default:'idle'"`
+	LastExtractAt   *time.Time    `json:"lastExtractAt"`
+	ExtractError    string        `json:"extractError"`
+	Charts          []Chart       `json:"-" gorm:"foreignKey:DatasetID"`
 }
 
 // ChartType 图表类型

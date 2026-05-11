@@ -1,10 +1,13 @@
 package api
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"data-analysis-platform/internal/database"
@@ -30,6 +33,7 @@ func RegisterDatasetRoutes(rg *gin.RouterGroup) {
 		dataset.GET("/:id/field-values", GetDatasetFieldValues)
 		dataset.GET("/:id/charts", GetDatasetCharts)
 		dataset.POST("/preview", PreviewDataset)
+		dataset.POST("/:id/extract", TriggerExtract)
 	}
 }
 
@@ -40,19 +44,43 @@ func datasetResponse(dataset models.Dataset) map[string]interface{} {
 		fieldsConfig = []interface{}{}
 	}
 
+	var extractSchedule map[string]interface{}
+	scheduleStr := dataset.ExtractSchedule
+	if scheduleStr == "" {
+		scheduleStr = "{}"
+	}
+	if err := json.Unmarshal([]byte(scheduleStr), &extractSchedule); err != nil {
+		extractSchedule = map[string]interface{}{}
+	}
+
 	var chartCount int64
 	database.DB.Model(&models.Chart{}).Where("dataset_id = ?", dataset.ID).Count(&chartCount)
 
+	datasetType := dataset.Type
+	if datasetType == "" {
+		datasetType = models.DatasetTypeDirect
+	}
+
+	extractStatus := dataset.ExtractStatus
+	if extractStatus == "" {
+		extractStatus = models.ExtractStatusIdle
+	}
+
 	return map[string]interface{}{
-		"id":           dataset.ID,
-		"name":         dataset.Name,
-		"sql":          dataset.SQL,
-		"description":  dataset.Description,
-		"fieldsConfig": fieldsConfig,
-		"dataSourceId": dataset.DataSourceID,
-		"chartCount":   chartCount,
-		"createdAt":    dataset.CreatedAt,
-		"updatedAt":    dataset.UpdatedAt,
+		"id":              dataset.ID,
+		"name":            dataset.Name,
+		"sql":             dataset.SQL,
+		"description":     dataset.Description,
+		"fieldsConfig":    fieldsConfig,
+		"dataSourceId":    dataset.DataSourceID,
+		"type":            datasetType,
+		"extractSchedule": extractSchedule,
+		"extractStatus":   extractStatus,
+		"lastExtractAt":   dataset.LastExtractAt,
+		"extractError":    dataset.ExtractError,
+		"chartCount":      chartCount,
+		"createdAt":       dataset.CreatedAt,
+		"updatedAt":       dataset.UpdatedAt,
 	}
 }
 
@@ -86,11 +114,13 @@ func ListDatasets(c *gin.Context) {
 // CreateDataset 创建数据集
 func CreateDataset(c *gin.Context) {
 	var req struct {
-		Name         string        `json:"name" binding:"required"`
-		SQL          string        `json:"sql" binding:"required"`
-		Description  string        `json:"description"`
-		FieldsConfig []interface{} `json:"fieldsConfig"`
-		DataSourceId string        `json:"dataSourceId" binding:"required"`
+		Name            string                 `json:"name" binding:"required"`
+		SQL             string                 `json:"sql" binding:"required"`
+		Description     string                 `json:"description"`
+		FieldsConfig    []interface{}          `json:"fieldsConfig"`
+		DataSourceId    string                 `json:"dataSourceId" binding:"required"`
+		Type            models.DatasetType     `json:"type"`
+		ExtractSchedule map[string]interface{} `json:"extractSchedule"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -101,6 +131,12 @@ func CreateDataset(c *gin.Context) {
 	if req.FieldsConfig == nil {
 		req.FieldsConfig = []interface{}{}
 	}
+	if req.Type == "" {
+		req.Type = models.DatasetTypeDirect
+	}
+	if req.ExtractSchedule == nil {
+		req.ExtractSchedule = map[string]interface{}{}
+	}
 
 	fieldsConfigJSON, err := json.Marshal(req.FieldsConfig)
 	if err != nil {
@@ -108,13 +144,21 @@ func CreateDataset(c *gin.Context) {
 		return
 	}
 
+	scheduleJSON, err := json.Marshal(req.ExtractSchedule)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "抽取计划序列化失败: " + err.Error()})
+		return
+	}
+
 	dataset := models.Dataset{
-		WorkspaceID:  GetWorkspaceID(c),
-		Name:         req.Name,
-		SQL:          req.SQL,
-		Description:  req.Description,
-		FieldsConfig: string(fieldsConfigJSON),
-		DataSourceID: req.DataSourceId,
+		WorkspaceID:     GetWorkspaceID(c),
+		Name:            req.Name,
+		SQL:             req.SQL,
+		Description:     req.Description,
+		FieldsConfig:    string(fieldsConfigJSON),
+		DataSourceID:    req.DataSourceId,
+		Type:            req.Type,
+		ExtractSchedule: string(scheduleJSON),
 	}
 
 	result := database.DB.Create(&dataset)
@@ -143,16 +187,25 @@ func GetDataset(c *gin.Context) {
 func UpdateDataset(c *gin.Context) {
 	id := c.Param("id")
 	var req struct {
-		Name         string        `json:"name" binding:"required"`
-		SQL          string        `json:"sql" binding:"required"`
-		Description  string        `json:"description"`
-		FieldsConfig []interface{} `json:"fieldsConfig"`
-		DataSourceId string        `json:"dataSourceId" binding:"required"`
+		Name            string                 `json:"name" binding:"required"`
+		SQL             string                 `json:"sql" binding:"required"`
+		Description     string                 `json:"description"`
+		FieldsConfig    []interface{}          `json:"fieldsConfig"`
+		DataSourceId    string                 `json:"dataSourceId" binding:"required"`
+		Type            models.DatasetType     `json:"type"`
+		ExtractSchedule map[string]interface{} `json:"extractSchedule"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误: " + err.Error()})
 		return
+	}
+
+	if req.Type == "" {
+		req.Type = models.DatasetTypeDirect
+	}
+	if req.ExtractSchedule == nil {
+		req.ExtractSchedule = map[string]interface{}{}
 	}
 
 	var dataset models.Dataset
@@ -168,11 +221,19 @@ func UpdateDataset(c *gin.Context) {
 		return
 	}
 
+	scheduleJSON, err := json.Marshal(req.ExtractSchedule)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "抽取计划序列化失败: " + err.Error()})
+		return
+	}
+
 	dataset.Name = req.Name
 	dataset.SQL = req.SQL
 	dataset.Description = req.Description
 	dataset.FieldsConfig = string(fieldsConfigJSON)
 	dataset.DataSourceID = req.DataSourceId
+	dataset.Type = req.Type
+	dataset.ExtractSchedule = string(scheduleJSON)
 
 	result = database.DB.Save(&dataset)
 	if result.Error != nil {
@@ -360,11 +421,31 @@ func GetDatasetFieldValues(c *gin.Context) {
 func PreviewDataset(c *gin.Context) {
 	var req struct {
 		SQL          string `json:"sql" binding:"required"`
-		DataSourceId string `json:"dataSourceId" binding:"required"`
+		DataSourceId string `json:"dataSourceId"`
+		DatasetId    string `json:"datasetId"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误: " + err.Error()})
+		return
+	}
+
+	// 抽取类型数据集直接查 ClickHouse
+	if req.DatasetId != "" {
+		var ds models.Dataset
+		if err := database.DB.First(&ds, "id = ?", req.DatasetId).Error; err == nil &&
+			ds.Type == models.DatasetTypeExtract {
+			if database.ClickHouseDB == nil {
+				c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ClickHouse 未连接"})
+				return
+			}
+			execPreviewQuery(c, database.ClickHouseDB, req.SQL)
+			return
+		}
+	}
+
+	if req.DataSourceId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误: dataSourceId 不能为空"})
 		return
 	}
 
@@ -386,10 +467,13 @@ func PreviewDataset(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据库连接测试失败: " + err.Error()})
 		return
 	}
+	execPreviewQuery(c, db, req.SQL)
+}
 
-	rows, err := db.Query(req.SQL)
+func execPreviewQuery(c *gin.Context, db *sql.DB, querySQL string) {
+	rows, err := db.Query(querySQL)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "执行SQL失败: " + err.Error() + ", SQL: " + req.SQL})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "执行SQL失败: " + err.Error()})
 		return
 	}
 	defer rows.Close()
@@ -463,4 +547,222 @@ func GetDatasetCharts(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"items": charts, "total": len(charts)})
+}
+
+// TriggerExtract 手动触发数据集抽取到 ClickHouse
+func TriggerExtract(c *gin.Context) {
+	id := c.Param("id")
+
+	var dataset models.Dataset
+	if err := database.DB.First(&dataset, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "数据集不存在"})
+		return
+	}
+	if dataset.Type != models.DatasetTypeExtract {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "仅抽取类型数据集支持此操作"})
+		return
+	}
+	if database.ClickHouseDB == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ClickHouse 未连接，请检查配置"})
+		return
+	}
+	if dataset.ExtractStatus == models.ExtractStatusRunning {
+		c.JSON(http.StatusConflict, gin.H{"error": "抽取任务正在进行中，请稍后再试"})
+		return
+	}
+
+	// 标记为运行中
+	now := time.Now()
+	database.DB.Model(&dataset).Updates(map[string]interface{}{
+		"extract_status": models.ExtractStatusRunning,
+		"extract_error":  "",
+	})
+
+	// 异步执行抽取
+	go func() {
+		err := doExtract(dataset)
+		now = time.Now()
+		if err != nil {
+			database.DB.Model(&dataset).Updates(map[string]interface{}{
+				"extract_status": models.ExtractStatusFailed,
+				"extract_error":  err.Error(),
+				"last_extract_at": now,
+			})
+		} else {
+			database.DB.Model(&dataset).Updates(map[string]interface{}{
+				"extract_status":  models.ExtractStatusSuccess,
+				"extract_error":   "",
+				"last_extract_at": now,
+			})
+		}
+	}()
+
+	c.JSON(http.StatusOK, gin.H{"message": "抽取任务已启动"})
+}
+
+// doExtract 执行数据抽取：从源数据库读取并写入 ClickHouse
+func doExtract(dataset models.Dataset) error {
+	var dataSource models.DataSource
+	if err := database.DB.First(&dataSource, "id = ?", dataset.DataSourceID).Error; err != nil {
+		return fmt.Errorf("数据源不存在: %w", err)
+	}
+
+	srcDB, err := connectToDataSource(dataSource)
+	if err != nil {
+		return fmt.Errorf("连接数据源失败: %w", err)
+	}
+	defer srcDB.Close()
+
+	rows, err := srcDB.Query(dataset.SQL)
+	if err != nil {
+		return fmt.Errorf("执行 SQL 失败: %w", err)
+	}
+	defer rows.Close()
+
+	colTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return fmt.Errorf("获取列信息失败: %w", err)
+	}
+
+	tableName := "ds_" + strings.ReplaceAll(dataset.ID.String(), "-", "_")
+
+	// 建表 DDL
+	if err := createClickHouseTable(tableName, colTypes); err != nil {
+		return fmt.Errorf("建表失败: %w", err)
+	}
+
+	// 批量写入
+	if err := insertRows(tableName, colTypes, rows); err != nil {
+		return fmt.Errorf("写入数据失败: %w", err)
+	}
+
+	return nil
+}
+
+// createClickHouseTable 在 ClickHouse 中创建（或重建）目标表
+func createClickHouseTable(tableName string, colTypes []*sql.ColumnType) error {
+	ckDB := database.ClickHouseDB
+
+	dropSQL := fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)
+	if _, err := ckDB.Exec(dropSQL); err != nil {
+		return err
+	}
+
+	var cols []string
+	for _, ct := range colTypes {
+		ckType := mapToCKType(ct.DatabaseTypeName())
+		cols = append(cols, fmt.Sprintf("`%s` %s", ct.Name(), ckType))
+	}
+
+	createSQL := fmt.Sprintf(
+		"CREATE TABLE %s (%s) ENGINE = MergeTree() ORDER BY tuple()",
+		tableName,
+		strings.Join(cols, ", "),
+	)
+	_, err := ckDB.Exec(createSQL)
+	return err
+}
+
+// insertRows 将查询结果批量插入 ClickHouse
+func insertRows(tableName string, colTypes []*sql.ColumnType, rows *sql.Rows) error {
+	ckDB := database.ClickHouseDB
+	colNames := make([]string, len(colTypes))
+	for i, ct := range colTypes {
+		colNames[i] = fmt.Sprintf("`%s`", ct.Name())
+	}
+
+	placeholders := strings.Repeat("?,", len(colTypes))
+	placeholders = placeholders[:len(placeholders)-1]
+	insertSQL := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
+		tableName, strings.Join(colNames, ","), placeholders)
+
+	tx, err := ckDB.Begin()
+	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(insertSQL)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
+
+	vals := make([]interface{}, len(colTypes))
+	ptrs := make([]interface{}, len(colTypes))
+	for i := range vals {
+		ptrs[i] = &vals[i]
+	}
+
+	for rows.Next() {
+		if err := rows.Scan(ptrs...); err != nil {
+			tx.Rollback()
+			return err
+		}
+		args := make([]interface{}, len(vals))
+		for i, v := range vals {
+			if b, ok := v.([]byte); ok {
+				args[i] = convertBytesToCKValue(string(b), colTypes[i].DatabaseTypeName())
+			} else {
+				args[i] = v
+			}
+		}
+		if _, err := stmt.Exec(args...); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
+// convertBytesToCKValue 将源库 []byte 值按目标 CK 类型转换为合适的 Go 类型
+func convertBytesToCKValue(s string, dbType string) interface{} {
+	t := strings.ToUpper(dbType)
+	switch {
+	case strings.Contains(t, "BIGINT"):
+		if n, err := strconv.ParseInt(s, 10, 64); err == nil {
+			return n
+		}
+	case strings.Contains(t, "INT"):
+		if n, err := strconv.ParseInt(s, 10, 64); err == nil {
+			return int32(n)
+		}
+	case strings.Contains(t, "FLOAT"), strings.Contains(t, "DOUBLE"),
+		strings.Contains(t, "DECIMAL"), strings.Contains(t, "NUMERIC"),
+		strings.Contains(t, "REAL"):
+		if f, err := strconv.ParseFloat(s, 64); err == nil {
+			return f
+		}
+	case strings.Contains(t, "BOOL"):
+		if b, err := strconv.ParseBool(s); err == nil {
+			if b {
+				return uint8(1)
+			}
+			return uint8(0)
+		}
+	}
+	return s
+}
+
+// mapToCKType 将源库字段类型映射为 ClickHouse 类型
+func mapToCKType(dbType string) string {
+	t := strings.ToUpper(dbType)
+	switch {
+	case strings.Contains(t, "BIGINT"):
+		return "Nullable(Int64)"
+	case strings.Contains(t, "INT"):
+		return "Nullable(Int32)"
+	case strings.Contains(t, "FLOAT"), strings.Contains(t, "DOUBLE"),
+		strings.Contains(t, "DECIMAL"), strings.Contains(t, "NUMERIC"),
+		strings.Contains(t, "REAL"):
+		return "Nullable(Float64)"
+	case strings.Contains(t, "BOOL"):
+		return "Nullable(UInt8)"
+	case strings.Contains(t, "DATETIME"), strings.Contains(t, "TIMESTAMP"):
+		return "Nullable(DateTime)"
+	case strings.Contains(t, "DATE"):
+		return "Nullable(Date)"
+	default:
+		return "Nullable(String)"
+	}
 }

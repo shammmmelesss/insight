@@ -46,6 +46,21 @@ export interface WorkspaceListResponse {
 
 // ==================== 数据集模块 ====================
 
+/** 数据集类型：直连 / 抽取 */
+export type DatasetType = "direct" | "extract";
+
+/** 抽取调度频率 */
+export type ExtractFrequency = "hourly" | "daily" | "weekly";
+
+/** 抽取调度配置 */
+export interface ExtractSchedule {
+  frequency: ExtractFrequency;
+  /** 每天/每周执行时间，格式 "HH:mm"，hourly 时忽略 */
+  time?: string;
+  /** 每周几执行，0=周日 … 6=周六，仅 weekly 生效 */
+  weekday?: number;
+}
+
 /** 数据类型 */
 export type DataType = "date" | "number" | "text" | "boolean";
 
@@ -59,6 +74,9 @@ export interface FieldConfig {
   isCalculated?: boolean;
 }
 
+/** 抽取状态 */
+export type ExtractStatus = "idle" | "running" | "success" | "failed";
+
 /** 数据集 */
 export interface Dataset {
   id: string;
@@ -67,6 +85,11 @@ export interface Dataset {
   fieldsConfig: FieldConfig[];
   dataSourceId: string;
   description?: string;
+  type: DatasetType;
+  extractSchedule?: ExtractSchedule;
+  extractStatus?: ExtractStatus;
+  lastExtractAt?: string;
+  extractError?: string;
   chartCount: number;
   createdBy: string;
   updatedBy: string;
@@ -81,6 +104,8 @@ export interface CreateDatasetRequest {
   fieldsConfig: FieldConfig[];
   dataSourceId: string;
   description?: string;
+  type: DatasetType;
+  extractSchedule?: ExtractSchedule;
 }
 
 /** 更新数据集请求 */
@@ -90,6 +115,8 @@ export interface UpdateDatasetRequest {
   fieldsConfig: FieldConfig[];
   dataSourceId: string;
   description?: string;
+  type: DatasetType;
+  extractSchedule?: ExtractSchedule;
 }
 
 /** 数据集列表响应 */

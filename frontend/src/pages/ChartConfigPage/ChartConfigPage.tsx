@@ -195,6 +195,8 @@ const ChartConfigPage: React.FC = () => {
   const [datasetSQL, setDatasetSQL] = useState('');
   const [dataSourceId, setDataSourceId] = useState('');
   const [dataSourceType, setDataSourceType] = useState('');
+  const [datasetType, setDatasetType] = useState<string>('');
+  const [loadedDatasetId, setLoadedDatasetId] = useState('');
 
   const [droppableArea, setDroppableArea] = useState<string | null>(null);
   const [draggedField, setDraggedField] = useState<FieldConfig | null>(null);
@@ -396,10 +398,19 @@ const ChartConfigPage: React.FC = () => {
     loadedFilterKeys.current.clear();
     setFilterFieldOptions({});
     setFilterValues({});
+    setLoadedDatasetId('');
     axios.get(`/api/datasets/${selectedDataset}`).then(res => {
       setDatasetFields(res.data.fieldsConfig || []);
-      setDatasetSQL(res.data.sql || '');
+      const dsType = res.data.type || 'direct';
+      setDatasetType(dsType);
+      if (dsType === 'extract') {
+        const ckTable = `ds_${res.data.id.replaceAll('-', '_')}`;
+        setDatasetSQL(`SELECT * FROM insight.${ckTable}`);
+      } else {
+        setDatasetSQL(res.data.sql || '');
+      }
       setDataSourceId(res.data.dataSourceId || '');
+      setLoadedDatasetId(selectedDataset);
       if (pendingFilterValues.current) {
         setFilterValues(pendingFilterValues.current);
         pendingFilterValues.current = null;
@@ -415,7 +426,7 @@ const ChartConfigPage: React.FC = () => {
       }
     }).catch(() => {
       message.error('获取数据集字段失败');
-      setDatasetFields([]); setDatasetSQL(''); setDataSourceId(''); setDataSourceType('');
+      setDatasetFields([]); setDatasetSQL(''); setDataSourceId(''); setDataSourceType(''); setDatasetType('');
     });
   }, [selectedDataset]);
 
@@ -445,11 +456,18 @@ const ChartConfigPage: React.FC = () => {
   }, [filterFields, fetchFilterFieldOptions]);
 
   useEffect(() => {
-    if (!selectedDataset || !datasetSQL || !dataSourceId) { setChartData([]); return; }
-    axios.post('/api/datasets/preview', { sql: generateSQL(), dataSourceId })
-      .then(res => setChartData(res.data.data || []))
-      .catch(() => { message.error('获取图表数据失败'); setChartData([]); });
-  }, [selectedDataset, datasetSQL, dataSourceId, generateSQL]);
+    if (!selectedDataset || !datasetSQL || loadedDatasetId !== selectedDataset) { setChartData([]); return; }
+    if (datasetType === 'extract') {
+      axios.post('/api/datasets/preview', { sql: generateSQL(), datasetId: selectedDataset })
+        .then(res => setChartData(res.data.data || []))
+        .catch(() => { message.error('获取图表数据失败'); setChartData([]); });
+    } else {
+      if (!dataSourceId) { setChartData([]); return; }
+      axios.post('/api/datasets/preview', { sql: generateSQL(), dataSourceId })
+        .then(res => setChartData(res.data.data || []))
+        .catch(() => { message.error('获取图表数据失败'); setChartData([]); });
+    }
+  }, [selectedDataset, loadedDatasetId, datasetSQL, dataSourceId, datasetType, generateSQL]);
 
   const handleDragStart = (e: React.DragEvent, field: FieldConfig) => {
     setDraggedField(field);

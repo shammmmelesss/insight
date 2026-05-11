@@ -25,6 +25,13 @@ func main() {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
+	// 初始化 ClickHouse（可选，连接失败时仅警告）
+	if err := database.InitClickHouse(cfg); err != nil {
+		log.Printf("ClickHouse not available, extract feature disabled: %v", err)
+	} else {
+		log.Println("Connected to ClickHouse successfully")
+	}
+
 	// 自动迁移数据库模型
 	database.DB.AutoMigrate(
 		&models.Workspace{},

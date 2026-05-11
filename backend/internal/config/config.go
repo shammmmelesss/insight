@@ -20,6 +20,13 @@ type Config struct {
 		DBName   string `default:"data_analysis"`
 		SSLMode  string `default:"disable"`
 	}
+	ClickHouse struct {
+		Host     string `default:"localhost"`
+		Port     string `default:"9000"`
+		User     string `default:"default"`
+		Password string `default:""`
+		DBName   string `default:"insight"`
+	}
 }
 
 func LoadConfig() (*Config, error) {

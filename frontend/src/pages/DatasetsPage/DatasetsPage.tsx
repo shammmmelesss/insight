@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Table, Modal, Drawer, Form, Input, message, Tabs, Row, Col, Select } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { App, Button, Card, Table, Modal, Drawer, Form, Input, Tabs, Row, Col, Select, Radio, TimePicker, Tooltip, Tag } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined, SyncOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import axios from 'axios';
-import { Dataset, CreateDatasetRequest, UpdateDatasetRequest, FieldConfig, DataType } from '@shared/api.interface';
+import dayjs from 'dayjs';
+import { Dataset, CreateDatasetRequest, UpdateDatasetRequest, FieldConfig, DataType, DatasetType, ExtractSchedule, ExtractFrequency, ExtractStatus } from '@shared/api.interface';
 
 const { Option } = Select;
 
@@ -10,6 +11,7 @@ const { Option } = Select;
 const { TextArea } = Input;
 
 const DatasetsPage: React.FC = () => {
+  const { message } = App.useApp();
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [loading, setLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -26,6 +28,10 @@ const DatasetsPage: React.FC = () => {
   const [dataSources, setDataSources] = useState<any[]>([]);
   const [selectedDataSource, setSelectedDataSource] = useState<string>('');
   
+  // 数据集类型和抽取调度
+  const [datasetType, setDatasetType] = useState<DatasetType>('direct');
+  const [extractSchedule, setExtractSchedule] = useState<ExtractSchedule>({ frequency: 'daily', time: '02:00' });
+
   // 表单字段状态
   const [formValues, setFormValues] = useState({
     name: '',
@@ -176,6 +182,8 @@ const DatasetsPage: React.FC = () => {
       // 编辑模式
       setEditingId(record.id);
       setSelectedDataSource(record.dataSourceId || '');
+      setDatasetType(record.type || 'direct');
+      setExtractSchedule(record.extractSchedule || { frequency: 'daily', time: '02:00' });
       setFieldsConfig((record.fieldsConfig || []).map(f => ({
         ...f,
         isCalculated: f.isCalculated ?? f.originalName.startsWith('calculated_'),
@@ -191,6 +199,8 @@ const DatasetsPage: React.FC = () => {
       // 新增模式
       setEditingId(null);
       setSelectedDataSource('');
+      setDatasetType('direct');
+      setExtractSchedule({ frequency: 'daily', time: '02:00' });
       setFieldsConfig([]);
       setFormValues({
         name: '',
@@ -246,6 +256,8 @@ const DatasetsPage: React.FC = () => {
       // 确保selectedDataSource被包含在请求中
       const dataSourceId = selectedDataSource;
       
+      const schedulePayload = datasetType === 'extract' ? extractSchedule : undefined;
+
       if (editingId) {
         // 更新数据集
         requestData = {
@@ -254,6 +266,8 @@ const DatasetsPage: React.FC = () => {
           description: formValues.description,
           fieldsConfig: fieldsConfig,
           dataSourceId: dataSourceId,
+          type: datasetType,
+          extractSchedule: schedulePayload,
         };
         console.log('更新数据集请求数据:', requestData);
         response = await axios.put(`/api/datasets/${editingId}`, requestData);
@@ -266,6 +280,8 @@ const DatasetsPage: React.FC = () => {
           description: formValues.description,
           fieldsConfig: fieldsConfig,
           dataSourceId: dataSourceId,
+          type: datasetType,
+          extractSchedule: schedulePayload,
         };
         console.log('创建数据集请求数据:', requestData);
         response = await axios.post('/api/datasets', requestData);
@@ -324,12 +340,83 @@ const DatasetsPage: React.FC = () => {
     setChartModalVisible(true);
   };
 
+  // 手动触发抽取
+  const [extractingIds, setExtractingIds] = useState<Set<string>>(new Set());
+
+  const triggerExtract = async (id: string) => {
+    setExtractingIds(prev => new Set(prev).add(id));
+
+    const removeExtracting = () =>
+      setExtractingIds(prev => { const s = new Set(prev); s.delete(id); return s; });
+
+    try {
+      await axios.post(`/api/datasets/${id}/extract`);
+
+      // 轮询直到抽取完成，按钮全程置灰
+      let retries = 0;
+      const poll = async () => {
+        try {
+          const res = await axios.get('/api/datasets', { params: { name: searchKeyword } });
+          const items: Dataset[] = res.data.items;
+          setDatasets(items);
+          const ds = items.find(d => d.id === id);
+          if (ds?.extractStatus === 'running' && retries < 60) {
+            retries++;
+            setTimeout(poll, 3000);
+          } else {
+            removeExtracting();
+            if (ds?.extractStatus === 'success') {
+              message.success('抽取完成');
+            } else if (ds?.extractStatus === 'failed') {
+              message.error(ds.extractError || '抽取失败');
+            }
+          }
+        } catch {
+          removeExtracting();
+        }
+      };
+      setTimeout(poll, 2000);
+    } catch (error: any) {
+      message.error(error.response?.data?.error || '触发抽取失败');
+      removeExtracting();
+    }
+  };
+
+  const renderExtractStatus = (status: ExtractStatus | undefined, lastAt: string | undefined, error: string | undefined) => {
+    if (!status || status === 'idle') return <Tag>未抽取</Tag>;
+    if (status === 'running') return <Tag icon={<SyncOutlined spin />} color="processing">抽取中</Tag>;
+    if (status === 'success') return (
+      <Tooltip title={lastAt ? `最后抽取：${lastAt}` : undefined}>
+        <Tag icon={<CheckCircleOutlined />} color="success">已抽取</Tag>
+      </Tooltip>
+    );
+    return (
+      <Tooltip title={error || '未知错误'}>
+        <Tag icon={<CloseCircleOutlined />} color="error">失败</Tag>
+      </Tooltip>
+    );
+  };
+
   // 表格列配置
   const columns = [
     {
       title: '数据集名称',
       dataIndex: 'name',
       key: 'name',
+    },
+    {
+      title: '类型',
+      dataIndex: 'type',
+      key: 'type',
+      render: (type: DatasetType) => type === 'extract' ? '抽取' : '直连',
+    },
+    {
+      title: '抽取状态',
+      key: 'extractStatus',
+      render: (_: any, record: Dataset) => {
+        if (record.type !== 'extract') return '-';
+        return renderExtractStatus(record.extractStatus, record.lastExtractAt, record.extractError);
+      },
     },
     {
       title: '关联图表',
@@ -376,6 +463,18 @@ const DatasetsPage: React.FC = () => {
           >
             可视化
           </Button>
+          {record.type === 'extract' && (
+            <Button
+              size="small"
+              icon={<SyncOutlined />}
+              loading={extractingIds.has(record.id)}
+              disabled={extractingIds.has(record.id) || record.extractStatus === 'running'}
+              onClick={() => triggerExtract(record.id)}
+              style={{ marginRight: 8 }}
+            >
+              手动抽取
+            </Button>
+          )}
           <Button
             icon={<EditOutlined />}
             size="small"
@@ -478,15 +577,72 @@ const DatasetsPage: React.FC = () => {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item
-                label="数据集描述"
-              >
-                <Input 
-                  placeholder="请输入数据集描述" 
+              <Form.Item label="数据集描述">
+                <Input
+                  placeholder="请输入数据集描述"
                   value={formValues.description}
                   onChange={(e) => setFormValues({...formValues, description: e.target.value})}
                 />
               </Form.Item>
+
+              <Form.Item label="类型">
+                <Radio.Group
+                  value={datasetType}
+                  onChange={(e) => setDatasetType(e.target.value)}
+                >
+                  <Radio.Button value="direct">直连</Radio.Button>
+                  <Radio.Button value="extract">抽取</Radio.Button>
+                </Radio.Group>
+                <div style={{ marginTop: 4, fontSize: 12, color: '#888' }}>
+                  {datasetType === 'direct'
+                    ? '图表直接查询原始数据源 SQL'
+                    : '将数据定期抽取到 ClickHouse，图表查询 ClickHouse 表'}
+                </div>
+              </Form.Item>
+
+              {datasetType === 'extract' && (
+                <Form.Item label="抽取调度">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <Select
+                      value={extractSchedule.frequency}
+                      onChange={(v: ExtractFrequency) =>
+                        setExtractSchedule({ ...extractSchedule, frequency: v })
+                      }
+                      style={{ width: 140 }}
+                    >
+                      <Option value="hourly">每小时</Option>
+                      <Option value="daily">每天</Option>
+                      <Option value="weekly">每周</Option>
+                    </Select>
+
+                    {(extractSchedule.frequency === 'daily' || extractSchedule.frequency === 'weekly') && (
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        {extractSchedule.frequency === 'weekly' && (
+                          <Select
+                            value={extractSchedule.weekday ?? 1}
+                            onChange={(v: number) =>
+                              setExtractSchedule({ ...extractSchedule, weekday: v })
+                            }
+                            style={{ width: 100 }}
+                          >
+                            {['周日','周一','周二','周三','周四','周五','周六'].map((label, i) => (
+                              <Option key={i} value={i}>{label}</Option>
+                            ))}
+                          </Select>
+                        )}
+                        <TimePicker
+                          format="HH:mm"
+                          value={extractSchedule.time ? dayjs(extractSchedule.time, 'HH:mm') : dayjs('02:00', 'HH:mm')}
+                          onChange={(t) =>
+                            setExtractSchedule({ ...extractSchedule, time: t ? t.format('HH:mm') : '02:00' })
+                          }
+                          style={{ width: 110 }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </Form.Item>
+              )}
             </Col>
           </Row>
 
@@ -526,7 +682,7 @@ const DatasetsPage: React.FC = () => {
                       key: col.name,
                     }))}
                     dataSource={sqlResult}
-                    rowKey={(index) => index?.toString() || '0'}
+                    rowKey={(_, idx) => String(idx ?? 0)}
                     pagination={{ pageSize: 5 }}
                     size="small"
                   />
@@ -550,7 +706,7 @@ const DatasetsPage: React.FC = () => {
               ) : (
                 <Table
                   dataSource={fieldsConfig}
-                  rowKey={(index) => index?.toString() || '0'}
+                  rowKey={(_, idx) => String(idx ?? 0)}
                   pagination={false}
                   size="small"
                 >

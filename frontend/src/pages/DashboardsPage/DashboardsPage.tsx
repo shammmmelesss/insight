@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button, Card, Modal, Layout, Skeleton, Select, DatePicker, Tooltip, Dropdown } from 'antd';
 import { EditOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined, InboxOutlined, PlusOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -6,6 +6,7 @@ import axios from 'axios';
 import { Dashboard, ChartOption, FilterField, DashboardLayoutItem } from '@shared/api.interface';
 import DashboardList from '../../components/DashboardList/DashboardList';
 import ChartRenderer from '../../components/ChartRenderer';
+import { dashboardCache } from '../../utils/dashboardCache';
 
 const ROW_HEIGHT = 30;
 const GRID_MARGIN = 10;
@@ -21,6 +22,30 @@ const isWide = (item: DashboardLayoutItem) =>
 
 const { RangePicker } = DatePicker;
 const { Sider, Content } = Layout;
+
+interface LazyChartCardProps {
+  onEnter: () => void;
+  onExit: () => void;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}
+
+const LazyChartCard: React.FC<LazyChartCardProps> = ({ onEnter, onExit, children, style }) => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { entry.isIntersecting ? onEnter() : onExit(); },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [onEnter, onExit]);
+
+  return <div ref={ref} style={style}>{children}</div>;
+};
 
 function parseLayout(raw: Dashboard['layout'] | string | unknown): DashboardLayoutItem[] {
   if (Array.isArray(raw)) return raw as DashboardLayoutItem[];
@@ -47,7 +72,9 @@ const DashboardsPage: React.FC = () => {
   const [charts, setCharts] = useState<ChartOption[]>([]);
   const [chartData, setChartData] = useState<Record<string, unknown[]>>({});
   const [chartConfigs, setChartConfigs] = useState<Record<string, Record<string, unknown>>>({});
-  const [chartLoading, setChartLoading] = useState(false);
+  const [chartLoadingMap, setChartLoadingMap] = useState<Record<string, boolean>>({});
+  const loadedChartIds = useRef<Set<string>>(new Set());
+  const visibleChartIds = useRef<Set<string>>(new Set());
   const [filters, setFilters] = useState<FilterField[]>([]);
   const [filterValues, setFilterValues] = useState<Record<string, unknown>>({});
   const [filterFieldOptions, setFilterFieldOptions] = useState<Record<string, unknown[]>>({});
@@ -58,20 +85,41 @@ const DashboardsPage: React.FC = () => {
   const [sqlModalVisible, setSqlModalVisible] = useState(false);
   const [currentSQLChartId, setCurrentSQLChartId] = useState('');
 
+  const applyDashboardList = (items: Dashboard[], fromCache: boolean) => {
+    setDashboards(items);
+    if (items.length > 0 && !fromCache) {
+      const selectedId = searchParams.get('selected');
+      setSelectedDashboard(prev => {
+        if (prev) return prev;
+        if (selectedId) return items.find(d => d.id === selectedId) ?? items[0];
+        return items[0];
+      });
+    }
+  };
+
   const fetchDashboards = async () => {
+    const cacheKey = 'dashboards';
+    const cached = dashboardCache.get<Dashboard[]>(cacheKey);
+
+    if (cached) {
+      applyDashboardList(cached, false);
+      void (async () => {
+        try {
+          const response = await axios.get('/api/dashboards');
+          const items: Dashboard[] = response.data.items;
+          dashboardCache.set(cacheKey, items);
+          applyDashboardList(items, true);
+        } catch { /* silent */ }
+      })();
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await axios.get('/api/dashboards');
       const items: Dashboard[] = response.data.items;
-      setDashboards(items);
-      if (items.length > 0) {
-        const selectedId = searchParams.get('selected');
-        setSelectedDashboard(prev => {
-          if (prev) return prev;
-          if (selectedId) return items.find(d => d.id === selectedId) ?? items[0];
-          return items[0];
-        });
-      }
+      dashboardCache.set(cacheKey, items);
+      applyDashboardList(items, false);
     } catch (error) {
       console.error('获取看板列表失败:', error);
     } finally {
@@ -86,6 +134,7 @@ const DashboardsPage: React.FC = () => {
   const handleDelete = async (id: string) => {
     try {
       await axios.delete(`/api/dashboards/${id}`);
+      dashboardCache.invalidate('dashboards');
       fetchDashboards();
     } catch (error) {
       console.error('看板删除失败:', error);
@@ -102,25 +151,42 @@ const DashboardsPage: React.FC = () => {
   };
 
   type FilterParam = { field: string; type: string; dataType: string; values: string[] };
+  interface ChartCacheEntry { data: unknown[]; config?: Record<string, unknown>; sql?: string; }
+
+  const applyChartResponse = (chartId: string, data: unknown[], config: Record<string, unknown> | undefined, sql: string | undefined) => {
+    setChartData(prev => ({ ...prev, [chartId]: data }));
+    if (sql) setChartSQLs(prev => ({ ...prev, [chartId]: sql }));
+    if (config) setChartConfigs(prev => ({ ...prev, [chartId]: config }));
+  };
 
   const fetchChartData = async (chartId: string, filterParams?: FilterParam[]) => {
+    const cacheKey = `chart:${chartId}:${JSON.stringify(filterParams ?? [])}`;
+    const cached = dashboardCache.get<ChartCacheEntry>(cacheKey);
+
+    if (cached) {
+      applyChartResponse(chartId, cached.data, cached.config, cached.sql);
+      void (async () => {
+        try {
+          const params: Record<string, string> = {};
+          if (filterParams && filterParams.length > 0) params.filters = JSON.stringify(filterParams);
+          const response = await axios.get(`/api/charts/${chartId}/data`, { params });
+          let config = response.data.chart?.config;
+          if (typeof config === 'string') { try { config = JSON.parse(config); } catch { config = undefined; } }
+          dashboardCache.set(cacheKey, { data: response.data.data, config, sql: response.data.sql });
+          applyChartResponse(chartId, response.data.data, config, response.data.sql);
+        } catch { /* silent */ }
+      })();
+      return;
+    }
+
     try {
       const params: Record<string, string> = {};
-      if (filterParams && filterParams.length > 0) {
-        params.filters = JSON.stringify(filterParams);
-      }
+      if (filterParams && filterParams.length > 0) params.filters = JSON.stringify(filterParams);
       const response = await axios.get(`/api/charts/${chartId}/data`, { params });
-      setChartData(prev => ({ ...prev, [chartId]: response.data.data }));
-      if (response.data.sql) {
-        setChartSQLs(prev => ({ ...prev, [chartId]: response.data.sql }));
-      }
-      if (response.data.chart?.config) {
-        let config = response.data.chart.config;
-        if (typeof config === 'string') {
-          try { config = JSON.parse(config); } catch { config = {}; }
-        }
-        setChartConfigs(prev => ({ ...prev, [chartId]: config }));
-      }
+      let config = response.data.chart?.config;
+      if (typeof config === 'string') { try { config = JSON.parse(config); } catch { config = undefined; } }
+      dashboardCache.set(cacheKey, { data: response.data.data, config, sql: response.data.sql });
+      applyChartResponse(chartId, response.data.data, config, response.data.sql);
     } catch (error) {
       console.error('获取图表数据失败:', error);
     }
@@ -186,16 +252,39 @@ const DashboardsPage: React.FC = () => {
     return params;
   };
 
+  const loadSingleChart = async (chartId: string, filterParams?: FilterParam[]) => {
+    setChartLoadingMap(prev => ({ ...prev, [chartId]: true }));
+    await fetchChartData(chartId, filterParams);
+    setChartLoadingMap(prev => ({ ...prev, [chartId]: false }));
+  };
+
+  const handleChartEnter = (chartId: string, activeFilters: FilterField[], activeValues: Record<string, unknown>) => {
+    visibleChartIds.current.add(chartId);
+    if (!loadedChartIds.current.has(chartId)) {
+      loadedChartIds.current.add(chartId);
+      const fp = buildFilterParamsForChart(chartId, activeFilters, activeValues);
+      loadSingleChart(chartId, fp.length > 0 ? fp : undefined);
+    }
+  };
+
+  const handleChartExit = (chartId: string) => {
+    visibleChartIds.current.delete(chartId);
+  };
+
   useEffect(() => {
     if (!selectedDashboard) {
       setParsedLayout([]);
       setFilters([]);
       setFilterValues({});
+      loadedChartIds.current.clear();
+      visibleChartIds.current.clear();
       return;
     }
 
     fetchCharts();
-    setChartLoading(true);
+    loadedChartIds.current.clear();
+    visibleChartIds.current.clear();
+    setChartLoadingMap({});
 
     const layout = parseLayout(selectedDashboard.layout);
     setParsedLayout(layout);
@@ -213,26 +302,21 @@ const DashboardsPage: React.FC = () => {
         fetchDatasetFieldType(f.dataset, f.field);
       }
     });
-
-    Promise.all(layout.map(item => {
-      const fp = buildFilterParamsForChart(item.chartId, savedFilters, initialValues);
-      return fetchChartData(item.chartId, fp.length > 0 ? fp : undefined);
-    })).finally(() => {
-      setChartLoading(false);
-    });
   }, [selectedDashboard]);
 
   const refetchSingleChart = (chartId: string) => {
     const params = buildFilterParamsForChart(chartId);
-    fetchChartData(chartId, params.length > 0 ? params : undefined);
+    loadSingleChart(chartId, params.length > 0 ? params : undefined);
   };
 
   useEffect(() => {
     if (filters.length === 0) return;
-    const affectedChartIds = new Set<string>();
-    filters.forEach(f => f.charts.forEach(cid => affectedChartIds.add(cid)));
-    affectedChartIds.forEach(chartId => {
-      fetchChartData(chartId, buildFilterParamsForChart(chartId));
+    // 清除已加载标记，让图表在下次可见时重新加载
+    loadedChartIds.current.clear();
+    // 立即刷新当前可见的图表
+    visibleChartIds.current.forEach(chartId => {
+      loadedChartIds.current.add(chartId);
+      loadSingleChart(chartId, buildFilterParamsForChart(chartId));
     });
   }, [filterValues]);
 
@@ -396,6 +480,8 @@ const DashboardsPage: React.FC = () => {
               const cfg = chartConfigs[item.chartId] || {};
               const isLarge = isWide(item);
               const chartH = chartAreaHeight(resolveH(item));
+              const isLoading = chartLoadingMap[item.chartId] ?? true;
+              const hasData = item.chartId in chartData;
               const chartMenuItems = [
                 { key: 'refresh', label: '刷新数据', onClick: () => refetchSingleChart(item.chartId) },
                 { key: 'sql', label: '查看SQL', icon: <CodeOutlined />, onClick: () => { setCurrentSQLChartId(item.chartId); setSqlModalVisible(true); } },
@@ -410,34 +496,40 @@ const DashboardsPage: React.FC = () => {
                 </div>
               );
               return (
-                <Card
+                <LazyChartCard
                   key={item.chartId}
-                  title={cardTitle}
-                  style={{ gridColumn: isLarge ? 'span 2' : 'span 1', minWidth: 0, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', transition: 'box-shadow 0.2s, transform 0.2s' }}
-                  styles={{ header: { padding: '10px 16px', minHeight: 44, borderBottom: 'none' }, body: { padding: '12px 16px', overflow: 'hidden' } }}
-                  onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; }}
-                  onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}
+                  style={{ gridColumn: isLarge ? 'span 2' : 'span 1' }}
+                  onEnter={() => handleChartEnter(item.chartId, filters, filterValues)}
+                  onExit={() => handleChartExit(item.chartId)}
                 >
-                  {chartLoading ? (
-                    <Skeleton active paragraph={{ rows: 4 }} />
-                  ) : (
-                    <ChartRenderer
-                      chartType={chart?.type ?? 'bar'}
-                      chartData={chartData[item.chartId] as Record<string, unknown>[] || []}
-                      rowFields={extractNames(cfg.rowFields)}
-                      colFields={extractNames(cfg.colFields)}
-                      measureFields={extractNames(cfg.measureFields)}
-                      xAxisFields={extractNames(cfg.xAxisFields)}
-                      yAxisFields={extractNames(cfg.yAxisFields)}
-                      y2AxisFields={extractNames(cfg.y2AxisFields)}
-                      groupFields={extractNames(cfg.groupFields)}
-                      indicatorFields={extractNames(cfg.indicatorFields)}
-                      containerHeight={chartH}
-                      fieldFormats={buildFieldFormats(cfg)}
-                      fieldLabelMap={buildFieldLabelMap(cfg)}
-                    />
-                  )}
-                </Card>
+                  <Card
+                    title={cardTitle}
+                    style={{ minWidth: 0, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', transition: 'box-shadow 0.2s, transform 0.2s' }}
+                    styles={{ header: { padding: '10px 16px', minHeight: 44, borderBottom: 'none' }, body: { padding: '12px 16px', overflow: 'hidden' } }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}
+                  >
+                    {(!hasData || isLoading) ? (
+                      <Skeleton active paragraph={{ rows: 4 }} style={{ height: chartH }} />
+                    ) : (
+                      <ChartRenderer
+                        chartType={chart?.type ?? 'bar'}
+                        chartData={chartData[item.chartId] as Record<string, unknown>[] || []}
+                        rowFields={extractNames(cfg.rowFields)}
+                        colFields={extractNames(cfg.colFields)}
+                        measureFields={extractNames(cfg.measureFields)}
+                        xAxisFields={extractNames(cfg.xAxisFields)}
+                        yAxisFields={extractNames(cfg.yAxisFields)}
+                        y2AxisFields={extractNames(cfg.y2AxisFields)}
+                        groupFields={extractNames(cfg.groupFields)}
+                        indicatorFields={extractNames(cfg.indicatorFields)}
+                        containerHeight={chartH}
+                        fieldFormats={buildFieldFormats(cfg)}
+                        fieldLabelMap={buildFieldLabelMap(cfg)}
+                      />
+                    )}
+                  </Card>
+                </LazyChartCard>
               );
             }) : (
               <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', background: '#fff', borderRadius: 8 }}>

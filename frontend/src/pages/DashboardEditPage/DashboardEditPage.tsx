@@ -3,6 +3,7 @@ import { Button, Input, Layout, Space, Card, Modal, message, Spin, Dropdown, Too
 import { ArrowLeftOutlined, SearchOutlined, EllipsisOutlined, CodeOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import { dashboardCache } from '../../utils/dashboardCache';
 import RGL, { WidthProvider } from 'react-grid-layout/legacy';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
@@ -244,10 +245,12 @@ const DashboardEditPage: React.FC = () => {
       if (id) {
         await axios.put(`/api/dashboards/${id}`, payload);
         message.success('看板更新成功');
+        dashboardCache.invalidateAll();
         backToDashboards(id);
       } else {
         const res = await axios.post('/api/dashboards', payload);
         message.success('看板创建成功');
+        dashboardCache.invalidateAll();
         backToDashboards(res.data?.id);
       }
     } catch (error) {

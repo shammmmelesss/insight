@@ -313,6 +313,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           title: { text: getFieldLabel(actualYField), style: { fontSize: 12 } },
           label: { style: { fontSize: 11 }, formatter: (v: any) => formatValue(v, yFormatLookup[actualYField]) },
         });
+        if (dataCount > 50) {
+          chart.slider('x', { values: [1 - 50 / dataCount, 1], style: { trackSize: 10, handleIconSize: 10 }, showLabelOnInteraction: true });
+        }
 
         const bar = chart
           .interval()
@@ -375,6 +378,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           title: { text: '值', style: { fontSize: 12 } },
           label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
         });
+        if (dataCount > 50) {
+          chart.slider('x', { values: [1 - 50 / dataCount, 1], style: { trackSize: 10, handleIconSize: 10 }, showLabelOnInteraction: true });
+        }
 
         chart
           .interval()
@@ -440,7 +446,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     const labelStep = isDense ? Math.ceil(dataCount / 20) : 1;
     const xAxisConfig = isDense
       ? {
-          labelTransform: 'rotate(-20)',
+          labelTransform: 'rotate(-10)',
           label: { style: { fontSize: 11, textAnchor: 'end' } },
           tickFilter: (_: any, i: number) => i % labelStep === 0,
           tick: false,
@@ -477,6 +483,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           title: { text: getFieldLabel(actualYField), style: { fontSize: 12 } },
           label: { style: { fontSize: 11 }, formatter: (v: any) => formatValue(v, yFormatLookup[actualYField]) },
         });
+        if (dataCount > 50) {
+          chart.slider('x', { values: [1 - 50 / dataCount, 1], style: { trackSize: 10, handleIconSize: 10 }, showLabelOnInteraction: true });
+        }
 
         const area = chart
           .area()
@@ -554,6 +563,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           title: { text: '值', style: { fontSize: 12 } },
           label: { style: { fontSize: 11 }, formatter: (v: any) => Number(v).toLocaleString() },
         });
+        if (dataCount > 50) {
+          chart.slider('x', { values: [1 - 50 / dataCount, 1], style: { trackSize: 10, handleIconSize: 10 }, showLabelOnInteraction: true });
+        }
 
         chart
           .line()
@@ -667,6 +679,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
     createAndRenderG2Chart((chart) => {
       chart.axis('x', xAxisConfig);
+      if (dataCount > 50) {
+        chart.slider('x', { values: [1 - 50 / dataCount, 1], style: { trackSize: 10, handleIconSize: 10 }, showLabelOnInteraction: true });
+      }
 
       if (leftLongData.length > 0) {
         const useStack = actualLeftFields.length > 1;

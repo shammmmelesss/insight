@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { App, Button, Card, Table, Space, message, Modal, Form, Input, Select, TimePicker, Row, Col, Tooltip} from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import {
@@ -77,6 +77,31 @@ const MonitorPage: React.FC = () => {
     setModalVisible(true);
   };
 
+  const openCopy = (record: Monitor) => {
+    setEditingMonitor(null);
+    const schedule = parseJson(record.triggerSchedule, { frequency: 'daily' as MonitorScheduleFrequency, time: '09:00' });
+    setScheduleFrequency(schedule.frequency || 'daily');
+    form.setFieldsValue({
+      name: `${record.name} (复制)`,
+      datasetId: record.datasetId,
+      timeField: record.timeField,
+      whereClause: record.whereClause,
+      triggerAggFunc: record.triggerAggFunc || 'SUM',
+      triggerMetric: record.triggerMetric,
+      triggerOperator: record.triggerOperator,
+      triggerThreshold: record.triggerThreshold,
+      scheduleFrequency: schedule.frequency || 'daily',
+      scheduleTime: schedule.time ? dayjs(schedule.time, 'HH:mm') : undefined,
+      scheduleWeekday: schedule.weekday,
+      scheduleDay: schedule.day,
+      webhookUrl: record.webhookUrl || '',
+      webhookSecret: record.webhookSecret || '',
+    });
+    if (record.datasetId) fetchFields(record.datasetId);
+    setTriggerResult(null);
+    setModalVisible(true);
+  };
+
   const openEdit = (record: Monitor) => {
     setEditingMonitor(record);
     const schedule = parseJson(record.triggerSchedule, { frequency: 'daily' as MonitorScheduleFrequency, time: '09:00' });
@@ -94,6 +119,8 @@ const MonitorPage: React.FC = () => {
       scheduleTime: schedule.time ? dayjs(schedule.time, 'HH:mm') : undefined,
       scheduleWeekday: schedule.weekday,
       scheduleDay: schedule.day,
+      webhookUrl: record.webhookUrl || '',
+      webhookSecret: record.webhookSecret || '',
     });
     if (record.datasetId) fetchFields(record.datasetId);
     setTriggerResult(null);
@@ -138,6 +165,8 @@ const MonitorPage: React.FC = () => {
       triggerThreshold: values.triggerThreshold,
       triggerSchedule: JSON.stringify(schedule),
       notifyChannels: JSON.stringify(['lark']),
+      webhookUrl: values.webhookUrl || '',
+      webhookSecret: values.webhookSecret || '',
       ...(editingMonitor ? { updatedBy: values.updatedBy } : { createdBy: values.createdBy }),
     };
     try {
@@ -181,6 +210,7 @@ const MonitorPage: React.FC = () => {
       render: (_: any, record: Monitor) => (
         <Space>
           <Button icon={<EditOutlined />} size="small" onClick={() => openEdit(record)}>编辑</Button>
+          <Button icon={<CopyOutlined />} size="small" onClick={() => openCopy(record)}>复制</Button>
           <Button icon={<DeleteOutlined />} size="small" danger onClick={() => handleDelete(record.id)}>删除</Button>
         </Space>
       ),
@@ -327,6 +357,22 @@ const MonitorPage: React.FC = () => {
                 </Form.Item>
               </Col>
             </Row>
+          </Form.Item>
+
+          <Form.Item
+            name="webhookUrl"
+            label="Webhook URL"
+            rules={[{ required: true, message: '请输入 Webhook URL' }]}
+          >
+            <Input placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..." />
+          </Form.Item>
+
+          <Form.Item
+            name="webhookSecret"
+            label="Webhook Secret"
+            rules={[{ required: true, message: '请输入 Webhook Secret' }]}
+          >
+            <Input.Password placeholder="签名校验密钥" />
           </Form.Item>
 
         </Form>

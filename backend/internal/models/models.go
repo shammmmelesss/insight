@@ -131,11 +131,12 @@ type Monitor struct {
 	TriggerThreshold string `json:"triggerThreshold"`
 	// 触发时间：JSON，如 {"frequency":"daily","time":"09:00","weekday":1,"day":1}
 	TriggerSchedule  string `json:"triggerSchedule" gorm:"type:jsonb;default:'{}'"`
-	NotifyChannels   string `json:"notifyChannels" gorm:"type:jsonb;default:'[]'"`
-	// 飞书接收人：JSON数组，如 [{"openId":"xxx","name":"张三"}]
-	NotifyLarkUsers  string `json:"notifyLarkUsers" gorm:"type:jsonb;default:'[]'"`
-	CreatedBy        string `json:"createdBy"`
-	UpdatedBy        string `json:"updatedBy"`
+	NotifyChannels      string `json:"notifyChannels" gorm:"type:jsonb;default:'[]'"`
+	NotifyLarkUsers     string `json:"notifyLarkUsers" gorm:"type:jsonb;default:'[]'"`
+	WebhookURL          string `json:"webhookUrl"`
+	WebhookSecret       string `json:"webhookSecret"`
+	CreatedBy           string `json:"createdBy"`
+	UpdatedBy           string `json:"updatedBy"`
 }
 
 // BeforeCreate 创建前钩子，生成UUID

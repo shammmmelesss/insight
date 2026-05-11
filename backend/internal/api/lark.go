@@ -73,14 +73,15 @@ func larkWebhookSign(secret string, ts int64) string {
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
 
-// SendLarkWebhookMessage 通过 Webhook 发送飞书群消息，lines 中每个元素单独一行
-func SendLarkWebhookMessage(title string, lines []string) error {
-	webhookURL := os.Getenv("LARK_WEBHOOK_URL")
-	secret := os.Getenv("LARK_WEBHOOK_SECRET")
+// SendLarkWebhookMessageWith 用监控自身配置的 webhookURL/secret 发送告警
+func SendLarkWebhookMessageWith(webhookURL, secret, title string, lines []string) error {
 	if webhookURL == "" || secret == "" {
-		return fmt.Errorf("LARK_WEBHOOK_URL or LARK_WEBHOOK_SECRET not configured")
+		return fmt.Errorf("飞书 Webhook 未配置，请在监控设置中填写 Webhook URL 和 Secret")
 	}
+	return sendWebhook(webhookURL, secret, title, lines)
+}
 
+func sendWebhook(webhookURL, secret, title string, lines []string) error {
 	paragraphs := make([][]map[string]interface{}, len(lines))
 	for i, line := range lines {
 		paragraphs[i] = []map[string]interface{}{{"tag": "text", "text": line}}

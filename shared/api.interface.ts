@@ -445,6 +445,8 @@ export interface Monitor {
   triggerSchedule: MonitorSchedule | string;
   notifyChannels: MonitorNotifyChannel[] | string;
   notifyLarkUsers: LarkUser[] | string;
+  webhookUrl: string;
+  webhookSecret: string;
   createdBy: string;
   updatedBy: string;
   createdAt: string;

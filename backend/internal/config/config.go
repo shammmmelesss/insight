@@ -28,10 +28,8 @@ type Config struct {
 		DBName   string `default:"insight"`
 	}
 	Lark struct {
-		AppID         string `yaml:"app_id"      default:""`
-		AppSecret     string `yaml:"app_secret"   default:""`
-		WebhookURL    string `yaml:"webhook_url"  default:""`
-		WebhookSecret string `yaml:"webhook_secret" default:""`
+		AppID     string `yaml:"app_id"    default:""`
+		AppSecret string `yaml:"app_secret" default:""`
 	}
 }
 
@@ -82,12 +80,6 @@ func LoadConfig() (*Config, error) {
 	}
 	if v := os.Getenv("LARK_APP_SECRET"); v != "" {
 		cfg.Lark.AppSecret = v
-	}
-	if v := os.Getenv("LARK_WEBHOOK_URL"); v != "" {
-		cfg.Lark.WebhookURL = v
-	}
-	if v := os.Getenv("LARK_WEBHOOK_SECRET"); v != "" {
-		cfg.Lark.WebhookSecret = v
 	}
 
 	return &cfg, nil

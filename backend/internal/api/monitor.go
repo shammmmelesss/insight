@@ -54,10 +54,12 @@ type monitorRequest struct {
 	TriggerOperator  string `json:"triggerOperator"`
 	TriggerThreshold string `json:"triggerThreshold"`
 	TriggerSchedule  string `json:"triggerSchedule"`
-	NotifyChannels   string `json:"notifyChannels"`
-	NotifyLarkUsers  string `json:"notifyLarkUsers"`
-	CreatedBy        string `json:"createdBy"`
-	UpdatedBy        string `json:"updatedBy"`
+	NotifyChannels  string `json:"notifyChannels"`
+	NotifyLarkUsers string `json:"notifyLarkUsers"`
+	WebhookURL      string `json:"webhookUrl"`
+	WebhookSecret   string `json:"webhookSecret"`
+	CreatedBy       string `json:"createdBy"`
+	UpdatedBy       string `json:"updatedBy"`
 }
 
 func CreateMonitor(c *gin.Context) {
@@ -89,10 +91,12 @@ func CreateMonitor(c *gin.Context) {
 		TriggerOperator:  req.TriggerOperator,
 		TriggerThreshold: req.TriggerThreshold,
 		TriggerSchedule:  triggerSchedule,
-		NotifyChannels:   notifyChannels,
-		NotifyLarkUsers:  notifyLarkUsers,
-		CreatedBy:        req.CreatedBy,
-		UpdatedBy:        req.CreatedBy,
+		NotifyChannels:  notifyChannels,
+		NotifyLarkUsers: notifyLarkUsers,
+		WebhookURL:      req.WebhookURL,
+		WebhookSecret:   req.WebhookSecret,
+		CreatedBy:       req.CreatedBy,
+		UpdatedBy:       req.CreatedBy,
 	}
 	if err := database.DB.Create(&monitor).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -148,6 +152,8 @@ func UpdateMonitor(c *gin.Context) {
 	if req.NotifyLarkUsers != "" {
 		monitor.NotifyLarkUsers = req.NotifyLarkUsers
 	}
+	monitor.WebhookURL = req.WebhookURL
+	monitor.WebhookSecret = req.WebhookSecret
 	monitor.UpdatedBy = req.UpdatedBy
 	if err := database.DB.Save(&monitor).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -308,10 +314,10 @@ func TriggerMonitor(c *gin.Context) {
 	if triggered {
 		title := fmt.Sprintf("⚠️ 监控告警：%s", monitor.Name)
 		lines := []string{
-			fmt.Sprintf("任务名称：%s", monitor.Name),
+			// fmt.Sprintf("任务名称：%s", monitor.Name),
 			fmt.Sprintf("指标 %s（%s）当前值 %.4g，满足条件 %s %.4g，已触发告警。", monitor.TriggerMetric, aggFunc, currentValue, monitor.TriggerOperator, threshold),
 		}
-		if sendErr := SendLarkWebhookMessage(title, lines); sendErr != nil {
+		if sendErr := SendLarkWebhookMessageWith(monitor.WebhookURL, monitor.WebhookSecret, title, lines); sendErr != nil {
 			notifyErrors = append(notifyErrors, "webhook: "+sendErr.Error())
 		}
 	}

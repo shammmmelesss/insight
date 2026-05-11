@@ -27,13 +27,6 @@ func main() {
 	if cfg.Lark.AppSecret != "" && os.Getenv("LARK_APP_SECRET") == "" {
 		os.Setenv("LARK_APP_SECRET", cfg.Lark.AppSecret)
 	}
-	if cfg.Lark.WebhookURL != "" && os.Getenv("LARK_WEBHOOK_URL") == "" {
-		os.Setenv("LARK_WEBHOOK_URL", cfg.Lark.WebhookURL)
-	}
-	if cfg.Lark.WebhookSecret != "" && os.Getenv("LARK_WEBHOOK_SECRET") == "" {
-		os.Setenv("LARK_WEBHOOK_SECRET", cfg.Lark.WebhookSecret)
-	}
-
 	// 初始化数据库
 	err = database.InitDB(cfg)
 	if err != nil {

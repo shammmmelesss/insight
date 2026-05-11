@@ -2,22 +2,116 @@ package api
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
+
 func RegisterLarkRoutes(rg *gin.RouterGroup) {
 	lark := rg.Group("/lark")
 	{
 		lark.GET("/users/search", SearchLarkUsers)
 	}
+}
+
+// SendLarkDirectMessage 通过 Bot 给指定 open_id 用户发私信
+func SendLarkDirectMessage(openID, title, content string) error {
+	token, err := getTenantAccessToken()
+	if err != nil {
+		return err
+	}
+	msg := map[string]interface{}{
+		"zh_cn": map[string]interface{}{
+			"title": title,
+			"content": [][]map[string]interface{}{
+				{{"tag": "text", "text": content}},
+			},
+		},
+	}
+	msgJSON, _ := json.Marshal(msg)
+	payload, _ := json.Marshal(map[string]string{
+		"receive_id": openID,
+		"msg_type":   "post",
+		"content":    string(msgJSON),
+	})
+	req, _ := http.NewRequest("POST",
+		"https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=open_id",
+		bytes.NewReader(payload))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	var result struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	json.NewDecoder(resp.Body).Decode(&result)
+	if result.Code != 0 {
+		return fmt.Errorf("lark im error: %s", result.Msg)
+	}
+	return nil
+}
+
+func larkWebhookSign(secret string, ts int64) string {
+	msg := strconv.FormatInt(ts, 10) + "\n" + secret
+	h := hmac.New(sha256.New, []byte(msg))
+	return base64.StdEncoding.EncodeToString(h.Sum(nil))
+}
+
+// SendLarkWebhookMessage 通过 Webhook 发送飞书群消息
+func SendLarkWebhookMessage(title, content string) error {
+	webhookURL := os.Getenv("LARK_WEBHOOK_URL")
+	secret := os.Getenv("LARK_WEBHOOK_SECRET")
+	if webhookURL == "" || secret == "" {
+		return fmt.Errorf("LARK_WEBHOOK_URL or LARK_WEBHOOK_SECRET not configured")
+	}
+
+	ts := time.Now().Unix()
+	payload := map[string]interface{}{
+		"timestamp": strconv.FormatInt(ts, 10),
+		"sign":      larkWebhookSign(secret, ts),
+		"msg_type":  "post",
+		"content": map[string]interface{}{
+			"post": map[string]interface{}{
+				"zh_cn": map[string]interface{}{
+					"title": title,
+					"content": [][]map[string]interface{}{
+						{{"tag": "text", "text": content}},
+					},
+				},
+			},
+		},
+	}
+	body, _ := json.Marshal(payload)
+	resp, err := http.Post(webhookURL, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	var result struct {
+		Code int    `json:"StatusCode"`
+		Msg  string `json:"StatusMessage"`
+	}
+	json.NewDecoder(resp.Body).Decode(&result)
+	if result.Code != 0 {
+		return fmt.Errorf("lark webhook error: %s", result.Msg)
+	}
+	return nil
 }
 
 // tenantToken 缓存

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"data-analysis-platform/internal/api"
@@ -17,6 +18,20 @@ func main() {
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	// 将 config 中的 Lark 配置写入环境变量（环境变量已有值时不覆盖）
+	if cfg.Lark.AppID != "" && os.Getenv("LARK_APP_ID") == "" {
+		os.Setenv("LARK_APP_ID", cfg.Lark.AppID)
+	}
+	if cfg.Lark.AppSecret != "" && os.Getenv("LARK_APP_SECRET") == "" {
+		os.Setenv("LARK_APP_SECRET", cfg.Lark.AppSecret)
+	}
+	if cfg.Lark.WebhookURL != "" && os.Getenv("LARK_WEBHOOK_URL") == "" {
+		os.Setenv("LARK_WEBHOOK_URL", cfg.Lark.WebhookURL)
+	}
+	if cfg.Lark.WebhookSecret != "" && os.Getenv("LARK_WEBHOOK_SECRET") == "" {
+		os.Setenv("LARK_WEBHOOK_SECRET", cfg.Lark.WebhookSecret)
 	}
 
 	// 初始化数据库

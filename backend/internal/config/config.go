@@ -28,14 +28,16 @@ type Config struct {
 		DBName   string `default:"insight"`
 	}
 	Lark struct {
-		AppID     string `default:""`
-		AppSecret string `default:""`
+		AppID          string `default:""`
+		AppSecret      string `default:""`
+		WebhookURL     string `default:""`
+		WebhookSecret  string `default:""`
 	}
 }
 
 func LoadConfig() (*Config, error) {
 	var cfg Config
-	err := configor.Load(&cfg, "config.yml")
+	err := configor.Load(&cfg, "config.yml", "config.local.yml")
 	if err != nil {
 		cfg.Server.Port = "8080"
 		cfg.Server.AllowedOrigins = []string{"http://localhost:3000", "http://127.0.0.1:3000"}
@@ -80,6 +82,12 @@ func LoadConfig() (*Config, error) {
 	}
 	if v := os.Getenv("LARK_APP_SECRET"); v != "" {
 		cfg.Lark.AppSecret = v
+	}
+	if v := os.Getenv("LARK_WEBHOOK_URL"); v != "" {
+		cfg.Lark.WebhookURL = v
+	}
+	if v := os.Getenv("LARK_WEBHOOK_SECRET"); v != "" {
+		cfg.Lark.WebhookSecret = v
 	}
 
 	return &cfg, nil

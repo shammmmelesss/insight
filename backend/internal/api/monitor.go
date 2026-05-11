@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -236,7 +237,11 @@ func TriggerMonitor(c *gin.Context) {
 		aggExpr = fmt.Sprintf(`%s("%s")`, aggFunc, monitor.TriggerMetric)
 	}
 
-	aggSQL := fmt.Sprintf(`SELECT %s AS _val FROM (%s) AS _t`, aggExpr, dataset.SQL)
+	whereClause := ""
+	if monitor.WhereClause != "" {
+		whereClause = " WHERE " + monitor.WhereClause
+	}
+	aggSQL := fmt.Sprintf(`SELECT %s AS _val FROM (%s) AS _t%s`, aggExpr, dataset.SQL, whereClause)
 
 	var db *sql.DB
 	if dataset.Type == models.DatasetTypeExtract {
@@ -245,7 +250,7 @@ func TriggerMonitor(c *gin.Context) {
 			return
 		}
 		ckTable := "ds_" + replaceHyphens(dataset.ID.String())
-		aggSQL = fmt.Sprintf(`SELECT %s AS _val FROM insight.%s`, aggExpr, ckTable)
+		aggSQL = fmt.Sprintf(`SELECT %s AS _val FROM insight.%s%s`, aggExpr, ckTable, whereClause)
 		db = database.ClickHouseDB
 	} else {
 		var dataSource models.DataSource
@@ -307,6 +312,26 @@ func TriggerMonitor(c *gin.Context) {
 		triggered = currentValue == threshold
 	case "!=":
 		triggered = currentValue != threshold
+	}
+
+	if triggered {
+		title := fmt.Sprintf("⚠️ 监控告警：%s", monitor.Name)
+		content := fmt.Sprintf("指标 %s（%s）当前值 %.4g，满足条件 %s %.4g，已触发告警。",
+			monitor.TriggerMetric, aggFunc, currentValue, monitor.TriggerOperator, threshold)
+		SendLarkWebhookMessage(title, content)
+		// 发私信给飞书接收人
+		if monitor.NotifyLarkUsers != "" && monitor.NotifyLarkUsers != "[]" {
+			var larkUsers []struct {
+				OpenID string `json:"openId"`
+			}
+			if jsonErr := json.Unmarshal([]byte(monitor.NotifyLarkUsers), &larkUsers); jsonErr == nil {
+				for _, u := range larkUsers {
+					if u.OpenID != "" {
+						SendLarkDirectMessage(u.OpenID, title, content)
+					}
+				}
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

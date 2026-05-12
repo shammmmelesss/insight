@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -314,11 +315,36 @@ func TriggerMonitor(c *gin.Context) {
 	if triggered {
 		title := fmt.Sprintf("⚠️ 监控告警：%s", monitor.Name)
 		lines := []string{
-			// fmt.Sprintf("任务名称：%s", monitor.Name),
 			fmt.Sprintf("指标 %s（%s）当前值 %.4g，满足条件 %s %.4g，已触发告警。", monitor.TriggerMetric, aggFunc, currentValue, monitor.TriggerOperator, threshold),
 		}
-		if sendErr := SendLarkWebhookMessageWith(monitor.WebhookURL, monitor.WebhookSecret, title, lines); sendErr != nil {
-			notifyErrors = append(notifyErrors, "webhook: "+sendErr.Error())
+
+		var channels []string
+		json.Unmarshal([]byte(monitor.NotifyChannels), &channels)
+
+		useLarkUser := false
+		for _, ch := range channels {
+			if ch == "lark_user" {
+				useLarkUser = true
+				break
+			}
+		}
+
+		if useLarkUser {
+			var users []struct {
+				OpenID string `json:"openId"`
+				Name   string `json:"name"`
+			}
+			json.Unmarshal([]byte(monitor.NotifyLarkUsers), &users)
+			content := lines[0]
+			for _, u := range users {
+				if sendErr := SendLarkDirectMessage(u.OpenID, title, content); sendErr != nil {
+					notifyErrors = append(notifyErrors, fmt.Sprintf("lark_user(%s): %s", u.Name, sendErr.Error()))
+				}
+			}
+		} else {
+			if sendErr := SendLarkWebhookMessageWith(monitor.WebhookURL, monitor.WebhookSecret, title, lines); sendErr != nil {
+				notifyErrors = append(notifyErrors, "webhook: "+sendErr.Error())
+			}
 		}
 	}
 

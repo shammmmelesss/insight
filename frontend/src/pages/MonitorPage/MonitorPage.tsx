@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { App, Button, Card, Table, Space, message, Modal, Form, Input, Select, TimePicker, Row, Col, Tooltip} from 'antd';
-import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import React, { useEffect, useState, useCallback } from 'react';
+import { App, Button, Card, Table, Space, message, Modal, Form, Input, Select, TimePicker, Row, Col, Tooltip, Avatar} from 'antd';
+import { CheckCircleOutlined, CloseCircleOutlined, UserOutlined } from '@ant-design/icons';
 import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import {
   Monitor, MonitorOperator, MonitorScheduleFrequency,
-  DatasetOption, FieldConfig,
+  DatasetOption, FieldConfig, LarkUser,
 } from '@shared/api.interface';
 
 const OPERATORS: { label: string; value: MonitorOperator }[] = [
@@ -38,9 +38,22 @@ const MonitorPage: React.FC = () => {
   const [datasets, setDatasets] = useState<DatasetOption[]>([]);
   const [fields, setFields] = useState<FieldConfig[]>([]);
   const [scheduleFrequency, setScheduleFrequency] = useState<MonitorScheduleFrequency>('daily');
+  const [notifyChannel, setNotifyChannel] = useState<'webhook' | 'lark_user'>('webhook');
+  const [larkUserOptions, setLarkUserOptions] = useState<LarkUser[]>([]);
+  const [larkUserSearching, setLarkUserSearching] = useState(false);
   const [triggering, setTriggering] = useState(false);
   const [triggerResult, setTriggerResult] = useState<{ triggered: boolean; currentValue: number; threshold: number; operator: string; metric: string; aggFunc: string; sql: string; notifyErrors?: string[] } | null>(null);
   const [form] = Form.useForm();
+
+  const searchLarkUsers = useCallback(async (keyword: string) => {
+    if (!keyword) { setLarkUserOptions([]); return; }
+    setLarkUserSearching(true);
+    try {
+      const res = await axios.get('/api/lark/users/search', { params: { keyword } });
+      setLarkUserOptions(res.data.items || []);
+    } catch { setLarkUserOptions([]); }
+    finally { setLarkUserSearching(false); }
+  }, []);
 
   const fetchMonitors = async () => {
     setLoading(true);
@@ -72,6 +85,8 @@ const MonitorPage: React.FC = () => {
     setEditingMonitor(null);
     setFields([]);
     setScheduleFrequency('daily');
+    setNotifyChannel('webhook');
+    setLarkUserOptions([]);
     setTriggerResult(null);
     form.resetFields();
     setModalVisible(true);
@@ -81,6 +96,11 @@ const MonitorPage: React.FC = () => {
     setEditingMonitor(null);
     const schedule = parseJson(record.triggerSchedule, { frequency: 'daily' as MonitorScheduleFrequency, time: '09:00' });
     setScheduleFrequency(schedule.frequency || 'daily');
+    const channels = parseJson<string[]>(record.notifyChannels as string, []);
+    const ch = channels.includes('lark_user') ? 'lark_user' : 'webhook';
+    setNotifyChannel(ch);
+    const notifyUsers = parseJson<LarkUser[]>(record.notifyLarkUsers as string, []);
+    setLarkUserOptions(notifyUsers);
     form.setFieldsValue({
       name: `${record.name} (复制)`,
       datasetId: record.datasetId,
@@ -94,8 +114,10 @@ const MonitorPage: React.FC = () => {
       scheduleTime: schedule.time ? dayjs(schedule.time, 'HH:mm') : undefined,
       scheduleWeekday: schedule.weekday,
       scheduleDay: schedule.day,
+      notifyChannel: ch,
       webhookUrl: record.webhookUrl || '',
       webhookSecret: record.webhookSecret || '',
+      notifyLarkUsers: notifyUsers.map(u => u.openId),
     });
     if (record.datasetId) fetchFields(record.datasetId);
     setTriggerResult(null);
@@ -106,6 +128,11 @@ const MonitorPage: React.FC = () => {
     setEditingMonitor(record);
     const schedule = parseJson(record.triggerSchedule, { frequency: 'daily' as MonitorScheduleFrequency, time: '09:00' });
     setScheduleFrequency(schedule.frequency || 'daily');
+    const channels = parseJson<string[]>(record.notifyChannels as string, []);
+    const ch = channels.includes('lark_user') ? 'lark_user' : 'webhook';
+    setNotifyChannel(ch);
+    const notifyUsers = parseJson<LarkUser[]>(record.notifyLarkUsers as string, []);
+    setLarkUserOptions(notifyUsers);
     form.setFieldsValue({
       name: record.name,
       datasetId: record.datasetId,
@@ -119,8 +146,10 @@ const MonitorPage: React.FC = () => {
       scheduleTime: schedule.time ? dayjs(schedule.time, 'HH:mm') : undefined,
       scheduleWeekday: schedule.weekday,
       scheduleDay: schedule.day,
+      notifyChannel: ch,
       webhookUrl: record.webhookUrl || '',
       webhookSecret: record.webhookSecret || '',
+      notifyLarkUsers: notifyUsers.map(u => u.openId),
     });
     if (record.datasetId) fetchFields(record.datasetId);
     setTriggerResult(null);
@@ -154,6 +183,9 @@ const MonitorPage: React.FC = () => {
       ...(values.scheduleFrequency === 'weekly' ? { weekday: values.scheduleWeekday } : {}),
       ...(values.scheduleFrequency === 'monthly' ? { day: values.scheduleDay } : {}),
     };
+    const channel = values.notifyChannel as 'webhook' | 'lark_user';
+    const selectedUserIds: string[] = channel === 'lark_user' ? (values.notifyLarkUsers || []) : [];
+    const selectedUsers = selectedUserIds.map(id => larkUserOptions.find(u => u.openId === id)).filter(Boolean) as LarkUser[];
     const payload = {
       name: values.name,
       datasetId: values.datasetId,
@@ -164,9 +196,10 @@ const MonitorPage: React.FC = () => {
       triggerOperator: values.triggerOperator,
       triggerThreshold: values.triggerThreshold,
       triggerSchedule: JSON.stringify(schedule),
-      notifyChannels: JSON.stringify(['lark']),
-      webhookUrl: values.webhookUrl || '',
-      webhookSecret: values.webhookSecret || '',
+      notifyChannels: JSON.stringify([channel]),
+      notifyLarkUsers: JSON.stringify(selectedUsers),
+      webhookUrl: channel === 'webhook' ? (values.webhookUrl || '') : '',
+      webhookSecret: channel === 'webhook' ? (values.webhookSecret || '') : '',
       ...(editingMonitor ? { updatedBy: values.updatedBy } : { createdBy: values.createdBy }),
     };
     try {
@@ -274,7 +307,7 @@ const MonitorPage: React.FC = () => {
           </div>
         }
       >
-        <Form form={form} layout="vertical" initialValues={{ scheduleFrequency: 'daily', notifyLarkUsers: [] }}>
+        <Form form={form} layout="vertical" initialValues={{ scheduleFrequency: 'daily', notifyChannel: 'webhook', notifyLarkUsers: [] }}>
           <Form.Item name="name" label="监控名称" rules={[{ required: true, message: '请输入监控名称' }]}>
             <Input placeholder="请输入监控名称" />
           </Form.Item>
@@ -359,21 +392,67 @@ const MonitorPage: React.FC = () => {
             </Row>
           </Form.Item>
 
-          <Form.Item
-            name="webhookUrl"
-            label="Webhook URL"
-            rules={[{ required: true, message: '请输入 Webhook URL' }]}
-          >
-            <Input placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..." />
+          <Form.Item name="notifyChannel" label="发送渠道" rules={[{ required: true }]}>
+            <Select
+              options={[
+                { label: '群', value: 'webhook' },
+                { label: '飞书', value: 'lark_user' },
+              ]}
+              onChange={(v) => {
+                setNotifyChannel(v);
+                form.setFieldsValue({ webhookUrl: '', webhookSecret: '', notifyLarkUsers: [] });
+              }}
+            />
           </Form.Item>
 
-          <Form.Item
-            name="webhookSecret"
-            label="Webhook Secret"
-            rules={[{ required: true, message: '请输入 Webhook Secret' }]}
-          >
-            <Input.Password placeholder="签名校验密钥" />
-          </Form.Item>
+          {notifyChannel === 'webhook' && (
+            <>
+              <Form.Item
+                name="webhookUrl"
+                label="Webhook URL"
+                rules={[{ required: true, message: '请输入 Webhook URL' }]}
+              >
+                <Input placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..." />
+              </Form.Item>
+              <Form.Item
+                name="webhookSecret"
+                label="Webhook Secret"
+                rules={[{ required: true, message: '请输入 Webhook Secret' }]}
+              >
+                <Input.Password placeholder="签名校验密钥" />
+              </Form.Item>
+            </>
+          )}
+
+          {notifyChannel === 'lark_user' && (
+            <Form.Item
+              name="notifyLarkUsers"
+              label="选择飞书用户"
+              rules={[{ required: true, message: '请至少选择一个用户', type: 'array', min: 1 }]}
+            >
+              <Select
+                mode="multiple"
+                placeholder="输入姓名搜索飞书用户"
+                filterOption={false}
+                showSearch
+                loading={larkUserSearching}
+                onSearch={searchLarkUsers}
+                notFoundContent={larkUserSearching ? '搜索中...' : '暂无结果'}
+                optionLabelProp="label"
+              >
+                {larkUserOptions.map(u => (
+                  <Select.Option key={u.openId} value={u.openId} label={u.name}>
+                    <Space>
+                      {u.avatar
+                        ? <Avatar size={20} src={u.avatar} />
+                        : <Avatar size={20} icon={<UserOutlined />} />}
+                      {u.name}
+                    </Space>
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+          )}
 
         </Form>
       </Modal>

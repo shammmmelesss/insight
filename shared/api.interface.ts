@@ -422,7 +422,7 @@ export interface MonitorSchedule {
   day?: number;       // 1-31，仅 monthly 生效
 }
 
-export type MonitorNotifyChannel = 'lark';
+export type MonitorNotifyChannel = 'webhook' | 'lark_user';
 
 export interface LarkUser {
   openId: string;

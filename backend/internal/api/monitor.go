@@ -22,6 +22,7 @@ func RegisterMonitorRoutes(rg *gin.RouterGroup) {
 		monitor.PUT("/:id", UpdateMonitor)
 		monitor.DELETE("/:id", DeleteMonitor)
 		monitor.POST("/:id/trigger", TriggerMonitor)
+		monitor.GET("/:id/records", ListMonitorRecords)
 	}
 }
 
@@ -348,6 +349,20 @@ func TriggerMonitor(c *gin.Context) {
 		}
 	}
 
+	notifyErrorsJSON, _ := json.Marshal(notifyErrors)
+	record := models.MonitorRecord{
+		MonitorID:    monitor.ID.String(),
+		CurrentValue: currentValue,
+		Threshold:    threshold,
+		Operator:     monitor.TriggerOperator,
+		AggFunc:      aggFunc,
+		Metric:       monitor.TriggerMetric,
+		Triggered:    triggered,
+		NotifyErrors: string(notifyErrorsJSON),
+		SQL:          aggSQL,
+	}
+	database.DB.Create(&record)
+
 	c.JSON(http.StatusOK, gin.H{
 		"triggered":    triggered,
 		"currentValue": currentValue,
@@ -357,6 +372,24 @@ func TriggerMonitor(c *gin.Context) {
 		"aggFunc":      aggFunc,
 		"sql":          aggSQL,
 		"notifyErrors": notifyErrors,
+	})
+}
+
+func ListMonitorRecords(c *gin.Context) {
+	id, err := parseUUID(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	records := make([]models.MonitorRecord, 0)
+	result := database.DB.Where("monitor_id = ?", id).Order("created_at DESC").Limit(100).Find(&records)
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"items": records,
+		"total": len(records),
 	})
 }
 

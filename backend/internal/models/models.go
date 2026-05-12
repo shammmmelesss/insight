@@ -139,6 +139,20 @@ type Monitor struct {
 	UpdatedBy           string `json:"updatedBy"`
 }
 
+// MonitorRecord 监控执行记录
+type MonitorRecord struct {
+	BaseModel
+	MonitorID    string  `json:"monitorId" gorm:"column:monitor_id;type:uuid;index"`
+	CurrentValue float64 `json:"currentValue"`
+	Threshold    float64 `json:"threshold"`
+	Operator     string  `json:"operator"`
+	AggFunc      string  `json:"aggFunc"`
+	Metric       string  `json:"metric"`
+	Triggered    bool    `json:"triggered"`
+	NotifyErrors string  `json:"notifyErrors" gorm:"type:jsonb;default:'[]'"`
+	SQL          string  `json:"sql" gorm:"type:text"`
+}
+
 // BeforeCreate 创建前钩子，生成UUID
 func (m *BaseModel) BeforeCreate(tx *gorm.DB) error {
 	if m.ID == uuid.Nil {

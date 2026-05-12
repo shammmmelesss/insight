@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { App, Button, Card, Table, Space, message, Modal, Form, Input, Select, TimePicker, Row, Col, Tooltip, Avatar} from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, UserOutlined } from '@ant-design/icons';
-import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined, HistoryOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import {
@@ -48,6 +48,9 @@ const MonitorPage: React.FC = () => {
   const [notifyChannel, setNotifyChannel] = useState<'webhook' | 'lark_user'>('webhook');
   const [larkUserOptions, setLarkUserOptions] = useState<LarkUser[]>([]);
   const [larkUserSearching, setLarkUserSearching] = useState(false);
+  const [historyVisible, setHistoryVisible] = useState(false);
+  const [historyRecords, setHistoryRecords] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [triggering, setTriggering] = useState(false);
   const [triggerResult, setTriggerResult] = useState<{ triggered: boolean; rows: { dimension: string; value: number }[]; threshold: number; operator: string; metric: string; aggFunc: string; sql: string; notifyErrors?: string[] } | null>(null);
   const [form] = Form.useForm();
@@ -223,6 +226,17 @@ const MonitorPage: React.FC = () => {
     } catch { message.error(editingMonitor ? '监控更新失败' : '监控创建失败'); }
   };
 
+  const openHistory = async (record: Monitor) => {
+    setHistoryRecords([]);
+    setHistoryVisible(true);
+    setHistoryLoading(true);
+    try {
+      const res = await axios.get(`/api/monitors/${record.id}/records`);
+      setHistoryRecords(res.data.items || []);
+    } catch { message.error('获取告警历史失败'); }
+    finally { setHistoryLoading(false); }
+  };
+
   const handleDelete = (id: string) => {
     modal.confirm({
       title: '确认删除', content: '删除后不可恢复，确认删除该监控吗？',
@@ -252,6 +266,7 @@ const MonitorPage: React.FC = () => {
         <Space>
           <Button icon={<EditOutlined />} size="small" onClick={() => openEdit(record)}>编辑</Button>
           <Button icon={<CopyOutlined />} size="small" onClick={() => openCopy(record)}>复制</Button>
+          <Button icon={<HistoryOutlined />} size="small" onClick={() => openHistory(record)}>告警历史</Button>
           <Button icon={<DeleteOutlined />} size="small" danger onClick={() => handleDelete(record.id)}>删除</Button>
         </Space>
       ),
@@ -472,6 +487,65 @@ const MonitorPage: React.FC = () => {
           )}
 
         </Form>
+      </Modal>
+
+      <Modal
+        title="告警历史"
+        open={historyVisible}
+        onCancel={() => setHistoryVisible(false)}
+        footer={null}
+        width={700}
+      >
+        <Table
+          dataSource={historyRecords}
+          rowKey="id"
+          loading={historyLoading}
+          size="small"
+          pagination={{ pageSize: 20, showSizeChanger: false }}
+          columns={[
+            {
+              title: '触发时间',
+              dataIndex: 'createdAt',
+              key: 'createdAt',
+              render: (val: string) => formatDateTime(val),
+              defaultSortOrder: 'descend' as const,
+              sorter: (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+            },
+            {
+              title: '结果',
+              dataIndex: 'triggered',
+              key: 'triggered',
+              render: (v: boolean) => v
+                ? <span style={{ color: '#ff4d4f' }}>已触发</span>
+                : <span style={{ color: '#52c41a' }}>未触发</span>,
+            },
+            { title: '指标', dataIndex: 'metric', key: 'metric' },
+            { title: '聚合', dataIndex: 'aggFunc', key: 'aggFunc' },
+            {
+              title: '满足条件行数',
+              dataIndex: 'currentValue',
+              key: 'currentValue',
+              render: (v: number) => v,
+            },
+            {
+              title: '条件',
+              key: 'condition',
+              render: (_: any, r: any) => `${r.operator} ${r.threshold}`,
+            },
+            {
+              title: '触发SQL',
+              dataIndex: 'sql',
+              key: 'sql',
+              render: (val: string) => (
+                <Tooltip title={<pre style={{ maxWidth: 500, whiteSpace: 'pre-wrap', margin: 0 }}>{val}</pre>}>
+                  <span style={{ color: '#1890ff', cursor: 'pointer', fontFamily: 'monospace', fontSize: 12 }}>
+                    {val ? val.slice(0, 40) + (val.length > 40 ? '…' : '') : '-'}
+                  </span>
+                </Tooltip>
+              ),
+            },
+          ]}
+        />
       </Modal>
     </div>
   );

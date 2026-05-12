@@ -1240,7 +1240,7 @@ const ChartConfigPage: React.FC = () => {
             {someChecked && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', backgroundColor: '#e6f4ff', borderBottom: '1px solid #bae0ff', flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 12, color: '#1677ff', fontWeight: 500, marginRight: 4 }}>
-                  已选 {selectedAreaRows.size} 项，批量设置：
+                  已选 {selectedAreaRows.size} 项，设置：
                 </span>
                 {isMeasureArea && (
                   <>

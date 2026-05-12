@@ -5,6 +5,13 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { Chart } from '@shared/api.interface';
 
+const formatDateTime = (val: string) => {
+  if (!val) return '';
+  const d = new Date(val);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
 const ChartsPage: React.FC = () => {
   const [charts, setCharts] = useState<Chart[]>([]);
   const [loading, setLoading] = useState(false);
@@ -19,7 +26,8 @@ const ChartsPage: React.FC = () => {
     setLoading(true);
     try {
       const response = await axios.get('/api/charts');
-      setCharts(response.data.items);
+      const items = response.data.items as Chart[];
+      setCharts(items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     } catch (error) {
       message.error('获取图表列表失败');
       console.error('获取图表列表失败:', error);
@@ -97,6 +105,9 @@ const ChartsPage: React.FC = () => {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
+      render: (val: string) => formatDateTime(val),
+      sorter: (a: Chart, b: Chart) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      defaultSortOrder: 'descend' as const,
     },
     {
       title: '修改人',
@@ -107,6 +118,8 @@ const ChartsPage: React.FC = () => {
       title: '修改时间',
       dataIndex: 'updatedAt',
       key: 'updatedAt',
+      render: (val: string) => formatDateTime(val),
+      sorter: (a: Chart, b: Chart) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
     },
     {
       title: '看板',
@@ -180,7 +193,7 @@ const ChartsPage: React.FC = () => {
         <Table
           columns={[
             { title: '看板名称', dataIndex: 'name', key: 'name' },
-            { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt' },
+            { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', render: (val: string) => formatDateTime(val), sorter: (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(), defaultSortOrder: 'descend' as const },
           ]}
           dataSource={chartDashboards}
           rowKey="id"

@@ -560,6 +560,18 @@ const DashboardEditPage: React.FC = () => {
                 loadedChartIds.current.delete(cid);
                 fetchChartData(cid);
               }}
+              onChartTypeChange={(cid, type) => {
+                setCharts(prev => prev.map(c => c.id === cid ? { ...c, type } : c));
+              }}
+              onConfigChange={(cid, config, type) => {
+                axios.post(`/api/charts/${cid}/preview`, { config, type })
+                  .then(res => {
+                    setChartData(prev => ({ ...prev, [cid]: res.data.data }));
+                    setChartConfigs(prev => ({ ...prev, [cid]: JSON.parse(config) }));
+                    setCharts(prev => prev.map(c => c.id === cid ? { ...c, type } : c));
+                  })
+                  .catch(() => {});
+              }}
             />
           ) : (
             <>

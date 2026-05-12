@@ -7,6 +7,13 @@ import { Dataset, CreateDatasetRequest, UpdateDatasetRequest, FieldConfig, DataT
 
 const { Option } = Select;
 
+const formatDateTime = (val: string) => {
+  if (!val) return '';
+  const d = new Date(val);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
 
 const { TextArea } = Input;
 
@@ -52,7 +59,8 @@ const DatasetsPage: React.FC = () => {
         params: { name: searchKeyword }
       });
       console.log('获取数据集列表响应:', response.data.items);
-      setDatasets(response.data.items);
+      const items: Dataset[] = response.data.items;
+      setDatasets(items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     } catch (error) {
       message.error('获取数据集列表失败');
       console.error('获取数据集列表失败:', error);
@@ -358,7 +366,7 @@ const DatasetsPage: React.FC = () => {
         try {
           const res = await axios.get('/api/datasets', { params: { name: searchKeyword } });
           const items: Dataset[] = res.data.items;
-          setDatasets(items);
+          setDatasets([...items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
           const ds = items.find(d => d.id === id);
           if (ds?.extractStatus === 'running' && retries < 60) {
             retries++;
@@ -386,7 +394,7 @@ const DatasetsPage: React.FC = () => {
     if (!status || status === 'idle') return <Tag>未抽取</Tag>;
     if (status === 'running') return <Tag icon={<SyncOutlined spin />} color="processing">抽取中</Tag>;
     if (status === 'success') return (
-      <Tooltip title={lastAt ? `最后抽取：${lastAt}` : undefined}>
+      <Tooltip title={lastAt ? `最后抽取：${formatDateTime(lastAt)}` : undefined}>
         <Tag icon={<CheckCircleOutlined />} color="success">已抽取</Tag>
       </Tooltip>
     );
@@ -445,11 +453,16 @@ const DatasetsPage: React.FC = () => {
       title: '创建时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
+      render: (val: string) => formatDateTime(val),
+      sorter: (a: Dataset, b: Dataset) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      defaultSortOrder: 'descend' as const,
     },
     {
       title: '修改时间',
       dataIndex: 'updatedAt',
       key: 'updatedAt',
+      render: (val: string) => formatDateTime(val),
+      sorter: (a: Dataset, b: Dataset) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
     },
     {
       title: '操作',
@@ -842,6 +855,9 @@ const DatasetsPage: React.FC = () => {
               title: '创建时间',
               dataIndex: 'createdAt',
               key: 'createdAt',
+              render: (val: string) => formatDateTime(val),
+              sorter: (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+              defaultSortOrder: 'descend' as const,
             },
             {
               title: '操作',

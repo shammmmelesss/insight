@@ -9,6 +9,13 @@ import {
   DatasetOption, FieldConfig, LarkUser,
 } from '@shared/api.interface';
 
+const formatDateTime = (val: string) => {
+  if (!val) return '';
+  const d = new Date(val);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
 const OPERATORS: { label: string; value: MonitorOperator }[] = [
   { label: '>', value: '>' },
   { label: '>=', value: '>=' },
@@ -59,7 +66,8 @@ const MonitorPage: React.FC = () => {
     setLoading(true);
     try {
       const res = await axios.get('/api/monitors');
-      setMonitors(res.data.items);
+      const items: Monitor[] = res.data.items;
+      setMonitors(items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     } catch { message.error('获取监控列表失败'); }
     finally { setLoading(false); }
   };
@@ -235,9 +243,9 @@ const MonitorPage: React.FC = () => {
   const columns = [
     { title: '监控名称', dataIndex: 'name', key: 'name' },
     { title: '创建人', dataIndex: 'createdBy', key: 'createdBy' },
-    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt' },
+    { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', render: (val: string) => formatDateTime(val), sorter: (a: Monitor, b: Monitor) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(), defaultSortOrder: 'descend' as const },
     { title: '修改人', dataIndex: 'updatedBy', key: 'updatedBy' },
-    { title: '修改时间', dataIndex: 'updatedAt', key: 'updatedAt' },
+    { title: '修改时间', dataIndex: 'updatedAt', key: 'updatedAt', render: (val: string) => formatDateTime(val), sorter: (a: Monitor, b: Monitor) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime() },
     {
       title: '操作', key: 'action',
       render: (_: any, record: Monitor) => (

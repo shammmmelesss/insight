@@ -26,6 +26,7 @@ func RegisterChartRoutes(rg *gin.RouterGroup) {
 		chart.DELETE("/:id", DeleteChart)
 		chart.GET("/select-list", GetChartSelectList)
 		chart.GET("/:id/data", GetChartData)
+		chart.POST("/:id/preview", PreviewChartData)
 		chart.GET("/:id/dashboards", GetChartDashboards)
 		chart.POST("/:id/copy", CopyChart)
 	}
@@ -399,6 +400,125 @@ func GetChartData(c *gin.Context) {
 		"data":  resultData,
 		"sql":   querySQL,
 	})
+}
+
+// PreviewChartData 用未保存的 config 预览图表数据
+func PreviewChartData(c *gin.Context) {
+	id := c.Param("id")
+	var body struct {
+		Config string `json:"config"`
+		Type   string `json:"type"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误: " + err.Error()})
+		return
+	}
+
+	var chart models.Chart
+	if err := database.DB.First(&chart, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Chart not found"})
+		return
+	}
+
+	var dataset models.Dataset
+	if err := database.DB.First(&dataset, "id = ?", chart.DatasetID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Dataset not found"})
+		return
+	}
+
+	var dataSource models.DataSource
+	if err := database.DB.First(&dataSource, "id = ?", dataset.DataSourceID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "DataSource not found"})
+		return
+	}
+
+	var querySQL string
+	var db *sql.DB
+	var err error
+	if dataset.Type == models.DatasetTypeExtract {
+		if database.ClickHouseDB == nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ClickHouse 未连接"})
+			return
+		}
+		if dataset.ExtractStatus != models.ExtractStatusSuccess {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "数据尚未抽取成功"})
+			return
+		}
+		ckTable := "ds_" + strings.ReplaceAll(dataset.ID.String(), "-", "_")
+		ckSQL := fmt.Sprintf("SELECT * FROM insight.%s", ckTable)
+		querySQL, err = buildChartSQL(body.Config, body.Type, ckSQL, nil)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
+			return
+		}
+		db = database.ClickHouseDB
+	} else {
+		querySQL, err = buildChartSQL(body.Config, body.Type, dataset.SQL, nil)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
+			return
+		}
+		db, err = connectToDataSource(dataSource)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "连接数据源失败: " + err.Error()})
+			return
+		}
+		defer db.Close()
+	}
+
+	rows, err := db.Query(querySQL)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "执行SQL失败: " + err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取列信息失败: " + err.Error()})
+		return
+	}
+
+	resultData := make([]map[string]interface{}, 0)
+	columnNames := make([]string, len(columnTypes))
+	columnPointers := make([]interface{}, len(columnTypes))
+	for i, colType := range columnTypes {
+		columnNames[i] = colType.Name()
+		columnPointers[i] = new(interface{})
+	}
+
+	for rows.Next() {
+		if err := rows.Scan(columnPointers...); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "解析查询结果失败: " + err.Error()})
+			return
+		}
+		row := make(map[string]interface{})
+		for i, colName := range columnNames {
+			val := *(columnPointers[i].(*interface{}))
+			if b, ok := val.([]byte); ok {
+				s := string(b)
+				if intVal, err := strconv.ParseInt(s, 10, 64); err == nil {
+					row[colName] = intVal
+				} else if floatVal, err := strconv.ParseFloat(s, 64); err == nil {
+					row[colName] = safeFloat(floatVal)
+				} else {
+					row[colName] = s
+				}
+			} else if floatVal, ok := val.(float64); ok {
+				row[colName] = safeFloat(floatVal)
+			} else {
+				row[colName] = val
+			}
+		}
+		resultData = append(resultData, row)
+	}
+
+	if err := rows.Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "处理查询结果失败: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"data": resultData, "sql": querySQL})
 }
 
 // FilterCondition 筛选条件

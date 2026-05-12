@@ -27,6 +27,7 @@ func RegisterChartRoutes(rg *gin.RouterGroup) {
 		chart.GET("/select-list", GetChartSelectList)
 		chart.GET("/:id/data", GetChartData)
 		chart.GET("/:id/dashboards", GetChartDashboards)
+		chart.POST("/:id/copy", CopyChart)
 	}
 }
 
@@ -144,6 +145,29 @@ func CreateChart(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, chart)
+}
+
+// CopyChart 复制图表
+func CopyChart(c *gin.Context) {
+	id := c.Param("id")
+	var original models.Chart
+	if err := database.DB.First(&original, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Chart not found"})
+		return
+	}
+
+	copied := models.Chart{
+		WorkspaceID: original.WorkspaceID,
+		Name:        original.Name + "_copy",
+		DatasetID:   original.DatasetID,
+		Type:        original.Type,
+		Config:      original.Config,
+	}
+	if err := database.DB.Create(&copied).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, chartResponse(copied))
 }
 
 // GetChart 获取图表详情

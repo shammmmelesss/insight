@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Button, Input, Layout, Space, Card, Modal, message, Spin, Dropdown, Tooltip, Select, DatePicker } from 'antd';
-import { ArrowLeftOutlined, SearchOutlined, EllipsisOutlined, CodeOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, SearchOutlined, EllipsisOutlined, CodeOutlined, SettingOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { dashboardCache } from '../../utils/dashboardCache';
@@ -22,6 +22,7 @@ interface RGLLayout {
 import { DashboardLayoutItem, ChartOption, FilterField } from '@shared/api.interface';
 import ChartRenderer from '../../components/ChartRenderer';
 import FilterConfigModal from '../../components/FilterConfigModal/FilterConfigModal';
+import ChartConfigPanel from '../../components/ChartConfigPanel/ChartConfigPanel';
 
 const ReactGridLayout = WidthProvider(RGL);
 
@@ -93,6 +94,7 @@ const DashboardEditPage: React.FC = () => {
   const [chartSQLs, setChartSQLs] = useState<Record<string, string>>({});
   const [sqlModalVisible, setSqlModalVisible] = useState(false);
   const [currentSQL, setCurrentSQL] = useState('');
+  const [configChartId, setConfigChartId] = useState<string | null>(null);
 
   const loadedChartIds = useRef<Set<string>>(new Set());
 
@@ -221,6 +223,23 @@ const DashboardEditPage: React.FC = () => {
   const handleRemoveChart = (chartId: string) => {
     setSelectedCharts(prev => prev.filter(item => item.chartId !== chartId));
     setRglLayout(prev => prev.filter(l => l.i !== chartId));
+  };
+
+  const handleCopyChart = async (item: DashboardLayoutItem) => {
+    try {
+      const res = await axios.post(`/api/charts/${item.chartId}/copy`);
+      const newChartId: string = res.data.id;
+      const newItem: DashboardLayoutItem = { chartId: newChartId, x: 0, y: 0, width: item.width, height: item.height };
+      const newRgl: RGLLayout = { i: newChartId, x: 0, y: Infinity, w: item.width, h: item.height, minW: 3, minH: 4 };
+      setSelectedCharts(prev => [...prev, newItem]);
+      setRglLayout(prev => [...prev, newRgl]);
+      // 刷新图表列表，使复制的图表出现在右侧面板
+      await fetchCharts();
+      message.success('图表复制成功');
+    } catch (error) {
+      message.error('图表复制失败');
+      console.error('图表复制失败:', error);
+    }
   };
 
   const handleLayoutChange = (layout: RGLLayout[]) => {
@@ -421,6 +440,7 @@ const DashboardEditPage: React.FC = () => {
               {selectedCharts.map((item, index) => {
                 const chart = charts.find(c => c.id === item.chartId);
                 const cfg = chartConfigs[item.chartId] || {};
+                const key = item.chartId;
                 const extractNames = (fields: any[]) => (fields || []).map((f: any) => f.originalName);
                 const buildFieldFormats = (): Record<string, string> => {
                   const result: Record<string, string> = {};
@@ -445,19 +465,21 @@ const DashboardEditPage: React.FC = () => {
                   });
                   return map;
                 };
-                const layoutItem = rglLayout.find(l => l.i === item.chartId);
+                const layoutItem = rglLayout.find(l => l.i === key);
                 const h = layoutItem?.h ?? DEFAULT_H;
                 const chartH = chartAreaHeight(h);
 
+                const isConfigSelected = configChartId === item.chartId;
+
                 return (
-                  <div key={item.chartId}>
+                  <div key={key} onClick={() => setConfigChartId(item.chartId)}>
                     <Card
                       title={
                         <span className="chart-drag-handle" style={{ cursor: 'move', display: 'block' }}>
                           {chart?.name || `图表${index + 1}`}
                         </span>
                       }
-                      style={{ height: '100%', boxShadow: 'none', overflow: 'hidden' }}
+                      style={{ height: '100%', boxShadow: isConfigSelected ? '0 0 0 2px #1677ff' : 'none', overflow: 'hidden' }}
                       styles={{
                         header: { height: '40px', padding: '0 12px', display: 'flex', alignItems: 'center', borderBottom: 'none', cursor: 'move' },
                         body: { padding: '10px', overflow: 'hidden', height: 'calc(100% - 40px)' },
@@ -467,16 +489,27 @@ const DashboardEditPage: React.FC = () => {
                           menu={{
                             items: [
                               {
+                                key: 'config',
+                                label: '配置图表',
+                                icon: <SettingOutlined />,
+                                onClick: () => setConfigChartId(item.chartId),
+                              },
+                              {
                                 key: 'viewSQL',
                                 label: '查看SQL',
                                 icon: <CodeOutlined />,
                                 onClick: () => { setCurrentSQL(chartSQLs[item.chartId] || '暂无SQL'); setSqlModalVisible(true); },
                               },
+                              {
+                                key: 'copy',
+                                label: '复制图表',
+                                onClick: () => handleCopyChart(item),
+                              },
                               { type: 'divider' as const },
                               {
                                 key: 'remove',
                                 label: <span style={{ color: '#ff4d4f' }}>移除</span>,
-                                onClick: () => handleRemoveChart(item.chartId),
+                                onClick: () => handleRemoveChart(key),
                               },
                             ],
                           }}
@@ -516,37 +549,49 @@ const DashboardEditPage: React.FC = () => {
           )}
         </Content>
 
-        {/* 图表选择区域 */}
-        <Sider width={300} style={{ background: '#fff', borderLeft: '1px solid #f0f0f0' }}>
-          <div style={{ padding: '20px' }}>
-            <div style={{ marginBottom: 16 }}>
-              <Input
-                placeholder="搜索图表名称"
-                prefix={<SearchOutlined />}
-                value={searchKeyword}
-                onChange={(e) => setSearchKeyword(e.target.value)}
-                style={{ width: '100%' }}
-              />
-            </div>
-          </div>
-          <div style={{ padding: '16px' }}>
-            {filteredCharts.length > 0 ? (
-              <div>
-                {filteredCharts.map((chart) => (
-                  <div key={chart.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, padding: '8px 12px', borderRadius: '4px', backgroundColor: '#fafafa' }}>
-                    <div>{chart.name}</div>
-                    {isChartAdded(chart.id) ? (
-                      <Button type="text" danger size="small" onClick={() => handleRemoveChart(chart.id)}>移除</Button>
-                    ) : (
-                      <Button type="text" size="small" onClick={() => handleAddChart(chart.id)}>添加</Button>
-                    )}
-                  </div>
-                ))}
+        {/* 图表选择 / 配置区域 */}
+        <Sider width={300} style={{ background: '#fff', borderLeft: '1px solid #f0f0f0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          {configChartId ? (
+            <ChartConfigPanel
+              chartId={configChartId}
+              onClose={() => setConfigChartId(null)}
+              onSaved={(cid) => {
+                setConfigChartId(null);
+                loadedChartIds.current.delete(cid);
+                fetchChartData(cid);
+              }}
+            />
+          ) : (
+            <>
+              <div style={{ padding: '20px 20px 0' }}>
+                <Input
+                  placeholder="搜索图表名称"
+                  prefix={<SearchOutlined />}
+                  value={searchKeyword}
+                  onChange={(e) => setSearchKeyword(e.target.value)}
+                  style={{ width: '100%', marginBottom: 16 }}
+                />
               </div>
-            ) : (
-              <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>没有找到匹配的图表</div>
-            )}
-          </div>
+              <div style={{ padding: '0 16px 16px', overflow: 'auto', flex: 1 }}>
+                {filteredCharts.length > 0 ? (
+                  <div>
+                    {filteredCharts.map((chart) => (
+                      <div key={chart.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, padding: '8px 12px', borderRadius: '4px', backgroundColor: '#fafafa' }}>
+                        <div>{chart.name}</div>
+                        {isChartAdded(chart.id) ? (
+                          <Button type="text" danger size="small" onClick={() => handleRemoveChart(chart.id)}>移除</Button>
+                        ) : (
+                          <Button type="text" size="small" onClick={() => handleAddChart(chart.id)}>添加</Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>没有找到匹配的图表</div>
+                )}
+              </div>
+            </>
+          )}
         </Sider>
       </Layout>
 

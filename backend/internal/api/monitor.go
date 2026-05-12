@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"data-analysis-platform/internal/database"
 	"data-analysis-platform/internal/models"
@@ -49,7 +50,7 @@ func ListMonitors(c *gin.Context) {
 type monitorRequest struct {
 	Name             string `json:"name" binding:"required"`
 	DatasetID        string `json:"datasetId"`
-	TimeField        string `json:"timeField"`
+	DimensionField   string `json:"dimensionField"`
 	WhereClause      string `json:"whereClause"`
 	TriggerAggFunc   string `json:"triggerAggFunc"`
 	TriggerMetric    string `json:"triggerMetric"`
@@ -86,7 +87,7 @@ func CreateMonitor(c *gin.Context) {
 		WorkspaceID:      GetWorkspaceID(c),
 		Name:             req.Name,
 		DatasetID:        req.DatasetID,
-		TimeField:        req.TimeField,
+		DimensionField:   req.DimensionField,
 		WhereClause:      req.WhereClause,
 		TriggerAggFunc:   req.TriggerAggFunc,
 		TriggerMetric:    req.TriggerMetric,
@@ -139,7 +140,7 @@ func UpdateMonitor(c *gin.Context) {
 	}
 	monitor.Name = req.Name
 	monitor.DatasetID = req.DatasetID
-	monitor.TimeField = req.TimeField
+	monitor.DimensionField = req.DimensionField
 	monitor.WhereClause = req.WhereClause
 	monitor.TriggerAggFunc = req.TriggerAggFunc
 	monitor.TriggerMetric = req.TriggerMetric
@@ -205,21 +206,7 @@ func TriggerMonitor(c *gin.Context) {
 	allowedAggFuncs := map[string]bool{"SUM": true, "COUNT": true, "AVG": true, "MAX": true, "MIN": true}
 	aggFunc := "SUM"
 	if monitor.TriggerAggFunc != "" {
-		upper := monitor.TriggerAggFunc
-		// 转大写比较
-		for _, ch := range monitor.TriggerAggFunc {
-			if ch >= 'a' && ch <= 'z' {
-				upper = ""
-				for _, c := range monitor.TriggerAggFunc {
-					if c >= 'a' && c <= 'z' {
-						upper += string(rune(c - 32))
-					} else {
-						upper += string(c)
-					}
-				}
-				break
-			}
-		}
+		upper := strings.ToUpper(monitor.TriggerAggFunc)
 		if !allowedAggFuncs[upper] {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "不支持的聚合函数: " + monitor.TriggerAggFunc})
 			return
@@ -231,13 +218,13 @@ func TriggerMonitor(c *gin.Context) {
 	metricExpr := monitor.TriggerMetric
 	isCalculatedField := false
 	if dataset.FieldsConfig != "" {
-		var fields []struct {
+		var fieldCfgs []struct {
 			OriginalName string `json:"originalName"`
 			IsCalculated bool   `json:"isCalculated"`
 			Expression   string `json:"expression"`
 		}
-		if err := json.Unmarshal([]byte(dataset.FieldsConfig), &fields); err == nil {
-			for _, f := range fields {
+		if err := json.Unmarshal([]byte(dataset.FieldsConfig), &fieldCfgs); err == nil {
+			for _, f := range fieldCfgs {
 				if f.OriginalName == monitor.TriggerMetric && f.IsCalculated && f.Expression != "" {
 					metricExpr = f.Expression
 					isCalculatedField = true
@@ -248,75 +235,13 @@ func TriggerMonitor(c *gin.Context) {
 	}
 
 	// 计算字段或已含聚合函数的表达式直接使用，普通字段包一层聚合函数
-	containsFunc := false
-	for _, ch := range metricExpr {
-		if ch == '(' {
-			containsFunc = true
-			break
-		}
-	}
 	var aggExpr string
 	if aggFunc == "COUNT" {
 		aggExpr = "COUNT(*)"
-	} else if isCalculatedField || containsFunc {
+	} else if isCalculatedField || strings.Contains(metricExpr, "(") {
 		aggExpr = metricExpr
 	} else {
 		aggExpr = fmt.Sprintf(`%s(%s)`, aggFunc, metricExpr)
-	}
-
-	whereClause := ""
-	if monitor.WhereClause != "" {
-		whereClause = " WHERE " + monitor.WhereClause
-	}
-	aggSQL := fmt.Sprintf(`SELECT %s AS _val FROM (%s) AS _t%s`, aggExpr, dataset.SQL, whereClause)
-
-	var db *sql.DB
-	if dataset.Type == models.DatasetTypeExtract {
-		if database.ClickHouseDB == nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ClickHouse 未连接"})
-			return
-		}
-		ckTable := "ds_" + replaceHyphens(dataset.ID.String())
-		aggSQL = fmt.Sprintf(`SELECT %s AS _val FROM insight.%s%s`, aggExpr, ckTable, whereClause)
-		db = database.ClickHouseDB
-	} else {
-		var dataSource models.DataSource
-		if err := database.DB.First(&dataSource, "id = ?", dataset.DataSourceID).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "数据源不存在"})
-			return
-		}
-		db, err = connectToDataSource(dataSource)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "连接数据源失败: " + err.Error()})
-			return
-		}
-		defer db.Close()
-	}
-
-	row := db.QueryRow(aggSQL)
-	var valRaw interface{}
-	if err := row.Scan(&valRaw); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询指标失败: " + err.Error()})
-		return
-	}
-
-	// 转为 float64 进行比较
-	var currentValue float64
-	switch v := valRaw.(type) {
-	case float64:
-		currentValue = v
-	case float32:
-		currentValue = float64(v)
-	case int64:
-		currentValue = float64(v)
-	case int32:
-		currentValue = float64(v)
-	case []byte:
-		currentValue, _ = strconv.ParseFloat(string(v), 64)
-	case string:
-		currentValue, _ = strconv.ParseFloat(v, 64)
-	default:
-		currentValue, _ = strconv.ParseFloat(fmt.Sprintf("%v", v), 64)
 	}
 
 	threshold, err := strconv.ParseFloat(monitor.TriggerThreshold, 64)
@@ -325,28 +250,142 @@ func TriggerMonitor(c *gin.Context) {
 		return
 	}
 
-	triggered := false
-	switch monitor.TriggerOperator {
-	case ">":
-		triggered = currentValue > threshold
-	case ">=":
-		triggered = currentValue >= threshold
-	case "<":
-		triggered = currentValue < threshold
-	case "<=":
-		triggered = currentValue <= threshold
-	case "=":
-		triggered = currentValue == threshold
-	case "!=":
-		triggered = currentValue != threshold
+	whereClause := ""
+	if monitor.WhereClause != "" {
+		whereClause = " WHERE " + monitor.WhereClause
 	}
+
+	dim := monitor.DimensionField
+	var querySQL string
+	var db *sql.DB
+	if dataset.Type == models.DatasetTypeExtract {
+		if database.ClickHouseDB == nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ClickHouse 未连接"})
+			return
+		}
+		ckTable := "insight.ds_" + replaceHyphens(dataset.ID.String())
+		if dim != "" {
+			querySQL = fmt.Sprintf(
+				"SELECT `%s` AS _dim, %s AS _val FROM %s%s GROUP BY `%s` HAVING %s %s %g",
+				dim, aggExpr, ckTable, whereClause, dim, aggExpr, monitor.TriggerOperator, threshold,
+			)
+		} else {
+			querySQL = fmt.Sprintf("SELECT '' AS _dim, %s AS _val FROM %s%s HAVING %s %s %g",
+				aggExpr, ckTable, whereClause, aggExpr, monitor.TriggerOperator, threshold)
+		}
+	} else {
+		var dataSource models.DataSource
+		if err := database.DB.First(&dataSource, "id = ?", dataset.DataSourceID).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "数据源不存在"})
+			return
+		}
+		var dbConn *sql.DB
+		dbConn, err = connectToDataSource(dataSource)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "连接数据源失败: " + err.Error()})
+			return
+		}
+		defer dbConn.Close()
+		if dim != "" {
+			querySQL = fmt.Sprintf(
+				"SELECT %s AS _dim, %s AS _val FROM (%s) AS _t%s GROUP BY %s HAVING %s %s %g",
+				dim, aggExpr, dataset.SQL, whereClause, dim, aggExpr, monitor.TriggerOperator, threshold,
+			)
+		} else {
+			querySQL = fmt.Sprintf(
+				"SELECT '' AS _dim, %s AS _val FROM (%s) AS _t%s HAVING %s %s %g",
+				aggExpr, dataset.SQL, whereClause, aggExpr, monitor.TriggerOperator, threshold,
+			)
+		}
+		db = dbConn
+	}
+
+	if dataset.Type == models.DatasetTypeExtract {
+		db = database.ClickHouseDB
+	}
+
+	rows, queryErr := db.Query(querySQL)
+	if queryErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败: " + queryErr.Error()})
+		return
+	}
+	defer rows.Close()
+
+	type resultRow struct {
+		Dimension string  `json:"dimension"`
+		Value     float64 `json:"value"`
+	}
+	var resultRows []resultRow
+	for rows.Next() {
+		var dimVal interface{}
+		var valRaw interface{}
+		if err := rows.Scan(&dimVal, &valRaw); err != nil {
+			continue
+		}
+		var val float64
+		switch v := valRaw.(type) {
+		case float64:
+			val = v
+		case float32:
+			val = float64(v)
+		case int64:
+			val = float64(v)
+		case int32:
+			val = float64(v)
+		case []byte:
+			val, _ = strconv.ParseFloat(string(v), 64)
+		case string:
+			val, _ = strconv.ParseFloat(v, 64)
+		default:
+			val, _ = strconv.ParseFloat(fmt.Sprintf("%v", v), 64)
+		}
+		resultRows = append(resultRows, resultRow{
+			Dimension: fmt.Sprintf("%v", dimVal),
+			Value:     val,
+		})
+	}
+
+	triggered := len(resultRows) > 0
+
+	// 从 fieldsConfig 解析字段显示名
+	type fieldMeta struct {
+		OriginalName string `json:"originalName"`
+		DisplayName  string `json:"displayName"`
+	}
+	var fieldMetas []fieldMeta
+	if dataset.FieldsConfig != "" {
+		json.Unmarshal([]byte(dataset.FieldsConfig), &fieldMetas)
+	}
+	getDisplayName := func(original string) string {
+		for _, f := range fieldMetas {
+			if f.OriginalName == original && f.DisplayName != "" {
+				return f.DisplayName
+			}
+		}
+		return original
+	}
+	dimLabel := getDisplayName(monitor.DimensionField)
+	metricLabel := fmt.Sprintf("%s(%s)", aggFunc, getDisplayName(monitor.TriggerMetric))
 
 	notifyErrors := []string{}
 	if triggered {
 		title := fmt.Sprintf("⚠️ 监控告警：%s", monitor.Name)
-		lines := []string{
-			fmt.Sprintf("指标 %s（%s）当前值 %.4g，满足条件 %s %.4g，已触发告警。", monitor.TriggerMetric, aggFunc, currentValue, monitor.TriggerOperator, threshold),
+		// 构造通知内容（表格形式）
+		var lines []string
+		lines = append(lines, monitor.Name)
+		if monitor.DimensionField != "" {
+			lines = append(lines, fmt.Sprintf("%s | %s", dimLabel, metricLabel))
+		} else {
+			lines = append(lines, metricLabel)
 		}
+		for _, r := range resultRows {
+			if monitor.DimensionField != "" {
+				lines = append(lines, fmt.Sprintf("%s | %.4g", r.Dimension, r.Value))
+			} else {
+				lines = append(lines, fmt.Sprintf("%.4g", r.Value))
+			}
+		}
+		lines = append(lines, fmt.Sprintf("满足条件 %s %g，已触发告警", monitor.TriggerOperator, threshold))
 
 		var channels []string
 		json.Unmarshal([]byte(monitor.NotifyChannels), &channels)
@@ -365,7 +404,7 @@ func TriggerMonitor(c *gin.Context) {
 				Name   string `json:"name"`
 			}
 			json.Unmarshal([]byte(monitor.NotifyLarkUsers), &users)
-			content := lines[0]
+			content := strings.Join(lines, "\n")
 			for _, u := range users {
 				if sendErr := SendLarkDirectMessage(u.OpenID, title, content); sendErr != nil {
 					notifyErrors = append(notifyErrors, fmt.Sprintf("lark_user(%s): %s", u.Name, sendErr.Error()))
@@ -378,28 +417,30 @@ func TriggerMonitor(c *gin.Context) {
 		}
 	}
 
+	resultRowsJSON, _ := json.Marshal(resultRows)
 	notifyErrorsJSON, _ := json.Marshal(notifyErrors)
 	record := models.MonitorRecord{
 		MonitorID:    monitor.ID.String(),
-		CurrentValue: currentValue,
+		CurrentValue: float64(len(resultRows)),
 		Threshold:    threshold,
 		Operator:     monitor.TriggerOperator,
 		AggFunc:      aggFunc,
 		Metric:       monitor.TriggerMetric,
 		Triggered:    triggered,
 		NotifyErrors: string(notifyErrorsJSON),
-		SQL:          aggSQL,
+		SQL:          querySQL,
+		ResultRows:   string(resultRowsJSON),
 	}
 	database.DB.Create(&record)
 
 	c.JSON(http.StatusOK, gin.H{
 		"triggered":    triggered,
-		"currentValue": currentValue,
+		"rows":         resultRows,
 		"threshold":    threshold,
 		"operator":     monitor.TriggerOperator,
 		"metric":       monitor.TriggerMetric,
 		"aggFunc":      aggFunc,
-		"sql":          aggSQL,
+		"sql":          querySQL,
 		"notifyErrors": notifyErrors,
 	})
 }

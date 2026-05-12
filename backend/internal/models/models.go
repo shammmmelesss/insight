@@ -123,7 +123,7 @@ type Monitor struct {
 	WorkspaceID      string `json:"workspaceId" gorm:"column:workspace_id;type:uuid;index"`
 	Name             string `json:"name"`
 	DatasetID        string `json:"datasetId" gorm:"column:dataset_id;type:uuid"`
-	TimeField        string `json:"timeField"`
+	DimensionField   string `json:"dimensionField"`
 	WhereClause      string `json:"whereClause"`
 	TriggerAggFunc   string `json:"triggerAggFunc"`
 	TriggerMetric    string `json:"triggerMetric"`
@@ -151,6 +151,7 @@ type MonitorRecord struct {
 	Triggered    bool    `json:"triggered"`
 	NotifyErrors string  `json:"notifyErrors" gorm:"type:jsonb;default:'[]'"`
 	SQL          string  `json:"sql" gorm:"type:text"`
+	ResultRows   string  `json:"resultRows" gorm:"type:text;default:'[]'"`
 }
 
 // BeforeCreate 创建前钩子，生成UUID

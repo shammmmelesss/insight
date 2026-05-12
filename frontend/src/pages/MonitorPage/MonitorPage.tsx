@@ -49,7 +49,7 @@ const MonitorPage: React.FC = () => {
   const [larkUserOptions, setLarkUserOptions] = useState<LarkUser[]>([]);
   const [larkUserSearching, setLarkUserSearching] = useState(false);
   const [triggering, setTriggering] = useState(false);
-  const [triggerResult, setTriggerResult] = useState<{ triggered: boolean; currentValue: number; threshold: number; operator: string; metric: string; aggFunc: string; sql: string; notifyErrors?: string[] } | null>(null);
+  const [triggerResult, setTriggerResult] = useState<{ triggered: boolean; rows: { dimension: string; value: number }[]; threshold: number; operator: string; metric: string; aggFunc: string; sql: string; notifyErrors?: string[] } | null>(null);
   const [form] = Form.useForm();
 
   const searchLarkUsers = useCallback(async (keyword: string) => {
@@ -112,7 +112,7 @@ const MonitorPage: React.FC = () => {
     form.setFieldsValue({
       name: `${record.name} (复制)`,
       datasetId: record.datasetId,
-      timeField: record.timeField,
+      dimensionField: record.dimensionField,
       whereClause: record.whereClause,
       triggerAggFunc: record.triggerAggFunc || 'SUM',
       triggerMetric: record.triggerMetric,
@@ -144,7 +144,7 @@ const MonitorPage: React.FC = () => {
     form.setFieldsValue({
       name: record.name,
       datasetId: record.datasetId,
-      timeField: record.timeField,
+      dimensionField: record.dimensionField,
       whereClause: record.whereClause,
       triggerAggFunc: record.triggerAggFunc || 'SUM',
       triggerMetric: record.triggerMetric,
@@ -179,7 +179,7 @@ const MonitorPage: React.FC = () => {
   };
 
   const handleDatasetChange = (datasetId: string) => {
-    form.setFieldsValue({ timeField: undefined, triggerMetric: undefined });
+    form.setFieldsValue({ dimensionField: undefined, triggerMetric: undefined });
     fetchFields(datasetId);
   };
 
@@ -197,7 +197,7 @@ const MonitorPage: React.FC = () => {
     const payload = {
       name: values.name,
       datasetId: values.datasetId,
-      timeField: values.timeField,
+      dimensionField: values.dimensionField,
       whereClause: values.whereClause || '',
       triggerAggFunc: values.triggerAggFunc || 'SUM',
       triggerMetric: values.triggerMetric,
@@ -237,7 +237,7 @@ const MonitorPage: React.FC = () => {
     });
   };
 
-  const timeFields = fields.filter(f => f.dataType === 'date');
+  const dimensionFields = fields.filter(f => f.type === 'dimension');
   const measureFields = fields.filter(f => f.type === 'measure');
 
   const columns = [
@@ -290,16 +290,25 @@ const MonitorPage: React.FC = () => {
               )}
               {triggerResult && (
                 <Space direction="vertical" size={2}>
-                  <Tooltip title={`${triggerResult.aggFunc}(${triggerResult.metric}) = ${triggerResult.currentValue}，阈值 ${triggerResult.operator} ${triggerResult.threshold}\nSQL: ${triggerResult.sql}`}>
+                  <Tooltip title={`SQL: ${triggerResult.sql}`}>
                     <Space size={4}>
                       {triggerResult.triggered
                         ? <CheckCircleOutlined style={{ color: '#ff4d4f' }} />
                         : <CloseCircleOutlined style={{ color: '#52c41a' }} />}
                       <span style={{ fontSize: 12, color: triggerResult.triggered ? '#ff4d4f' : '#52c41a' }}>
-                        {triggerResult.triggered ? '已触发告警' : '未触发'}（当前值：{triggerResult.currentValue}）
+                        {triggerResult.triggered
+                          ? `已触发告警（${triggerResult.rows.length} 条满足条件 ${triggerResult.operator} ${triggerResult.threshold}）`
+                          : `未触发（无数据满足条件 ${triggerResult.operator} ${triggerResult.threshold}）`}
                       </span>
                     </Space>
                   </Tooltip>
+                  {triggerResult.triggered && triggerResult.rows.length > 0 && (
+                    <div style={{ fontSize: 12, color: '#595959', maxHeight: 80, overflowY: 'auto' }}>
+                      {triggerResult.rows.map((r, i) => (
+                        <span key={i}>{r.dimension ? `${r.dimension}：` : ''}{r.value}；</span>
+                      ))}
+                    </div>
+                  )}
                   {triggerResult.notifyErrors && triggerResult.notifyErrors.length > 0 && (
                     <Tooltip title={triggerResult.notifyErrors.join('\n')}>
                       <span style={{ fontSize: 12, color: '#faad14', cursor: 'pointer' }}>⚠️ 通知发送失败，点击查看详情</span>
@@ -330,11 +339,11 @@ const MonitorPage: React.FC = () => {
             />
           </Form.Item>
 
-          <Form.Item name="timeField" label="时间字段">
+          <Form.Item name="dimensionField" label="维度字段">
             <Select
-              placeholder="请选择时间字段"
-              options={timeFields.map(f => ({ label: f.displayName || f.originalName, value: f.originalName }))}
-              allowClear disabled={timeFields.length === 0}
+              placeholder="请选择维度字段：显示名称（原始字段名）"
+              options={dimensionFields.map(f => ({ label: f.displayName ? `${f.displayName}（${f.originalName}）` : f.originalName, value: f.originalName }))}
+              allowClear disabled={dimensionFields.length === 0}
             />
           </Form.Item>
 

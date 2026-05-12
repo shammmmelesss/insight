@@ -436,7 +436,7 @@ export interface Monitor {
   name: string;
   workspaceId: string;
   datasetId: string;
-  timeField: string;
+  dimensionField: string;
   whereClause: string;
   triggerAggFunc: string;
   triggerMetric: string;
@@ -457,7 +457,7 @@ export interface Monitor {
 export interface MonitorRequest {
   name: string;
   datasetId?: string;
-  timeField?: string;
+  dimensionField?: string;
   triggerMetric?: string;
   triggerOperator?: MonitorOperator;
   triggerThreshold?: string;

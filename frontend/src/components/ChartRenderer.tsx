@@ -79,6 +79,8 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       case '百分比': return (num * 100).toFixed(2) + '%';
       case '千分比': return (num*1000).toFixed(2) + '‰';
       case '小数': return num.toFixed(2);
+      case '1位小数': return num.toFixed(1);
+      case '2位小数': return num.toFixed(2);
       case '整数': return Math.round(num).toLocaleString();
       default: return axis ? formatAxisValue(num) : num.toLocaleString();
     }

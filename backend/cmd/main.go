@@ -38,6 +38,8 @@ func main() {
 		log.Printf("ClickHouse not available, extract feature disabled: %v", err)
 	} else {
 		log.Println("Connected to ClickHouse successfully")
+		api.StartExtractScheduler()
+		log.Println("Extract scheduler started")
 	}
 
 	// 自动迁移数据库模型

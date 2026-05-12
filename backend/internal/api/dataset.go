@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -796,5 +797,74 @@ func mapToCKType(dbType string) string {
 		return "Nullable(Date)"
 	default:
 		return "Nullable(String)"
+	}
+}
+
+// StartExtractScheduler 每分钟检查一次，触发到点的抽取任务
+func StartExtractScheduler() {
+	go func() {
+		for {
+			now := time.Now()
+			// 等到下一分钟整点再开始，避免启动时立即触发
+			next := now.Truncate(time.Minute).Add(time.Minute)
+			time.Sleep(time.Until(next))
+
+			runScheduledExtracts()
+		}
+	}()
+}
+
+func runScheduledExtracts() {
+	if database.ClickHouseDB == nil {
+		return
+	}
+
+	var datasets []models.Dataset
+	if err := database.DB.Where("type = ? AND extract_schedule != '' AND extract_schedule != '{}'", models.DatasetTypeExtract).Find(&datasets).Error; err != nil {
+		return
+	}
+
+	now := time.Now()
+	currentTime := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())
+
+	for _, ds := range datasets {
+		var schedule struct {
+			Frequency string `json:"frequency"`
+			Time      string `json:"time"`
+		}
+		if err := json.Unmarshal([]byte(ds.ExtractSchedule), &schedule); err != nil {
+			continue
+		}
+		if schedule.Frequency != "daily" || schedule.Time != currentTime {
+			continue
+		}
+		if ds.ExtractStatus == models.ExtractStatusRunning {
+			continue
+		}
+
+		dataset := ds
+		database.DB.Model(&dataset).Updates(map[string]interface{}{
+			"extract_status": models.ExtractStatusRunning,
+			"extract_error":  "",
+		})
+		go func() {
+			err := doExtract(dataset)
+			t := time.Now()
+			if err != nil {
+				database.DB.Model(&dataset).Updates(map[string]interface{}{
+					"extract_status":  models.ExtractStatusFailed,
+					"extract_error":   err.Error(),
+					"last_extract_at": t,
+				})
+				log.Printf("[scheduler] extract failed for dataset %s: %v", dataset.ID, err)
+			} else {
+				database.DB.Model(&dataset).Updates(map[string]interface{}{
+					"extract_status":  models.ExtractStatusSuccess,
+					"extract_error":   "",
+					"last_extract_at": t,
+				})
+				log.Printf("[scheduler] extract succeeded for dataset %s", dataset.ID)
+			}
+		}()
 	}
 }

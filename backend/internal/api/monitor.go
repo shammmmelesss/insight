@@ -4,9 +4,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"data-analysis-platform/internal/database"
 	"data-analysis-platform/internal/models"
@@ -461,6 +463,299 @@ func ListMonitorRecords(c *gin.Context) {
 		"items": records,
 		"total": len(records),
 	})
+}
+
+// StartMonitorScheduler 每分钟检查一次，触发到点的监控任务
+func StartMonitorScheduler() {
+	go func() {
+		for {
+			now := time.Now()
+			next := now.Truncate(time.Minute).Add(time.Minute)
+			time.Sleep(time.Until(next))
+			runScheduledMonitors()
+		}
+	}()
+}
+
+func runScheduledMonitors() {
+	var monitors []models.Monitor
+	if err := database.DB.Where("trigger_schedule != '' AND trigger_schedule != '{}'").Find(&monitors).Error; err != nil {
+		return
+	}
+
+	now := time.Now()
+	currentTime := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())
+	currentWeekday := int(now.Weekday()) // 0=Sunday
+	currentDay := now.Day()
+
+	for _, m := range monitors {
+		var schedule struct {
+			Frequency string `json:"frequency"`
+			Time      string `json:"time"`
+			Weekday   *int   `json:"weekday"`
+			Day       *int   `json:"day"`
+		}
+		if err := json.Unmarshal([]byte(m.TriggerSchedule), &schedule); err != nil {
+			continue
+		}
+		if schedule.Time != currentTime {
+			continue
+		}
+		switch schedule.Frequency {
+		case "daily":
+			// 每天到点就触发
+		case "weekly":
+			if schedule.Weekday == nil || *schedule.Weekday != currentWeekday {
+				continue
+			}
+		case "monthly":
+			if schedule.Day == nil || *schedule.Day != currentDay {
+				continue
+			}
+		default:
+			continue
+		}
+
+		monitor := m
+		go func() {
+			log.Printf("[monitor-scheduler] triggering monitor %s (%s)", monitor.ID, monitor.Name)
+			if err := runMonitor(monitor); err != nil {
+				log.Printf("[monitor-scheduler] monitor %s failed: %v", monitor.ID, err)
+			}
+		}()
+	}
+}
+
+// runMonitor 执行监控检查逻辑（与 TriggerMonitor HTTP 接口共用）
+func runMonitor(monitor models.Monitor) error {
+	if monitor.DatasetID == "" || monitor.TriggerMetric == "" || monitor.TriggerOperator == "" {
+		return fmt.Errorf("监控配置不完整")
+	}
+
+	var dataset models.Dataset
+	if err := database.DB.First(&dataset, "id = ?", monitor.DatasetID).Error; err != nil {
+		return fmt.Errorf("数据集不存在: %w", err)
+	}
+
+	allowedAggFuncs := map[string]bool{"SUM": true, "COUNT": true, "AVG": true, "MAX": true, "MIN": true}
+	aggFunc := "SUM"
+	if monitor.TriggerAggFunc != "" {
+		upper := strings.ToUpper(monitor.TriggerAggFunc)
+		if !allowedAggFuncs[upper] {
+			return fmt.Errorf("不支持的聚合函数: %s", monitor.TriggerAggFunc)
+		}
+		aggFunc = upper
+	}
+
+	metricExpr := monitor.TriggerMetric
+	isCalculatedField := false
+	if dataset.FieldsConfig != "" {
+		var fieldCfgs []struct {
+			OriginalName string `json:"originalName"`
+			IsCalculated bool   `json:"isCalculated"`
+			Expression   string `json:"expression"`
+		}
+		if err := json.Unmarshal([]byte(dataset.FieldsConfig), &fieldCfgs); err == nil {
+			for _, f := range fieldCfgs {
+				if f.OriginalName == monitor.TriggerMetric && f.IsCalculated && f.Expression != "" {
+					metricExpr = f.Expression
+					isCalculatedField = true
+					break
+				}
+			}
+		}
+	}
+
+	var aggExpr string
+	if aggFunc == "COUNT" {
+		aggExpr = "COUNT(*)"
+	} else if isCalculatedField || strings.Contains(metricExpr, "(") {
+		aggExpr = metricExpr
+	} else {
+		aggExpr = fmt.Sprintf(`%s(%s)`, aggFunc, metricExpr)
+	}
+
+	threshold, err := strconv.ParseFloat(monitor.TriggerThreshold, 64)
+	if err != nil {
+		return fmt.Errorf("阈值格式错误: %w", err)
+	}
+
+	whereClause := ""
+	if monitor.WhereClause != "" {
+		whereClause = " WHERE " + monitor.WhereClause
+	}
+
+	dim := monitor.DimensionField
+	var querySQL string
+	var db *sql.DB
+
+	if dataset.Type == models.DatasetTypeExtract {
+		if database.ClickHouseDB == nil {
+			return fmt.Errorf("ClickHouse 未连接")
+		}
+		ckTable := "insight.ds_" + replaceHyphens(dataset.ID.String())
+		if dim != "" {
+			querySQL = fmt.Sprintf(
+				"SELECT `%s` AS _dim, %s AS _val FROM %s%s GROUP BY `%s` HAVING %s %s %g",
+				dim, aggExpr, ckTable, whereClause, dim, aggExpr, monitor.TriggerOperator, threshold,
+			)
+		} else {
+			querySQL = fmt.Sprintf("SELECT '' AS _dim, %s AS _val FROM %s%s HAVING %s %s %g",
+				aggExpr, ckTable, whereClause, aggExpr, monitor.TriggerOperator, threshold)
+		}
+		db = database.ClickHouseDB
+	} else {
+		var dataSource models.DataSource
+		if err := database.DB.First(&dataSource, "id = ?", dataset.DataSourceID).Error; err != nil {
+			return fmt.Errorf("数据源不存在: %w", err)
+		}
+		dbConn, err := connectToDataSource(dataSource)
+		if err != nil {
+			return fmt.Errorf("连接数据源失败: %w", err)
+		}
+		defer dbConn.Close()
+		if dim != "" {
+			querySQL = fmt.Sprintf(
+				"SELECT %s AS _dim, %s AS _val FROM (%s) AS _t%s GROUP BY %s HAVING %s %s %g",
+				dim, aggExpr, dataset.SQL, whereClause, dim, aggExpr, monitor.TriggerOperator, threshold,
+			)
+		} else {
+			querySQL = fmt.Sprintf(
+				"SELECT '' AS _dim, %s AS _val FROM (%s) AS _t%s HAVING %s %s %g",
+				aggExpr, dataset.SQL, whereClause, aggExpr, monitor.TriggerOperator, threshold,
+			)
+		}
+		db = dbConn
+	}
+
+	rows, queryErr := db.Query(querySQL)
+	if queryErr != nil {
+		return fmt.Errorf("查询失败: %w", queryErr)
+	}
+	defer rows.Close()
+
+	type resultRow struct {
+		Dimension string  `json:"dimension"`
+		Value     float64 `json:"value"`
+	}
+	var resultRows []resultRow
+	for rows.Next() {
+		var dimVal interface{}
+		var valRaw interface{}
+		if err := rows.Scan(&dimVal, &valRaw); err != nil {
+			continue
+		}
+		var val float64
+		switch v := valRaw.(type) {
+		case float64:
+			val = v
+		case float32:
+			val = float64(v)
+		case int64:
+			val = float64(v)
+		case int32:
+			val = float64(v)
+		case []byte:
+			val, _ = strconv.ParseFloat(string(v), 64)
+		case string:
+			val, _ = strconv.ParseFloat(v, 64)
+		default:
+			val, _ = strconv.ParseFloat(fmt.Sprintf("%v", v), 64)
+		}
+		resultRows = append(resultRows, resultRow{
+			Dimension: fmt.Sprintf("%v", dimVal),
+			Value:     val,
+		})
+	}
+
+	triggered := len(resultRows) > 0
+	notifyErrors := []string{}
+
+	if triggered {
+		type fieldMeta struct {
+			OriginalName string `json:"originalName"`
+			DisplayName  string `json:"displayName"`
+		}
+		var fieldMetas []fieldMeta
+		if dataset.FieldsConfig != "" {
+			json.Unmarshal([]byte(dataset.FieldsConfig), &fieldMetas)
+		}
+		getDisplayName := func(original string) string {
+			for _, f := range fieldMetas {
+				if f.OriginalName == original && f.DisplayName != "" {
+					return f.DisplayName
+				}
+			}
+			return original
+		}
+		dimLabel := getDisplayName(monitor.DimensionField)
+		metricLabel := fmt.Sprintf("%s(%s)", aggFunc, getDisplayName(monitor.TriggerMetric))
+
+		title := fmt.Sprintf("⚠️ 监控告警：%s", monitor.Name)
+		var lines []string
+		lines = append(lines, monitor.Name)
+		if monitor.DimensionField != "" {
+			lines = append(lines, fmt.Sprintf("%s | %s", dimLabel, metricLabel))
+		} else {
+			lines = append(lines, metricLabel)
+		}
+		for _, r := range resultRows {
+			if monitor.DimensionField != "" {
+				lines = append(lines, fmt.Sprintf("%s | %.4g", r.Dimension, r.Value))
+			} else {
+				lines = append(lines, fmt.Sprintf("%.4g", r.Value))
+			}
+		}
+		lines = append(lines, fmt.Sprintf("满足条件 %s %g，已触发告警", monitor.TriggerOperator, threshold))
+
+		var channels []string
+		json.Unmarshal([]byte(monitor.NotifyChannels), &channels)
+
+		useLarkUser := false
+		for _, ch := range channels {
+			if ch == "lark_user" {
+				useLarkUser = true
+				break
+			}
+		}
+
+		if useLarkUser {
+			var users []struct {
+				OpenID string `json:"openId"`
+				Name   string `json:"name"`
+			}
+			json.Unmarshal([]byte(monitor.NotifyLarkUsers), &users)
+			content := strings.Join(lines, "\n")
+			for _, u := range users {
+				if sendErr := SendLarkDirectMessage(u.OpenID, title, content); sendErr != nil {
+					notifyErrors = append(notifyErrors, fmt.Sprintf("lark_user(%s): %s", u.Name, sendErr.Error()))
+				}
+			}
+		} else {
+			if sendErr := SendLarkWebhookMessageWith(monitor.WebhookURL, monitor.WebhookSecret, title, lines); sendErr != nil {
+				notifyErrors = append(notifyErrors, "webhook: "+sendErr.Error())
+			}
+		}
+	}
+
+	resultRowsJSON, _ := json.Marshal(resultRows)
+	notifyErrorsJSON, _ := json.Marshal(notifyErrors)
+	record := models.MonitorRecord{
+		MonitorID:    monitor.ID.String(),
+		CurrentValue: float64(len(resultRows)),
+		Threshold:    threshold,
+		Operator:     monitor.TriggerOperator,
+		AggFunc:      aggFunc,
+		Metric:       monitor.TriggerMetric,
+		Triggered:    triggered,
+		NotifyErrors: string(notifyErrorsJSON),
+		SQL:          querySQL,
+		ResultRows:   string(resultRowsJSON),
+	}
+	database.DB.Create(&record)
+
+	log.Printf("[monitor-scheduler] monitor %s done: triggered=%v rows=%d", monitor.ID, triggered, len(resultRows))
+	return nil
 }
 
 func replaceHyphens(s string) string {

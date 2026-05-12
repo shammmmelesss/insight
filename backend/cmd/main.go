@@ -42,6 +42,9 @@ func main() {
 		log.Println("Extract scheduler started")
 	}
 
+	api.StartMonitorScheduler()
+	log.Println("Monitor scheduler started")
+
 	// 自动迁移数据库模型
 	database.DB.AutoMigrate(
 		&models.Workspace{},

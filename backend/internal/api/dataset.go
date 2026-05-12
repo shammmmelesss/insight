@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -19,6 +20,8 @@ import (
 	_ "github.com/microsoft/go-mssqldb"
 	_ "github.com/oracle/oci-go-sdk/v65/database"
 )
+
+const queryTimeout = 30 * time.Second
 
 // RegisterDatasetRoutes 注册数据集路由
 func RegisterDatasetRoutes(rg *gin.RouterGroup) {
@@ -302,7 +305,9 @@ func GetDatasetFields(c *gin.Context) {
 			defer db.Close()
 
 			schemaSQL := fmt.Sprintf("SELECT * FROM (%s) AS _schema LIMIT 1", dataset.SQL)
-			rows, err := db.Query(schemaSQL)
+			ctx, cancel := context.WithTimeout(c.Request.Context(), queryTimeout)
+			defer cancel()
+			rows, err := db.QueryContext(ctx, schemaSQL)
 			if err == nil {
 				defer rows.Close()
 
@@ -426,7 +431,9 @@ func GetDatasetFieldValues(c *gin.Context) {
 	query := fmt.Sprintf("SELECT %s FROM (%s) AS dataset WHERE 1=1 GROUP BY %s ORDER BY %s LIMIT 1000",
 		fieldName, dataset.SQL, fieldName, fieldName)
 
-	rows, err := db.Query(query)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), queryTimeout)
+	defer cancel()
+	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询字段值失败: " + err.Error()})
 		return
@@ -504,8 +511,15 @@ func PreviewDataset(c *gin.Context) {
 }
 
 func execPreviewQuery(c *gin.Context, db *sql.DB, querySQL string) {
-	rows, err := db.Query(querySQL)
+	ctx, cancel := context.WithTimeout(c.Request.Context(), queryTimeout)
+	defer cancel()
+
+	rows, err := db.QueryContext(ctx, querySQL)
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			c.JSON(http.StatusRequestTimeout, gin.H{"error": "查询超时，请优化SQL或缩小数据范围"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "执行SQL失败: " + err.Error()})
 		return
 	}

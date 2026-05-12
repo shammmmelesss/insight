@@ -227,12 +227,41 @@ func TriggerMonitor(c *gin.Context) {
 		aggFunc = upper
 	}
 
-	// COUNT 不需要指定字段名，其他函数需要
+	// 解析 fieldsConfig，若 triggerMetric 是计算字段则用其表达式替换
+	metricExpr := monitor.TriggerMetric
+	isCalculatedField := false
+	if dataset.FieldsConfig != "" {
+		var fields []struct {
+			OriginalName string `json:"originalName"`
+			IsCalculated bool   `json:"isCalculated"`
+			Expression   string `json:"expression"`
+		}
+		if err := json.Unmarshal([]byte(dataset.FieldsConfig), &fields); err == nil {
+			for _, f := range fields {
+				if f.OriginalName == monitor.TriggerMetric && f.IsCalculated && f.Expression != "" {
+					metricExpr = f.Expression
+					isCalculatedField = true
+					break
+				}
+			}
+		}
+	}
+
+	// 计算字段或已含聚合函数的表达式直接使用，普通字段包一层聚合函数
+	containsFunc := false
+	for _, ch := range metricExpr {
+		if ch == '(' {
+			containsFunc = true
+			break
+		}
+	}
 	var aggExpr string
 	if aggFunc == "COUNT" {
 		aggExpr = "COUNT(*)"
+	} else if isCalculatedField || containsFunc {
+		aggExpr = metricExpr
 	} else {
-		aggExpr = fmt.Sprintf(`%s("%s")`, aggFunc, monitor.TriggerMetric)
+		aggExpr = fmt.Sprintf(`%s(%s)`, aggFunc, metricExpr)
 	}
 
 	whereClause := ""

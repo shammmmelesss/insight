@@ -237,7 +237,7 @@ export interface DataTableListResponse {
 // ==================== 图表模块 ====================
 
 /** 图表类型 */
-export type ChartType = "crossTable" | "bar" | "line" | "pie" | "indicator";
+export type ChartType = "crossTable" | "bar" | "line" | "pie" | "indicator" | "dualAxis";
 
 /** 图表配置 */
 export interface ChartConfig {

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Layout, Form, Select, Radio, DatePicker, message } from 'antd';
+import { Modal, Button, Layout, Form, Select, Radio, message } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { FilterField } from '@shared/api.interface';
+import DateRangeFilterPicker, { DateRangeFilterValue, resolvedRangeLabel } from '../DateRangeFilterPicker/DateRangeFilterPicker';
 
 const { Sider, Content } = Layout;
 const { Option } = Select;
-const { RangePicker } = DatePicker;
 
 interface Dataset {
   id: string;
@@ -315,10 +315,17 @@ const FilterConfigModal: React.FC<FilterConfigModalProps> = ({ visible, onCancel
               
               <Form.Item label="筛选默认值">
                 {selectedField.type === 'dateRange' ? (
-                  <RangePicker
-                    style={{ width: 200 }}
-                    onChange={(dates) => updateField(selectedField.id, { defaultValue: dates })}
-                  />
+                  <div style={{ marginTop: 4 }}>
+                    {selectedField.defaultValue?.startType && (
+                      <div style={{ fontSize: 12, color: '#595959', marginBottom: 6 }}>
+                        已选：{resolvedRangeLabel(selectedField.defaultValue as DateRangeFilterValue)}
+                      </div>
+                    )}
+                    <DateRangeFilterPicker
+                      value={selectedField.defaultValue?.startType ? selectedField.defaultValue as DateRangeFilterValue : undefined}
+                      onChange={(val) => updateField(selectedField.id, { defaultValue: val })}
+                    />
+                  </div>
                 ) : (
                   <Select
                     style={{ width: 200 }}

@@ -616,14 +616,24 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 		return "ASC"
 	}
 
-	addDimension := func(name string) error {
+	addDimension := func(f fieldConfig) error {
+		name := f.OriginalName
 		if !isValidIdentifier(name) {
 			return fmt.Errorf("非法字段名: %s", name)
 		}
 		if !seen[name] {
 			seen[name] = true
-			selectFields = append(selectFields, name)
-			groupByFields = append(groupByFields, name)
+			if f.IsCalculated && f.Expression != "" {
+				if !isValidExpression(f.Expression) {
+					return fmt.Errorf("非法计算字段表达式: %s", name)
+				}
+				alias := sanitizeAlias(name)
+				selectFields = append(selectFields, fmt.Sprintf("%s AS %s", f.Expression, alias))
+				groupByFields = append(groupByFields, f.Expression)
+			} else {
+				selectFields = append(selectFields, name)
+				groupByFields = append(groupByFields, name)
+			}
 		}
 		return nil
 	}
@@ -632,13 +642,13 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 	switch chartType {
 	case "crossTable":
 		for _, f := range config.RowFields {
-			if err = addDimension(f.OriginalName); err != nil {
+			if err = addDimension(f); err != nil {
 				return "", err
 			}
 			orderByFields = append(orderByFields, fmt.Sprintf("%s %s", f.OriginalName, sortDir(f)))
 		}
 		for _, f := range config.ColFields {
-			if err = addDimension(f.OriginalName); err != nil {
+			if err = addDimension(f); err != nil {
 				return "", err
 			}
 		}
@@ -651,7 +661,7 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 		}
 	case "bar", "line":
 		for _, f := range config.XAxisFields {
-			if err = addDimension(f.OriginalName); err != nil {
+			if err = addDimension(f); err != nil {
 				return "", err
 			}
 			orderByFields = append(orderByFields, fmt.Sprintf("%s %s", f.OriginalName, sortDir(f)))
@@ -664,13 +674,13 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 			selectFields = append(selectFields, agg)
 		}
 		for _, f := range config.GroupFields {
-			if err = addDimension(f.OriginalName); err != nil {
+			if err = addDimension(f); err != nil {
 				return "", err
 			}
 		}
 	case "pie":
 		for _, f := range config.GroupFields {
-			if err = addDimension(f.OriginalName); err != nil {
+			if err = addDimension(f); err != nil {
 				return "", err
 			}
 		}
@@ -691,7 +701,7 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 		}
 	case "dualAxis":
 		for _, f := range config.XAxisFields {
-			if err = addDimension(f.OriginalName); err != nil {
+			if err = addDimension(f); err != nil {
 				return "", err
 			}
 			orderByFields = append(orderByFields, fmt.Sprintf("%s %s", f.OriginalName, sortDir(f)))

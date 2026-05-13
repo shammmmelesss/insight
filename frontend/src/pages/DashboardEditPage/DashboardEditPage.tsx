@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Button, Input, Layout, Space, Card, Modal, message, Spin, Dropdown, Tooltip, Select, DatePicker } from 'antd';
-import { ArrowLeftOutlined, SearchOutlined, EllipsisOutlined, CodeOutlined, SettingOutlined } from '@ant-design/icons';
+import { Button, Input, Layout, Space, Card, Modal, message, Spin, Dropdown, Tooltip, Select, Popover } from 'antd';
+import { ArrowLeftOutlined, SearchOutlined, EllipsisOutlined, CodeOutlined, SettingOutlined, CalendarOutlined } from '@ant-design/icons';
+import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel, resolvedPresetName } from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { dashboardCache } from '../../utils/dashboardCache';
@@ -36,7 +37,6 @@ const chineseAggToAlias = (agg: string): string => {
     default: return 'count';
   }
 };
-const { RangePicker } = DatePicker;
 const { Sider, Content } = Layout;
 
 const COLS = 12;
@@ -122,7 +122,9 @@ const DashboardEditPage: React.FC = () => {
         if (savedFilters.length > 0) {
           setFilters(savedFilters);
           const initialValues: Record<string, any> = {};
-          savedFilters.forEach(f => { initialValues[f.id] = f.defaultValue; });
+          savedFilters.forEach(f => {
+            initialValues[f.id] = f.type === 'dateRange' ? DEFAULT_DATE_RANGE_VALUE : f.defaultValue;
+          });
           setFilterValues(initialValues);
           savedFilters.forEach(f => {
             if (f.dataset && f.field) {
@@ -284,7 +286,14 @@ const DashboardEditPage: React.FC = () => {
   const handleSaveFilterConfig = (newFilters: FilterField[]) => {
     setFilters(newFilters);
     const initialValues: Record<string, any> = {};
-    newFilters.forEach(f => { initialValues[f.id] = f.defaultValue; });
+    newFilters.forEach(f => {
+      if (f.type === 'dateRange') {
+        const dv = f.defaultValue as DateRangeFilterValue | undefined;
+        initialValues[f.id] = dv?.startType ? dv : DEFAULT_DATE_RANGE_VALUE;
+      } else {
+        initialValues[f.id] = f.defaultValue;
+      }
+    });
     setFilterValues(initialValues);
     newFilters.forEach(f => {
       if (f.dataset && f.field) {
@@ -322,7 +331,11 @@ const DashboardEditPage: React.FC = () => {
       if (val === undefined || val === null) return;
       const dataType = datasetFieldTypes[`${f.dataset}:${f.field}`] || 'text';
       if (f.type === 'dateRange') {
-        if (Array.isArray(val) && val.length === 2 && val[0] && val[1]) {
+        if (val && typeof val === 'object' && 'startType' in (val as object)) {
+          const drv = val as DateRangeFilterValue;
+          const [s, e] = resolveDateRangeValue(drv);
+          params.push({ field: f.field, type: 'dateRange', dataType, values: [s.format('YYYY-MM-DD'), e.format('YYYY-MM-DD')] });
+        } else if (Array.isArray(val) && val.length === 2 && val[0] && val[1]) {
           params.push({ field: f.field, type: 'dateRange', dataType, values: [val[0].format('YYYY-MM-DD'), val[1].format('YYYY-MM-DD')] });
         }
       } else {
@@ -398,12 +411,22 @@ const DashboardEditPage: React.FC = () => {
                 <div key={filter.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 'calc(100% / 6 - 14px)' }}>
                   <span style={{ fontSize: 12, color: '#666' }}>{filter.name}</span>
                   {filter.type === 'dateRange' ? (
-                    <RangePicker
-                      size="small"
-                      style={{ width: '100%', height: 32 }}
-                      value={filterValues[filter.id]}
-                      onChange={(dates) => setFilterValues(prev => ({ ...prev, [filter.id]: dates }))}
-                    />
+                    <Popover
+                      trigger="click"
+                      placement="bottomLeft"
+                      content={
+                        <DateRangeFilterPicker
+                          value={filterValues[filter.id] as DateRangeFilterValue | undefined}
+                          onChange={(val) => setFilterValues(prev => ({ ...prev, [filter.id]: val }))}
+                        />
+                      }
+                    >
+                      <Button size="small" icon={<CalendarOutlined />} style={{ width: '100%', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {filterValues[filter.id]
+                          ? resolvedRangeLabel(filterValues[filter.id] as DateRangeFilterValue)
+                          : '选择日期范围'}
+                      </Button>
+                    </Popover>
                   ) : (
                     <Select
                       size="small"
@@ -479,10 +502,10 @@ const DashboardEditPage: React.FC = () => {
                           {chart?.name || `图表${index + 1}`}
                         </span>
                       }
-                      style={{ height: '100%', boxShadow: isConfigSelected ? '0 0 0 2px #1677ff' : 'none', overflow: 'hidden' }}
+                      style={{ height: '100%', boxShadow: isConfigSelected ? '0 0 0 2px #1677ff' : 'none', overflow: 'visible' }}
                       styles={{
                         header: { height: '40px', padding: '0 12px', display: 'flex', alignItems: 'center', borderBottom: 'none', cursor: 'move' },
-                        body: { padding: '10px', overflow: 'hidden', height: 'calc(100% - 40px)' },
+                        body: { padding: '10px', overflow: 'visible', height: 'calc(100% - 40px)' },
                       }}
                       extra={
                         <Dropdown

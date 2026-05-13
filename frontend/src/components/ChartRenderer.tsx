@@ -324,7 +324,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         chart.axis('x', xAxisConfig);
         chart.axis(actualYField, {
           title: { text: getFieldLabel(actualYField), style: { fontSize: 12 } },
-          label: { style: { fontSize: 11 }, formatter: (v: any) => formatValue(v, yFormatLookup[actualYField], true) },
+          labelFormatter: (v: any) => formatValue(v, yFormatLookup[actualYField], true),
         });
         if (dataCount > 50) {
           chart.slider('x', { values: [0, 1], style: { trackSize: 6, handleIconSize: 4 }, showLabelOnInteraction: true });
@@ -389,7 +389,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         chart.axis('x', xAxisConfig);
         chart.axis('_value', {
           title: { text: '值', style: { fontSize: 12 } },
-          label: { style: { fontSize: 11 }, formatter: (v: any) => formatAxisValue(v) },
+          labelFormatter: (v: any) => formatAxisValue(v),
         });
         if (dataCount > 50) {
           chart.slider('x', { values: [0, 1], style: { trackSize: 6, handleIconSize: 4 }, showLabelOnInteraction: true });
@@ -494,7 +494,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         chart.axis('x', xAxisConfig);
         chart.axis(actualYField, {
           title: { text: getFieldLabel(actualYField), style: { fontSize: 12 } },
-          label: { style: { fontSize: 11 }, formatter: (v: any) => formatValue(v, yFormatLookup[actualYField], true) },
+          labelFormatter: (v: any) => formatValue(v, yFormatLookup[actualYField], true),
         });
         if (dataCount > 50) {
           chart.slider('x', { values: [0, 1], style: { trackSize: 6, handleIconSize: 4 }, showLabelOnInteraction: true });
@@ -574,7 +574,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         chart.axis('x', xAxisConfig);
         chart.axis('_value', {
           title: { text: '值', style: { fontSize: 12 } },
-          label: { style: { fontSize: 11 }, formatter: (v: any) => formatAxisValue(v) },
+          labelFormatter: (v: any) => formatAxisValue(v),
         });
         if (dataCount > 50) {
           chart.slider('x', { values: [0, 1], style: { trackSize: 6, handleIconSize: 4 }, showLabelOnInteraction: true });
@@ -708,7 +708,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .axis('y', {
             position: 'left',
             title: actualLeftFields.map(f => getFieldLabel(f)).join(' / '),
-            label: { style: { fontSize: 11 }, formatter: (v: any) => formatAxisValue(v) },
+            labelFormatter: (v: any) => formatAxisValue(v),
           })
           .tooltip({
             title: (d: any) => String(d[actualXField] ?? ''),
@@ -737,7 +737,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .axis('y', {
             position: 'right',
             title: actualRightFields.map(f => getFieldLabel(f)).join(' / '),
-            label: { style: { fontSize: 11 }, formatter: (v: any) => formatAxisValue(v) },
+            labelFormatter: (v: any) => formatAxisValue(v),
           })
           .tooltip(false);
 

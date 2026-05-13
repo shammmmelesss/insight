@@ -20,6 +20,10 @@
   background-color: #001529;
 }
 
+.react-grid-item {
+  overflow: visible !important;
+}
+
 .logo {
   height: 32px;
   margin: 16px;

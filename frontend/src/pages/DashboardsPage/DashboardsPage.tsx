@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Button, Card, Modal, Layout, Skeleton, Select, DatePicker, Tooltip, Dropdown } from 'antd';
-import { EditOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined, InboxOutlined, PlusOutlined } from '@ant-design/icons';
+import { Button, Card, Modal, Layout, Skeleton, Select, Tooltip, Dropdown, Popover } from 'antd';
+import { EditOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined, InboxOutlined, PlusOutlined, CalendarOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Dashboard, ChartOption, FilterField, DashboardLayoutItem } from '@shared/api.interface';
 import DashboardList from '../../components/DashboardList/DashboardList';
 import ChartRenderer from '../../components/ChartRenderer';
 import { dashboardCache } from '../../utils/dashboardCache';
+import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel, resolvedPresetName } from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
 
 const ROW_HEIGHT = 30;
 const GRID_MARGIN = 10;
@@ -20,7 +21,6 @@ const chartAreaHeight = (h: number) =>
 const isWide = (item: DashboardLayoutItem) =>
   item.width <= 8 ? item.width >= 8 : item.width >= 10;
 
-const { RangePicker } = DatePicker;
 const { Sider, Content } = Layout;
 
 interface LazyChartCardProps {
@@ -234,7 +234,11 @@ const DashboardsPage: React.FC = () => {
       if (val === undefined || val === null) return;
       const dataType = datasetFieldTypes[`${f.dataset}:${f.field}`] || 'text';
       if (f.type === 'dateRange') {
-        if (Array.isArray(val) && val.length === 2 && val[0] && val[1]) {
+        if (val && typeof val === 'object' && 'startType' in (val as object)) {
+          const drv = val as DateRangeFilterValue;
+          const [s, e] = resolveDateRangeValue(drv);
+          params.push({ field: f.field, type: 'dateRange', dataType, values: [s.format('YYYY-MM-DD'), e.format('YYYY-MM-DD')] });
+        } else if (Array.isArray(val) && val.length === 2 && val[0] && val[1]) {
           params.push({
             field: f.field,
             type: 'dateRange',
@@ -293,7 +297,9 @@ const DashboardsPage: React.FC = () => {
     setFilters(savedFilters);
 
     const initialValues: Record<string, unknown> = {};
-    savedFilters.forEach(f => { initialValues[f.id] = f.defaultValue; });
+    savedFilters.forEach(f => {
+      initialValues[f.id] = f.type === 'dateRange' ? DEFAULT_DATE_RANGE_VALUE : f.defaultValue;
+    });
     setFilterValues(initialValues);
 
     savedFilters.forEach(f => {
@@ -445,12 +451,22 @@ const DashboardsPage: React.FC = () => {
               <div key={filter.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
                 <span style={{ fontSize: 12, color: '#666' }}>{filter.name}</span>
                 {filter.type === 'dateRange' ? (
-                  <RangePicker
-                    size="small"
-                    style={{ width: '100%' }}
-                    value={filterValues[filter.id] as Parameters<typeof RangePicker>[0]['value']}
-                    onChange={(dates) => setFilterValues(prev => ({ ...prev, [filter.id]: dates }))}
-                  />
+                  <Popover
+                    trigger="click"
+                    placement="bottomLeft"
+                    content={
+                      <DateRangeFilterPicker
+                        value={filterValues[filter.id] as DateRangeFilterValue | undefined}
+                        onChange={(val) => setFilterValues(prev => ({ ...prev, [filter.id]: val }))}
+                      />
+                    }
+                  >
+                    <Button size="small" icon={<CalendarOutlined />} style={{ width: '100%', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {filterValues[filter.id]
+                        ? resolvedRangeLabel(filterValues[filter.id] as DateRangeFilterValue)
+                        : '选择日期范围'}
+                    </Button>
+                  </Popover>
                 ) : (
                   <Select
                     size="small"
@@ -505,7 +521,7 @@ const DashboardsPage: React.FC = () => {
                   <Card
                     title={cardTitle}
                     style={{ minWidth: 0, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', transition: 'box-shadow 0.2s, transform 0.2s' }}
-                    styles={{ header: { padding: '10px 16px', minHeight: 44, borderBottom: 'none' }, body: { padding: '12px 16px', overflow: 'hidden' } }}
+                    styles={{ header: { padding: '10px 16px', minHeight: 44, borderBottom: 'none' }, body: { padding: '12px 16px', overflow: 'visible' } }}
                     onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}
                   >

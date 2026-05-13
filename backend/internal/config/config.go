@@ -75,6 +75,22 @@ func LoadConfig() (*Config, error) {
 		cfg.Server.AllowedOrigins = []string{"http://localhost:3000", "http://127.0.0.1:3000"}
 	}
 
+	if v := os.Getenv("CLICKHOUSE_HOST"); v != "" {
+		cfg.ClickHouse.Host = v
+	}
+	if v := os.Getenv("CLICKHOUSE_PORT"); v != "" {
+		cfg.ClickHouse.Port = v
+	}
+	if v := os.Getenv("CLICKHOUSE_USER"); v != "" {
+		cfg.ClickHouse.User = v
+	}
+	if v := os.Getenv("CLICKHOUSE_PASSWORD"); v != "" {
+		cfg.ClickHouse.Password = v
+	}
+	if v := os.Getenv("CLICKHOUSE_DB"); v != "" {
+		cfg.ClickHouse.DBName = v
+	}
+
 	if v := os.Getenv("LARK_APP_ID"); v != "" {
 		cfg.Lark.AppID = v
 	}

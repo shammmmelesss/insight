@@ -1,5 +1,5 @@
 # 使用官方的Go镜像作为基础镜像
-FROM golang:1.25-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 # 设置工作目录
 WORKDIR /app
@@ -18,6 +18,8 @@ RUN go build -o main ./cmd/main.go
 
 # 使用更小的alpine镜像作为运行时
 FROM alpine:latest
+
+RUN apk --no-cache add ca-certificates tzdata
 
 # 设置工作目录
 WORKDIR /app

@@ -587,7 +587,10 @@ const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, o
               </>
             )}
             {chartType === 'indicator' && (
-              <DropZone {...dropZoneProps} areaKey="indicator" label="指标" fields={indicatorFields} isOver={droppableArea === 'indicator'} showAggregation />
+              <>
+                <DropZone {...dropZoneProps} areaKey="indicator" label="指标" fields={indicatorFields} isOver={droppableArea === 'indicator'} showAggregation />
+                <DropZone {...dropZoneProps} areaKey="filter" label="筛选" fields={filterFields} isOver={droppableArea === 'filter'} />
+              </>
             )}
             {chartType === 'dualAxis' && (
               <>

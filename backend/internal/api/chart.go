@@ -385,7 +385,8 @@ func GetChartData(c *gin.Context) {
 			} else if floatVal, ok := val.(float64); ok {
 				row[colName] = safeFloat(floatVal)
 			} else if t, ok := val.(time.Time); ok {
-				if columnTypes[i].DatabaseTypeName() == "DATE" {
+				dbTypeName := strings.ToUpper(columnTypes[i].DatabaseTypeName())
+				if dbTypeName == "DATE" {
 					row[colName] = t.Format("2006-01-02")
 				} else {
 					row[colName] = t.Format("2006-01-02 15:04:05")
@@ -514,7 +515,8 @@ func PreviewChartData(c *gin.Context) {
 			} else if floatVal, ok := val.(float64); ok {
 				row[colName] = safeFloat(floatVal)
 			} else if t, ok := val.(time.Time); ok {
-				if columnTypes[i].DatabaseTypeName() == "DATE" {
+				dbTypeName := strings.ToUpper(columnTypes[i].DatabaseTypeName())
+				if dbTypeName == "DATE" {
 					row[colName] = t.Format("2006-01-02")
 				} else {
 					row[colName] = t.Format("2006-01-02 15:04:05")

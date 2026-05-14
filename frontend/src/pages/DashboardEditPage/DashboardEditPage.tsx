@@ -125,7 +125,7 @@ const DashboardEditPage: React.FC = () => {
           setFilters(savedFilters);
           const initialValues: Record<string, any> = {};
           savedFilters.forEach(f => {
-            initialValues[f.id] = f.type === 'dateRange' ? DEFAULT_DATE_RANGE_VALUE : f.defaultValue;
+            initialValues[f.id] = f.type === 'dateRange' ? (f.defaultValue ?? DEFAULT_DATE_RANGE_VALUE) : f.defaultValue;
           });
           setFilterValues(initialValues);
           savedFilters.forEach(f => {

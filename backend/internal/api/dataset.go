@@ -567,10 +567,10 @@ func execPreviewQuery(c *gin.Context, db *sql.DB, querySQL string) {
 				}
 			} else if t, ok := val.(time.Time); ok {
 				dbTypeName := strings.ToUpper(columnTypes[i].DatabaseTypeName())
-				if dbTypeName == "DATE" {
-					row[colName] = t.Format("2006-01-02")
-				} else {
+				if strings.Contains(dbTypeName, "DATETIME") || strings.Contains(dbTypeName, "TIMESTAMP") {
 					row[colName] = t.Format("2006-01-02 15:04:05")
+				} else {
+					row[colName] = t.Format("2006-01-02")
 				}
 			} else {
 				row[colName] = val

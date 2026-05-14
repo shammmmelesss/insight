@@ -538,10 +538,11 @@ func PreviewChartData(c *gin.Context) {
 
 // FilterCondition 筛选条件
 type FilterCondition struct {
-	Field    string   `json:"field"`
-	Type     string   `json:"type"`     // "multiple", "single", "dateRange"
-	DataType string   `json:"dataType"` // "number", "text", "date" 等
-	Values   []string `json:"values"`
+	Field      string   `json:"field"`
+	Type       string   `json:"type"`                 // "multiple", "single", "dateRange"
+	DataType   string   `json:"dataType"`             // "number", "text", "date" 等
+	Values     []string `json:"values"`
+	Expression string   `json:"expression,omitempty"` // 计算字段表达式，非空时替代 Field 用于 WHERE 子句
 }
 
 // chartFilterFieldConfig 图表配置中的筛选字段
@@ -570,6 +571,27 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 
 	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
 		return datasetSQL, nil
+	}
+
+	// 收集所有维度字段的计算表达式，用于筛选条件中替换字段名
+	calcExprMap := make(map[string]string)
+	allDimFields := make([]fieldConfig, 0)
+	allDimFields = append(allDimFields, config.RowFields...)
+	allDimFields = append(allDimFields, config.ColFields...)
+	allDimFields = append(allDimFields, config.XAxisFields...)
+	allDimFields = append(allDimFields, config.GroupFields...)
+	for _, f := range allDimFields {
+		if f.IsCalculated && f.Expression != "" && isValidExpression(f.Expression) {
+			calcExprMap[f.OriginalName] = f.Expression
+		}
+	}
+
+	// resolveFilterExpr 将计算字段的筛选条件中的字段名替换为其表达式
+	resolveFilterExpr := func(fc FilterCondition) FilterCondition {
+		if expr, ok := calcExprMap[fc.Field]; ok {
+			fc.Expression = expr
+		}
+		return fc
 	}
 
 	// 从图表配置中提取图表级筛选条件
@@ -607,12 +629,12 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 		if len(values) == 0 {
 			continue
 		}
-		chartFilters = append(chartFilters, FilterCondition{
+		chartFilters = append(chartFilters, resolveFilterExpr(FilterCondition{
 			Field:    ff.OriginalName,
 			Type:     filterType,
 			DataType: "text",
 			Values:   values,
-		})
+		}))
 	}
 
 	// 构建内层 SQL：数据集 + 图表级筛选
@@ -741,9 +763,15 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 		return innerSQL, nil
 	}
 
+	// 解析看板级筛选中的计算字段表达式
+	resolvedFilters := make([]FilterCondition, len(filters))
+	for i, f := range filters {
+		resolvedFilters[i] = resolveFilterExpr(f)
+	}
+
 	// 构建外层 SQL：图表聚合字段 + 看板级筛选
 	// 结构：SELECT <fields> FROM (<innerSQL>) AS dataset WHERE <看板筛选> GROUP BY ... ORDER BY ...
-	sql := buildFilteredSQL(fmt.Sprintf("SELECT %s FROM (%s) AS dataset", strings.Join(selectFields, ", "), innerSQL), filters)
+	sql := buildFilteredSQL(fmt.Sprintf("SELECT %s FROM (%s) AS dataset", strings.Join(selectFields, ", "), innerSQL), resolvedFilters)
 
 	if len(groupByFields) > 0 {
 		sql += fmt.Sprintf(" GROUP BY %s", strings.Join(groupByFields, ", "))
@@ -761,15 +789,25 @@ func buildFilteredSQL(base string, filters []FilterCondition) string {
 		if len(f.Values) == 0 {
 			continue
 		}
-		if !isValidIdentifier(f.Field) {
-			continue
+		// 计算字段使用表达式，普通字段使用字段名
+		var fieldExpr string
+		if f.Expression != "" {
+			if !isValidExpression(f.Expression) {
+				continue
+			}
+			fieldExpr = f.Expression
+		} else {
+			if !isValidIdentifier(f.Field) {
+				continue
+			}
+			fieldExpr = f.Field
 		}
 		switch f.Type {
 		case "dateRange":
 			if len(f.Values) == 2 && f.Values[0] != "" && f.Values[1] != "" {
 				start := truncateISODatetime(sanitizeSQLString(f.Values[0]))
 				end := truncateISODatetime(sanitizeSQLString(f.Values[1]))
-				sql += fmt.Sprintf(" AND %s BETWEEN '%s' AND '%s'", f.Field, start, end)
+				sql += fmt.Sprintf(" AND %s BETWEEN '%s' AND '%s'", fieldExpr, start, end)
 			}
 		case "single", "multiple":
 			if f.DataType == "number" {
@@ -781,7 +819,7 @@ func buildFilteredSQL(base string, filters []FilterCondition) string {
 					}
 				}
 				if len(safeValues) > 0 {
-					sql += fmt.Sprintf(" AND %s IN (%s)", f.Field, strings.Join(safeValues, ", "))
+					sql += fmt.Sprintf(" AND %s IN (%s)", fieldExpr, strings.Join(safeValues, ", "))
 				}
 			} else {
 				quoted := make([]string, len(f.Values))
@@ -789,7 +827,7 @@ func buildFilteredSQL(base string, filters []FilterCondition) string {
 					val := truncateISODatetime(sanitizeSQLString(v))
 					quoted[i] = fmt.Sprintf("'%s'", val)
 				}
-				sql += fmt.Sprintf(" AND %s IN (%s)", f.Field, strings.Join(quoted, ", "))
+				sql += fmt.Sprintf(" AND %s IN (%s)", fieldExpr, strings.Join(quoted, ", "))
 			}
 		}
 	}

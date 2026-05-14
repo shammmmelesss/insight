@@ -415,6 +415,24 @@ func GetDatasetFieldValues(c *gin.Context) {
 		return
 	}
 
+	// 计算字段：从 FieldsConfig 找到其表达式，用表达式替代字段名查询
+	queryExpr := fieldName
+	var fieldsConfig []map[string]interface{}
+	if err := json.Unmarshal([]byte(dataset.FieldsConfig), &fieldsConfig); err == nil {
+		for _, field := range fieldsConfig {
+			origName, _ := field["originalName"].(string)
+			if origName != fieldName {
+				continue
+			}
+			isCalc, _ := field["isCalculated"].(bool)
+			expr, _ := field["expression"].(string)
+			if isCalc && expr != "" && isValidExpression(expr) {
+				queryExpr = expr
+			}
+			break
+		}
+	}
+
 	var dataSource models.DataSource
 	if err := database.DB.First(&dataSource, "id = ?", dataset.DataSourceID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "数据源不存在"})
@@ -428,8 +446,13 @@ func GetDatasetFieldValues(c *gin.Context) {
 	}
 	defer db.Close()
 
+	alias := sanitizeAlias(fieldName)
+	selectExpr := queryExpr
+	if queryExpr != fieldName {
+		selectExpr = fmt.Sprintf("%s AS %s", queryExpr, alias)
+	}
 	query := fmt.Sprintf("SELECT %s FROM (%s) AS dataset WHERE 1=1 GROUP BY %s ORDER BY %s LIMIT 1000",
-		fieldName, dataset.SQL, fieldName, fieldName)
+		selectExpr, dataset.SQL, queryExpr, queryExpr)
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), queryTimeout)
 	defer cancel()
@@ -440,6 +463,16 @@ func GetDatasetFieldValues(c *gin.Context) {
 	}
 	defer rows.Close()
 
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取列信息失败: " + err.Error()})
+		return
+	}
+	var dbTypeName string
+	if len(columnTypes) > 0 {
+		dbTypeName = strings.ToUpper(columnTypes[0].DatabaseTypeName())
+	}
+
 	var values []interface{}
 	for rows.Next() {
 		var val interface{}
@@ -449,6 +482,12 @@ func GetDatasetFieldValues(c *gin.Context) {
 		}
 		if b, ok := val.([]byte); ok {
 			values = append(values, string(b))
+		} else if t, ok := toTime(val); ok {
+			if strings.Contains(dbTypeName, "DATETIME") || strings.Contains(dbTypeName, "TIMESTAMP") {
+				values = append(values, t.Format("2006-01-02 15:04:05"))
+			} else {
+				values = append(values, t.Format("2006-01-02"))
+			}
 		} else {
 			values = append(values, val)
 		}
@@ -826,11 +865,17 @@ func StartExtractScheduler() {
 	go func() {
 		for {
 			now := time.Now()
-			// 等到下一分钟整点再开始，避免启动时立即触发
 			next := now.Truncate(time.Minute).Add(time.Minute)
 			time.Sleep(time.Until(next))
 
-			runScheduledExtracts()
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						log.Printf("[scheduler] extract scheduler panic recovered: %v", r)
+					}
+				}()
+				runScheduledExtracts()
+			}()
 		}
 	}()
 }
@@ -841,29 +886,59 @@ func runScheduledExtracts() {
 	}
 
 	var datasets []models.Dataset
-	if err := database.DB.Where("type = ? AND extract_schedule IS NOT NULL AND extract_schedule::text != '{}'", models.DatasetTypeExtract).Find(&datasets).Error; err != nil {
+	if err := database.DB.Where("type = ?", models.DatasetTypeExtract).Find(&datasets).Error; err != nil {
+		log.Printf("[scheduler] failed to query extract datasets: %v", err)
 		return
 	}
 
-	loc, _ := time.LoadLocation("Asia/Shanghai")
+	loc, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		log.Printf("[scheduler] failed to load timezone Asia/Shanghai: %v, falling back to UTC", err)
+		loc = time.UTC
+	}
 	now := time.Now().In(loc)
 	currentTime := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())
+	currentWeekday := int(now.Weekday())
+	currentDay := now.Day()
 
 	for _, ds := range datasets {
+		if ds.ExtractSchedule == "" || ds.ExtractSchedule == "{}" || ds.ExtractSchedule == "null" {
+			continue
+		}
 		var schedule struct {
 			Frequency string `json:"frequency"`
 			Time      string `json:"time"`
+			Weekday   *int   `json:"weekday"`
+			Day       *int   `json:"day"`
 		}
 		if err := json.Unmarshal([]byte(ds.ExtractSchedule), &schedule); err != nil {
+			log.Printf("[scheduler] failed to parse schedule for dataset %s: %v (schedule=%q)", ds.ID, err, ds.ExtractSchedule)
 			continue
 		}
-		if schedule.Frequency != "daily" || schedule.Time != currentTime {
+		if schedule.Time != currentTime {
+			continue
+		}
+		switch schedule.Frequency {
+		case "daily":
+			// 每天到点就触发
+		case "weekly":
+			if schedule.Weekday == nil || *schedule.Weekday != currentWeekday {
+				continue
+			}
+		case "monthly":
+			if schedule.Day == nil || *schedule.Day != currentDay {
+				continue
+			}
+		default:
+			log.Printf("[scheduler] unknown frequency %q for dataset %s", schedule.Frequency, ds.ID)
 			continue
 		}
 		if ds.ExtractStatus == models.ExtractStatusRunning {
+			log.Printf("[scheduler] dataset %s is already running, skipping", ds.ID)
 			continue
 		}
 
+		log.Printf("[scheduler] triggering extract for dataset %s (%s) at %s", ds.ID, ds.Name, currentTime)
 		dataset := ds
 		database.DB.Model(&dataset).Updates(map[string]interface{}{
 			"extract_status": models.ExtractStatusRunning,

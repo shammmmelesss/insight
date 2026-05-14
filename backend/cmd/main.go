@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	_ "time/tzdata"
 
 	"github.com/gin-gonic/gin"
 	"data-analysis-platform/internal/api"

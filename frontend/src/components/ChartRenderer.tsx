@@ -2,6 +2,9 @@ import React, { useEffect, useRef } from 'react';
 
 // 图表类型
 type ChartType = 'crossTable' | 'bar' | 'line' | 'pie' | 'indicator' | 'dualAxis';
+
+const G2_COLORS = ['#1783FF', '#00C9C9', '#F0884D', '#D580FF', '#7863FF', '#60C42D', '#BD8F24', '#FF80CA', '#2491B3', '#17C76F'];
+const LINE_LEGEND_HEIGHT = 36;
 import {
   S2Options,
   PivotSheet,
@@ -44,6 +47,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   const chartInstanceRef = useRef<PivotSheet | Chart | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const lastWidthRef = useRef<number>(0);
+  const hiddenSeriesRef = useRef<Set<string>>(new Set());
+  const legendContainerRef = useRef<HTMLDivElement>(null);
+  const renderChartCallbackRef = useRef<() => void>(() => {});
 
   // 获取数据中的实际字段名（支持聚合后的字段名，如 col3_计数, col3_求和 等）
   const getActualField = (field: string, dataFields: string[]): string => {
@@ -98,7 +104,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   };
 
   // 创建并渲染G2图表的公共函数
-  const createAndRenderG2Chart = (chartConfig: (chart: Chart) => void) => {
+  const createAndRenderG2Chart = (chartConfig: (chart: Chart) => void, legendHeight = 0) => {
     if (!chartRef.current) return;
 
     let defaultHeight = 300;
@@ -106,8 +112,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       defaultHeight = 120;
     }
 
-    chartRef.current.style.height = containerHeight ? `${containerHeight}px` : '100%';
-    const detectedHeight = containerHeight || chartRef.current.clientHeight;
+    const adjustedContainerHeight = containerHeight ? containerHeight - legendHeight : undefined;
+    chartRef.current.style.height = adjustedContainerHeight ? `${adjustedContainerHeight}px` : '100%';
+    const detectedHeight = adjustedContainerHeight || Math.max(chartRef.current.clientHeight - legendHeight, 0);
     const actualHeight = detectedHeight > 80 ? detectedHeight : defaultHeight;
     chartRef.current.style.height = `${actualHeight}px`;
 
@@ -119,6 +126,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       insetBottom: 10,
     });
 
+    chart.interaction('tooltip', { enterable: true });
     chartConfig(chart);
     chart.render();
     chartInstanceRef.current = chart;
@@ -144,6 +152,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     try {
       // 清理之前的内容
       chartRef.current.innerHTML = '';
+      if (legendContainerRef.current) legendContainerRef.current.innerHTML = '';
       
       // 直接根据图表类型调用对应的渲染函数
       if (chartType === 'crossTable') {
@@ -168,6 +177,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   };
 
   useEffect(() => {
+    hiddenSeriesRef.current = new Set();
     renderChart();
     if (chartRef.current) {
       lastWidthRef.current = chartRef.current.clientWidth;
@@ -478,17 +488,30 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       // 单Y轴：保持原有逻辑
       const actualYField = actualYFields[0];
 
-      const cleanedData = chartData.map(item => ({
+      const baseCleanedData = chartData.map(item => ({
         ...item,
         [actualYField]: Number(item[actualYField]) || 0,
       })).filter(item => !isNaN(item[actualYField]));
 
-      if (cleanedData.length === 0) {
+      if (baseCleanedData.length === 0) {
         if (chartRef.current) {
           chartRef.current.innerHTML = '<div style="text-align:center; color:#999; padding:20px;">Y轴字段无有效数值</div>';
         }
         return;
       }
+
+      // 计算分组系列信息（用于自定义图例）
+      let seriesItems: Array<{ name: string; color: string }> = [];
+      let cleanedData = baseCleanedData;
+      if (actualGroupField) {
+        const uniqueGroups = [...new Set(baseCleanedData.map(item => String(item[actualGroupField] ?? '')))].filter(g => g !== '');
+        seriesItems = uniqueGroups.map((name, i) => ({ name, color: G2_COLORS[i % G2_COLORS.length] }));
+        if (hiddenSeriesRef.current.size > 0) {
+          cleanedData = baseCleanedData.filter(item => !hiddenSeriesRef.current.has(String(item[actualGroupField] ?? '')));
+        }
+      }
+
+      const hasLegend = actualGroupField && seriesItems.length > 0;
 
       createAndRenderG2Chart((chart) => {
         chart.axis('x', xAxisConfig);
@@ -511,6 +534,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
         if (actualGroupField) {
           area.encode('color', actualGroupField);
+          area.scale('color', { range: G2_COLORS });
         }
 
         const line = chart
@@ -533,17 +557,23 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
         if (actualGroupField) {
           line.encode('color', actualGroupField);
+          line.scale('color', { range: G2_COLORS });
         }
 
-        chart.legend('color', { position: 'bottom', layout: { justifyContent: 'center' } });
-      });
+        chart.legend(false);
+      }, hasLegend ? LINE_LEGEND_HEIGHT : 0);
+
+      if (hasLegend) renderCustomLegend(seriesItems);
     } else {
       // 多Y轴：将宽格式数据转换为长格式
+      const multiSeriesItems = actualYFields.map((f, i) => ({ name: getFieldLabel(f), color: G2_COLORS[i % G2_COLORS.length] }));
+      const visibleMetrics = new Set(multiSeriesItems.filter(s => !hiddenSeriesRef.current.has(s.name)).map(s => s.name));
+
       const longData: any[] = [];
       chartData.forEach(item => {
         actualYFields.forEach(yField => {
           const value = Number(item[yField]) || 0;
-          if (!isNaN(value)) {
+          if (!isNaN(value) && visibleMetrics.has(getFieldLabel(yField))) {
             longData.push({
               ...item,
               _metric: getFieldLabel(yField),
@@ -587,6 +617,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .encode('y', '_value')
           .encode('color', '_metric')
           .encode('shape', 'smooth')
+          .scale('color', { range: G2_COLORS })
           .style({ lineWidth: 2 })
           .interaction('elementHighlight')
           .tooltip({
@@ -597,8 +628,10 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
             })),
           });
 
-        chart.legend('color', { position: 'bottom', layout: { justifyContent: 'center' } });
-      });
+        chart.legend(false);
+      }, LINE_LEGEND_HEIGHT);
+
+      renderCustomLegend(multiSeriesItems);
     }
   };
 
@@ -889,21 +922,83 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       </div>`;
   };
 
+  // 折线图自定义图例（含反选 icon）
+  const renderCustomLegend = (series: Array<{ name: string; color: string }>) => {
+    if (!legendContainerRef.current || series.length === 0) return;
+    const allNames = series.map(s => s.name);
+    const container = legendContainerRef.current;
+    container.innerHTML = '';
+    container.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:12px;padding:4px 12px;';
+
+    series.forEach(({ name, color }) => {
+      const isHidden = hiddenSeriesRef.current.has(name);
+      const isSolo = !isHidden && hiddenSeriesRef.current.size > 0;
+
+      const item = document.createElement('div');
+      item.style.cssText = `display:flex;align-items:center;gap:4px;cursor:pointer;opacity:${isHidden ? 0.35 : 1};user-select:none;transition:opacity 0.15s;`;
+
+      const dot = document.createElement('span');
+      dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;`;
+
+      const label = document.createElement('span');
+      label.style.cssText = 'font-size:12px;color:#595959;';
+      label.textContent = name;
+
+      const soloBtn = document.createElement('span');
+      soloBtn.title = '仅显示此项';
+      soloBtn.style.cssText = `display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;cursor:pointer;color:${isSolo ? '#1783FF' : '#bfbfbf'};transition:color 0.15s;flex-shrink:0;`;
+      soloBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.5"/><circle cx="6" cy="6" r="2" fill="currentColor"/></svg>`;
+
+      soloBtn.addEventListener('mouseenter', () => { soloBtn.style.color = '#1783FF'; });
+      soloBtn.addEventListener('mouseleave', () => { soloBtn.style.color = (hiddenSeriesRef.current.size > 0 && !hiddenSeriesRef.current.has(name)) ? '#1783FF' : '#bfbfbf'; });
+
+      soloBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const hidden = hiddenSeriesRef.current;
+        if (hidden.size === allNames.length - 1 && !hidden.has(name)) {
+          hiddenSeriesRef.current = new Set();
+        } else {
+          hiddenSeriesRef.current = new Set(allNames.filter(n => n !== name));
+        }
+        renderChartCallbackRef.current();
+      });
+
+      item.addEventListener('click', () => {
+        const hidden = hiddenSeriesRef.current;
+        const newHidden = new Set(hidden);
+        if (newHidden.has(name)) {
+          newHidden.delete(name);
+        } else {
+          if (allNames.filter(n => !hidden.has(n)).length <= 1) return;
+          newHidden.add(name);
+        }
+        hiddenSeriesRef.current = newHidden;
+        renderChartCallbackRef.current();
+      });
+
+      item.appendChild(dot);
+      item.appendChild(label);
+      item.appendChild(soloBtn);
+      container.appendChild(item);
+    });
+  };
+
   // 渲染默认内容
   const renderDefault = () => {
     if (!chartRef.current) return;
     chartRef.current.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #999;">请先选择数据集</div>';
   };
 
+  renderChartCallbackRef.current = renderChart;
+
   return (
-    <div
-      ref={chartRef}
-      style={{
-        width: '100%',
-        height: '100%',
-        overflow: 'visible',
-      }}
-    />
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'visible' }}>
+      <div
+        ref={chartRef}
+        style={{ flex: 1, minHeight: 0, overflow: 'visible' }}
+      />
+      <div ref={legendContainerRef} style={{ flexShrink: 0 }} />
+    </div>
   );
 };
 

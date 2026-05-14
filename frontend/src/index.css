@@ -39,3 +39,13 @@ code {
 ::-webkit-scrollbar-thumb:hover {
   background: #bfbfbf;
 }
+
+.g2-tooltip-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.g2-tooltip {
+  user-select: text;
+  transition: left 300ms ease-out, top 300ms ease-out !important;
+}

@@ -384,7 +384,7 @@ func GetChartData(c *gin.Context) {
 				}
 			} else if floatVal, ok := val.(float64); ok {
 				row[colName] = safeFloat(floatVal)
-			} else if t, ok := val.(time.Time); ok {
+			} else if t, ok := toTime(val); ok {
 				dbTypeName := strings.ToUpper(columnTypes[i].DatabaseTypeName())
 				if strings.Contains(dbTypeName, "DATETIME") || strings.Contains(dbTypeName, "TIMESTAMP") {
 					row[colName] = t.Format("2006-01-02 15:04:05")
@@ -514,7 +514,7 @@ func PreviewChartData(c *gin.Context) {
 				}
 			} else if floatVal, ok := val.(float64); ok {
 				row[colName] = safeFloat(floatVal)
-			} else if t, ok := val.(time.Time); ok {
+			} else if t, ok := toTime(val); ok {
 				dbTypeName := strings.ToUpper(columnTypes[i].DatabaseTypeName())
 				if strings.Contains(dbTypeName, "DATETIME") || strings.Contains(dbTypeName, "TIMESTAMP") {
 					row[colName] = t.Format("2006-01-02 15:04:05")
@@ -808,6 +808,17 @@ func truncateISODatetime(v string) string {
 		return v[:10]
 	}
 	return v
+}
+
+// toTime 兼容 time.Time 和 *time.Time（BigQuery 驱动返回指针类型）
+func toTime(val interface{}) (time.Time, bool) {
+	if t, ok := val.(time.Time); ok {
+		return t, true
+	}
+	if tp, ok := val.(*time.Time); ok && tp != nil {
+		return *tp, true
+	}
+	return time.Time{}, false
 }
 
 // safeFloat 将 NaN/Inf 替换为 nil，避免 JSON 序列化失败

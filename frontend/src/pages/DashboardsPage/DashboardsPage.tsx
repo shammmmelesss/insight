@@ -77,6 +77,8 @@ const DashboardsPage: React.FC = () => {
   const visibleChartIds = useRef<Set<string>>(new Set());
   const [filters, setFilters] = useState<FilterField[]>([]);
   const [filterValues, setFilterValues] = useState<Record<string, unknown>>({});
+  const filtersRef = useRef<FilterField[]>([]);
+  const filterValuesRef = useRef<Record<string, unknown>>({});
   const [datePickerOpen, setDatePickerOpen] = useState<Record<string, boolean>>({});
   const [filterFieldOptions, setFilterFieldOptions] = useState<Record<string, unknown[]>>({});
   const [datasetFieldTypes, setDatasetFieldTypes] = useState<Record<string, string>>({});
@@ -263,11 +265,11 @@ const DashboardsPage: React.FC = () => {
     setChartLoadingMap(prev => ({ ...prev, [chartId]: false }));
   };
 
-  const handleChartEnter = (chartId: string, activeFilters: FilterField[], activeValues: Record<string, unknown>) => {
+  const handleChartEnter = (chartId: string) => {
     visibleChartIds.current.add(chartId);
     if (!loadedChartIds.current.has(chartId)) {
       loadedChartIds.current.add(chartId);
-      const fp = buildFilterParamsForChart(chartId, activeFilters, activeValues);
+      const fp = buildFilterParamsForChart(chartId, filtersRef.current, filterValuesRef.current);
       loadSingleChart(chartId, fp.length > 0 ? fp : undefined);
     }
   };
@@ -295,6 +297,7 @@ const DashboardsPage: React.FC = () => {
     setParsedLayout(layout);
 
     const savedFilters = parseFilters(selectedDashboard.filters);
+    filtersRef.current = savedFilters;
     setFilters(savedFilters);
 
     const initialValues: Record<string, unknown> = {};
@@ -306,6 +309,7 @@ const DashboardsPage: React.FC = () => {
         initialValues[f.id] = f.defaultValue;
       }
     });
+    filterValuesRef.current = initialValues;
     setFilterValues(initialValues);
 
     savedFilters.forEach(f => {
@@ -322,6 +326,7 @@ const DashboardsPage: React.FC = () => {
   };
 
   useEffect(() => {
+    filterValuesRef.current = filterValues;
     if (filters.length === 0) return;
     // 清除已加载标记，让图表在下次可见时重新加载
     loadedChartIds.current.clear();
@@ -529,7 +534,7 @@ const DashboardsPage: React.FC = () => {
                 <LazyChartCard
                   key={item.chartId}
                   style={{ gridColumn: isLarge ? 'span 2' : 'span 1' }}
-                  onEnter={() => handleChartEnter(item.chartId, filters, filterValues)}
+                  onEnter={() => handleChartEnter(item.chartId)}
                   onExit={() => handleChartExit(item.chartId)}
                 >
                   <Card

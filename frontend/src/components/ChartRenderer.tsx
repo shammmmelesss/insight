@@ -119,6 +119,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       insetBottom: 10,
     });
 
+    chart.interaction('tooltip', { mount: 'body' });
     chartConfig(chart);
     chart.render();
     chartInstanceRef.current = chart;

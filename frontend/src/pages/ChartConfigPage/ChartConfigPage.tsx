@@ -380,25 +380,31 @@ const ChartConfigPage: React.FC = () => {
   const generateSQL = useCallback(() => {
     if (!datasetSQL) return `SELECT * FROM ${selectedDataset || 'your_table'}`;
 
+    // 计算字段用表达式，普通字段用字段名
+    const fieldExpr = (f: FieldConfig) => (f.isCalculated && f.expression) ? f.expression : f.originalName;
+    const fieldSelect = (f: FieldConfig) =>
+      (f.isCalculated && f.expression) ? `${f.expression} AS ${f.originalName}` : f.originalName;
+
     const filterClauses = filterFields
       .map(f => {
         const filterType = f.config?.filterType || 'multiple';
         const vals = filterValues[f.originalName];
         if (!vals) return null;
+        const expr = fieldExpr(f);
         if (filterType === 'dateRange') {
           if (vals && typeof vals === 'object' && 'startType' in vals) {
             const [s, e] = resolveDateRangeValue(vals as DateRangeFilterValue);
-            return `${f.originalName} BETWEEN '${s.format('YYYY-MM-DD')}' AND '${e.format('YYYY-MM-DD')}'`;
+            return `${expr} BETWEEN '${s.format('YYYY-MM-DD')}' AND '${e.format('YYYY-MM-DD')}'`;
           }
           if (Array.isArray(vals) && vals.length === 2 && vals[0] && vals[1]) {
-            return `${f.originalName} BETWEEN '${vals[0]}' AND '${vals[1]}'`;
+            return `${expr} BETWEEN '${vals[0]}' AND '${vals[1]}'`;
           }
           return null;
         }
         const arr: string[] = Array.isArray(vals) ? vals : (vals !== '' ? [String(vals)] : []);
         if (arr.length === 0) return null;
         const quoted = arr.map((v: string) => `'${v.replace(/'/g, "''")}'`).join(', ');
-        return `${f.originalName} IN (${quoted})`;
+        return `${expr} IN (${quoted})`;
       })
       .filter((c): c is string => c !== null);
 
@@ -418,27 +424,37 @@ const ChartConfigPage: React.FC = () => {
     const sortDir = (f: FieldConfig) => f.config?.sort === '降序' ? 'DESC' : 'ASC';
 
     if (chartType === 'crossTable') {
-      const rows = rowFields.map(f => f.originalName);
-      const cols = colFields.map(f => f.originalName);
+      const rows = rowFields.map(fieldSelect);
+      const cols = colFields.map(fieldSelect);
       return wrap(
         [...rows, ...cols],
         measureFields.map(buildAggField),
-        [...rows, ...cols],
-        rowFields.map(f => `${f.originalName} ${sortDir(f)}`),
+        [...rowFields.map(fieldExpr), ...colFields.map(fieldExpr)],
+        rowFields.map(f => `${fieldExpr(f)} ${sortDir(f)}`),
       );
     }
     if (chartType === 'bar' || chartType === 'line') {
-      const xs = xAxisFields.map(f => f.originalName);
-      const gs = groupFields.map(f => f.originalName);
-      return wrap([...xs, ...gs], yAxisFields.map(buildAggField), [...xs, ...gs], xAxisFields.map(f => `${f.originalName} ${sortDir(f)}`));
+      const xs = xAxisFields.map(fieldSelect);
+      const gs = groupFields.map(fieldSelect);
+      return wrap(
+        [...xs, ...gs],
+        yAxisFields.map(buildAggField),
+        [...xAxisFields.map(fieldExpr), ...groupFields.map(fieldExpr)],
+        xAxisFields.map(f => `${fieldExpr(f)} ${sortDir(f)}`),
+      );
     }
     if (chartType === 'dualAxis') {
-      const xs = xAxisFields.map(f => f.originalName);
-      return wrap(xs, [...yAxisFields.map(buildAggField), ...y2AxisFields.map(buildAggField)], xs, xAxisFields.map(f => `${f.originalName} ${sortDir(f)}`));
+      const xs = xAxisFields.map(fieldSelect);
+      return wrap(
+        xs,
+        [...yAxisFields.map(buildAggField), ...y2AxisFields.map(buildAggField)],
+        xAxisFields.map(fieldExpr),
+        xAxisFields.map(f => `${fieldExpr(f)} ${sortDir(f)}`),
+      );
     }
     if (chartType === 'pie') {
-      const gs = groupFields.map(f => f.originalName);
-      return wrap(gs, measureFields.map(buildAggField), gs, []);
+      const gs = groupFields.map(fieldSelect);
+      return wrap(gs, measureFields.map(buildAggField), groupFields.map(fieldExpr), []);
     }
     if (chartType === 'indicator') {
       const agg = indicatorFields.map(buildAggField);
@@ -674,6 +690,19 @@ const ChartConfigPage: React.FC = () => {
         return { ...f, displayName: edit.displayName ?? f.displayName, description: edit.description, config: edit.config ?? f.config };
       }));
     }
+    // 日期筛选：将 filterDefault 同步到 filterValues
+    if (currentAreaKey === 'filter') {
+      setFilterValues(prev => {
+        const next = { ...prev };
+        Object.entries(tempAreaFieldEdits).forEach(([name, edit]) => {
+          if (edit.config?.filterType === 'dateRange') {
+            const dv = edit.config.filterDefault;
+            next[name] = (dv && typeof dv === 'object' && 'startType' in dv) ? dv : DEFAULT_DATE_RANGE_VALUE;
+          }
+        });
+        return next;
+      });
+    }
     setIsAreaSettingsModalVisible(false);
   };
 
@@ -700,6 +729,13 @@ const ChartConfigPage: React.FC = () => {
       fieldSetters[area](prev =>
         prev.map(f => f.originalName === currentField.originalName ? { ...f, config: tempFieldConfig } : f)
       );
+    }
+    // 日期筛选：将 filterDefault 同步到 filterValues，确保预览立即生效
+    // （useEffect 只在 filterValues 中无该 key 时初始化，无法覆盖已有值）
+    if (area === 'filter' && tempFieldConfig.filterType === 'dateRange') {
+      const dv = tempFieldConfig.filterDefault;
+      const newVal = (dv && typeof dv === 'object' && 'startType' in dv) ? dv : DEFAULT_DATE_RANGE_VALUE;
+      setFilterValues(prev => ({ ...prev, [currentField.originalName]: newVal }));
     }
     setIsFieldSettingsModalVisible(false);
     setCurrentField(null);

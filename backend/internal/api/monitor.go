@@ -313,11 +313,7 @@ func TriggerMonitor(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	type resultRow struct {
-		Dimension string  `json:"dimension"`
-		Value     float64 `json:"value"`
-	}
-	var resultRows []resultRow
+	var resultRows []monitorResultRow
 	for rows.Next() {
 		var dimVal interface{}
 		var valRaw interface{}
@@ -341,97 +337,32 @@ func TriggerMonitor(c *gin.Context) {
 		default:
 			val, _ = strconv.ParseFloat(fmt.Sprintf("%v", v), 64)
 		}
-		resultRows = append(resultRows, resultRow{
+		resultRows = append(resultRows, monitorResultRow{
 			Dimension: fmt.Sprintf("%v", dimVal),
 			Value:     val,
 		})
 	}
 
 	triggered := len(resultRows) > 0
-
-	// 从 fieldsConfig 解析字段显示名
-	type fieldMeta struct {
-		OriginalName string `json:"originalName"`
-		DisplayName  string `json:"displayName"`
-	}
-	var fieldMetas []fieldMeta
-	if dataset.FieldsConfig != "" {
-		json.Unmarshal([]byte(dataset.FieldsConfig), &fieldMetas)
-	}
-	getDisplayName := func(original string) string {
-		for _, f := range fieldMetas {
-			if f.OriginalName == original && f.DisplayName != "" {
-				return f.DisplayName
-			}
-		}
-		return original
-	}
-	dimLabel := getDisplayName(monitor.DimensionField)
-	metricLabel := fmt.Sprintf("%s(%s)", aggFunc, getDisplayName(monitor.TriggerMetric))
-
 	notifyErrors := []string{}
 	if triggered {
-		title := fmt.Sprintf("⚠️ 监控告警：%s", monitor.Name)
-		// 构造通知内容（表格形式）
-		var lines []string
-		lines = append(lines, monitor.Name)
-		if monitor.DimensionField != "" {
-			lines = append(lines, fmt.Sprintf("%s | %s", dimLabel, metricLabel))
-		} else {
-			lines = append(lines, metricLabel)
-		}
-		for _, r := range resultRows {
-			if monitor.DimensionField != "" {
-				lines = append(lines, fmt.Sprintf("%s | %.4g", r.Dimension, r.Value))
-			} else {
-				lines = append(lines, fmt.Sprintf("%.4g", r.Value))
-			}
-		}
-		lines = append(lines, fmt.Sprintf("满足条件 %s %g，已触发告警", monitor.TriggerOperator, threshold))
-
-		var channels []string
-		json.Unmarshal([]byte(monitor.NotifyChannels), &channels)
-
-		useLarkUser := false
-		for _, ch := range channels {
-			if ch == "lark_user" {
-				useLarkUser = true
-				break
-			}
-		}
-
-		if useLarkUser {
-			var users []struct {
-				OpenID string `json:"openId"`
-				Name   string `json:"name"`
-			}
-			json.Unmarshal([]byte(monitor.NotifyLarkUsers), &users)
-			content := strings.Join(lines, "\n")
-			for _, u := range users {
-				if sendErr := SendLarkDirectMessage(u.OpenID, title, content); sendErr != nil {
-					notifyErrors = append(notifyErrors, fmt.Sprintf("lark_user(%s): %s", u.Name, sendErr.Error()))
-				}
-			}
-		} else {
-			if sendErr := SendLarkWebhookMessageWith(monitor.WebhookURL, monitor.WebhookSecret, title, lines); sendErr != nil {
-				notifyErrors = append(notifyErrors, "webhook: "+sendErr.Error())
-			}
-		}
+		notifyErrors = sendMonitorNotification(monitor, dataset, resultRows, aggFunc, threshold)
 	}
 
 	resultRowsJSON, _ := json.Marshal(resultRows)
 	notifyErrorsJSON, _ := json.Marshal(notifyErrors)
 	record := models.MonitorRecord{
-		MonitorID:    monitor.ID.String(),
-		CurrentValue: float64(len(resultRows)),
-		Threshold:    threshold,
-		Operator:     monitor.TriggerOperator,
-		AggFunc:      aggFunc,
-		Metric:       monitor.TriggerMetric,
-		Triggered:    triggered,
-		NotifyErrors: string(notifyErrorsJSON),
-		SQL:          querySQL,
-		ResultRows:   string(resultRowsJSON),
+		MonitorID:     monitor.ID.String(),
+		CurrentValue:  float64(len(resultRows)),
+		Threshold:     threshold,
+		Operator:      monitor.TriggerOperator,
+		AggFunc:       aggFunc,
+		Metric:        monitor.TriggerMetric,
+		Triggered:     triggered,
+		NotifySuccess: !triggered || len(notifyErrors) == 0,
+		NotifyErrors:  string(notifyErrorsJSON),
+		SQL:           querySQL,
+		ResultRows:    string(resultRowsJSON),
 	}
 	database.DB.Create(&record)
 
@@ -525,6 +456,8 @@ func runScheduledMonitors() {
 			}
 		}()
 	}
+
+	retryFailedNotifications()
 }
 
 // runMonitor 执行监控检查逻辑（与 TriggerMonitor HTTP 接口共用）
@@ -635,11 +568,7 @@ func runMonitor(monitor models.Monitor) error {
 	}
 	defer rows.Close()
 
-	type resultRow struct {
-		Dimension string  `json:"dimension"`
-		Value     float64 `json:"value"`
-	}
-	var resultRows []resultRow
+	var resultRows []monitorResultRow
 	for rows.Next() {
 		var dimVal interface{}
 		var valRaw interface{}
@@ -663,7 +592,7 @@ func runMonitor(monitor models.Monitor) error {
 		default:
 			val, _ = strconv.ParseFloat(fmt.Sprintf("%v", v), 64)
 		}
-		resultRows = append(resultRows, resultRow{
+		resultRows = append(resultRows, monitorResultRow{
 			Dimension: fmt.Sprintf("%v", dimVal),
 			Value:     val,
 		})
@@ -671,87 +600,24 @@ func runMonitor(monitor models.Monitor) error {
 
 	triggered := len(resultRows) > 0
 	notifyErrors := []string{}
-
 	if triggered {
-		type fieldMeta struct {
-			OriginalName string `json:"originalName"`
-			DisplayName  string `json:"displayName"`
-		}
-		var fieldMetas []fieldMeta
-		if dataset.FieldsConfig != "" {
-			json.Unmarshal([]byte(dataset.FieldsConfig), &fieldMetas)
-		}
-		getDisplayName := func(original string) string {
-			for _, f := range fieldMetas {
-				if f.OriginalName == original && f.DisplayName != "" {
-					return f.DisplayName
-				}
-			}
-			return original
-		}
-		dimLabel := getDisplayName(monitor.DimensionField)
-		metricLabel := fmt.Sprintf("%s(%s)", aggFunc, getDisplayName(monitor.TriggerMetric))
-
-		title := fmt.Sprintf("⚠️ 监控告警：%s", monitor.Name)
-		var lines []string
-		lines = append(lines, monitor.Name)
-		if monitor.DimensionField != "" {
-			lines = append(lines, fmt.Sprintf("%s | %s", dimLabel, metricLabel))
-		} else {
-			lines = append(lines, metricLabel)
-		}
-		for _, r := range resultRows {
-			if monitor.DimensionField != "" {
-				lines = append(lines, fmt.Sprintf("%s | %.4g", r.Dimension, r.Value))
-			} else {
-				lines = append(lines, fmt.Sprintf("%.4g", r.Value))
-			}
-		}
-		lines = append(lines, fmt.Sprintf("满足条件 %s %g，已触发告警", monitor.TriggerOperator, threshold))
-
-		var channels []string
-		json.Unmarshal([]byte(monitor.NotifyChannels), &channels)
-
-		useLarkUser := false
-		for _, ch := range channels {
-			if ch == "lark_user" {
-				useLarkUser = true
-				break
-			}
-		}
-
-		if useLarkUser {
-			var users []struct {
-				OpenID string `json:"openId"`
-				Name   string `json:"name"`
-			}
-			json.Unmarshal([]byte(monitor.NotifyLarkUsers), &users)
-			content := strings.Join(lines, "\n")
-			for _, u := range users {
-				if sendErr := SendLarkDirectMessage(u.OpenID, title, content); sendErr != nil {
-					notifyErrors = append(notifyErrors, fmt.Sprintf("lark_user(%s): %s", u.Name, sendErr.Error()))
-				}
-			}
-		} else {
-			if sendErr := SendLarkWebhookMessageWith(monitor.WebhookURL, monitor.WebhookSecret, title, lines); sendErr != nil {
-				notifyErrors = append(notifyErrors, "webhook: "+sendErr.Error())
-			}
-		}
+		notifyErrors = sendMonitorNotification(monitor, dataset, resultRows, aggFunc, threshold)
 	}
 
 	resultRowsJSON, _ := json.Marshal(resultRows)
 	notifyErrorsJSON, _ := json.Marshal(notifyErrors)
 	record := models.MonitorRecord{
-		MonitorID:    monitor.ID.String(),
-		CurrentValue: float64(len(resultRows)),
-		Threshold:    threshold,
-		Operator:     monitor.TriggerOperator,
-		AggFunc:      aggFunc,
-		Metric:       monitor.TriggerMetric,
-		Triggered:    triggered,
-		NotifyErrors: string(notifyErrorsJSON),
-		SQL:          querySQL,
-		ResultRows:   string(resultRowsJSON),
+		MonitorID:     monitor.ID.String(),
+		CurrentValue:  float64(len(resultRows)),
+		Threshold:     threshold,
+		Operator:      monitor.TriggerOperator,
+		AggFunc:       aggFunc,
+		Metric:        monitor.TriggerMetric,
+		Triggered:     triggered,
+		NotifySuccess: !triggered || len(notifyErrors) == 0,
+		NotifyErrors:  string(notifyErrorsJSON),
+		SQL:           querySQL,
+		ResultRows:    string(resultRowsJSON),
 	}
 	database.DB.Create(&record)
 
@@ -769,4 +635,118 @@ func replaceHyphens(s string) string {
 		}
 	}
 	return string(result)
+}
+
+type monitorResultRow struct {
+	Dimension string  `json:"dimension"`
+	Value     float64 `json:"value"`
+}
+
+// sendMonitorNotification 发送告警通知，返回失败错误列表（空表示全部成功）
+func sendMonitorNotification(monitor models.Monitor, dataset models.Dataset, resultRows []monitorResultRow, aggFunc string, threshold float64) []string {
+	type fieldMeta struct {
+		OriginalName string `json:"originalName"`
+		DisplayName  string `json:"displayName"`
+	}
+	var fieldMetas []fieldMeta
+	if dataset.FieldsConfig != "" {
+		json.Unmarshal([]byte(dataset.FieldsConfig), &fieldMetas)
+	}
+	getDisplayName := func(original string) string {
+		for _, f := range fieldMetas {
+			if f.OriginalName == original && f.DisplayName != "" {
+				return f.DisplayName
+			}
+		}
+		return original
+	}
+
+	dimLabel := getDisplayName(monitor.DimensionField)
+	metricLabel := fmt.Sprintf("%s(%s)", aggFunc, getDisplayName(monitor.TriggerMetric))
+	title := fmt.Sprintf("⚠️ 监控告警：%s", monitor.Name)
+
+	var lines []string
+	lines = append(lines, monitor.Name)
+	if monitor.DimensionField != "" {
+		lines = append(lines, fmt.Sprintf("%s | %s", dimLabel, metricLabel))
+	} else {
+		lines = append(lines, metricLabel)
+	}
+	for _, r := range resultRows {
+		if monitor.DimensionField != "" {
+			lines = append(lines, fmt.Sprintf("%s | %.4g", r.Dimension, r.Value))
+		} else {
+			lines = append(lines, fmt.Sprintf("%.4g", r.Value))
+		}
+	}
+	lines = append(lines, fmt.Sprintf("满足条件 %s %g，已触发告警", monitor.TriggerOperator, threshold))
+
+	var channels []string
+	json.Unmarshal([]byte(monitor.NotifyChannels), &channels)
+
+	useLarkUser := false
+	for _, ch := range channels {
+		if ch == "lark_user" {
+			useLarkUser = true
+			break
+		}
+	}
+
+	var notifyErrors []string
+	if useLarkUser {
+		var users []struct {
+			OpenID string `json:"openId"`
+			Name   string `json:"name"`
+		}
+		json.Unmarshal([]byte(monitor.NotifyLarkUsers), &users)
+		content := strings.Join(lines, "\n")
+		for _, u := range users {
+			if sendErr := SendLarkDirectMessage(u.OpenID, title, content); sendErr != nil {
+				notifyErrors = append(notifyErrors, fmt.Sprintf("lark_user(%s): %s", u.Name, sendErr.Error()))
+			}
+		}
+	} else {
+		if sendErr := SendLarkWebhookMessageWith(monitor.WebhookURL, monitor.WebhookSecret, title, lines); sendErr != nil {
+			notifyErrors = append(notifyErrors, "webhook: "+sendErr.Error())
+		}
+	}
+	return notifyErrors
+}
+
+// retryFailedNotifications 对之前发送失败的告警记录重新发送通知
+func retryFailedNotifications() {
+	var records []models.MonitorRecord
+	if err := database.DB.Where("triggered = true AND notify_success = false").
+		Order("created_at DESC").
+		Limit(50).
+		Find(&records).Error; err != nil {
+		return
+	}
+	for _, record := range records {
+		var monitor models.Monitor
+		if err := database.DB.First(&monitor, "id = ?", record.MonitorID).Error; err != nil {
+			// 监控已删除，停止重试
+			database.DB.Model(&record).Updates(map[string]interface{}{"notify_success": true, "notify_errors": "[]"})
+			continue
+		}
+		var dataset models.Dataset
+		if err := database.DB.First(&dataset, "id = ?", monitor.DatasetID).Error; err != nil {
+			continue
+		}
+		var rows []monitorResultRow
+		json.Unmarshal([]byte(record.ResultRows), &rows)
+
+		errs := sendMonitorNotification(monitor, dataset, rows, record.AggFunc, record.Threshold)
+		errJSON, _ := json.Marshal(errs)
+		if len(errs) == 0 {
+			database.DB.Model(&record).Updates(map[string]interface{}{
+				"notify_success": true,
+				"notify_errors":  "[]",
+			})
+			log.Printf("[monitor-retry] notification succeeded for record %s (monitor: %s)", record.ID, monitor.Name)
+		} else {
+			database.DB.Model(&record).Update("notify_errors", string(errJSON))
+			log.Printf("[monitor-retry] notification still failing for record %s: %v", record.ID, errs)
+		}
+	}
 }

@@ -149,6 +149,7 @@ type MonitorRecord struct {
 	AggFunc      string  `json:"aggFunc"`
 	Metric       string  `json:"metric"`
 	Triggered    bool    `json:"triggered"`
+	NotifySuccess bool   `json:"notifySuccess" gorm:"default:false"`
 	NotifyErrors string  `json:"notifyErrors" gorm:"type:jsonb;default:'[]'"`
 	SQL          string  `json:"sql" gorm:"type:text"`
 	ResultRows   string  `json:"resultRows" gorm:"type:text;default:'[]'"`

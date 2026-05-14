@@ -309,6 +309,7 @@ func GetChartData(c *gin.Context) {
 	}
 
 	// 抽取类型数据集使用 ClickHouse 表，直连类型使用原始数据源
+	dsCalcExprs := extractCalcFieldExprs(dataset.FieldsConfig)
 	var querySQL string
 	var db *sql.DB
 	var err error
@@ -323,14 +324,14 @@ func GetChartData(c *gin.Context) {
 		}
 		ckTable := "ds_" + strings.ReplaceAll(dataset.ID.String(), "-", "_")
 		ckSQL := fmt.Sprintf("SELECT * FROM insight.%s", ckTable)
-		querySQL, err = buildChartSQL(chart.Config, string(chart.Type), ckSQL, filterConditions)
+		querySQL, err = buildChartSQL(chart.Config, string(chart.Type), ckSQL, filterConditions, dsCalcExprs)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
 			return
 		}
 		db = database.ClickHouseDB
 	} else {
-		querySQL, err = buildChartSQL(chart.Config, string(chart.Type), dataset.SQL, filterConditions)
+		querySQL, err = buildChartSQL(chart.Config, string(chart.Type), dataset.SQL, filterConditions, dsCalcExprs)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
 			return
@@ -440,6 +441,7 @@ func PreviewChartData(c *gin.Context) {
 		return
 	}
 
+	dsCalcExprs := extractCalcFieldExprs(dataset.FieldsConfig)
 	var querySQL string
 	var db *sql.DB
 	var err error
@@ -454,14 +456,14 @@ func PreviewChartData(c *gin.Context) {
 		}
 		ckTable := "ds_" + strings.ReplaceAll(dataset.ID.String(), "-", "_")
 		ckSQL := fmt.Sprintf("SELECT * FROM insight.%s", ckTable)
-		querySQL, err = buildChartSQL(body.Config, body.Type, ckSQL, nil)
+		querySQL, err = buildChartSQL(body.Config, body.Type, ckSQL, nil, dsCalcExprs)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
 			return
 		}
 		db = database.ClickHouseDB
 	} else {
-		querySQL, err = buildChartSQL(body.Config, body.Type, dataset.SQL, nil)
+		querySQL, err = buildChartSQL(body.Config, body.Type, dataset.SQL, nil, dsCalcExprs)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
 			return
@@ -536,6 +538,51 @@ func PreviewChartData(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"data": resultData, "sql": querySQL})
 }
 
+// dateRangeFilterValue 前端 DateRangeFilterPicker 保存的筛选值结构
+type dateRangeFilterValue struct {
+	StartType    string          `json:"startType"`    // "dynamic" | "static"
+	StartDynamic int             `json:"startDynamic"` // 距今天 N 天前（dynamic 时使用）
+	StartStatic  json.RawMessage `json:"startStatic"`  // ISO 日期字符串 或 null（static 时使用）
+	EndType      string          `json:"endType"`
+	EndDynamic   int             `json:"endDynamic"`
+	EndStatic    json.RawMessage `json:"endStatic"`
+}
+
+// resolveDateRangeFilterVal 将 dateRangeFilterValue 解析为 YYYY-MM-DD 格式的起止日期
+func resolveDateRangeFilterVal(drv dateRangeFilterValue) (string, string, error) {
+	today := time.Now()
+	parseStaticDate := func(raw json.RawMessage) (time.Time, error) {
+		var s string
+		if err := json.Unmarshal(raw, &s); err != nil {
+			return time.Time{}, err
+		}
+		if t, err := time.Parse(time.RFC3339, s); err == nil {
+			return t, nil
+		}
+		return time.Parse("2006-01-02", s)
+	}
+	var start, end time.Time
+	if drv.StartType == "static" {
+		t, err := parseStaticDate(drv.StartStatic)
+		if err != nil {
+			return "", "", err
+		}
+		start = t
+	} else {
+		start = today.AddDate(0, 0, -drv.StartDynamic)
+	}
+	if drv.EndType == "static" {
+		t, err := parseStaticDate(drv.EndStatic)
+		if err != nil {
+			return "", "", err
+		}
+		end = t
+	} else {
+		end = today.AddDate(0, 0, -drv.EndDynamic)
+	}
+	return start.Format("2006-01-02"), end.Format("2006-01-02"), nil
+}
+
 // FilterCondition 筛选条件
 type FilterCondition struct {
 	Field      string   `json:"field"`
@@ -548,14 +595,35 @@ type FilterCondition struct {
 // chartFilterFieldConfig 图表配置中的筛选字段
 type chartFilterFieldConfig struct {
 	OriginalName string `json:"originalName"`
+	IsCalculated bool   `json:"isCalculated"`
+	Expression   string `json:"expression"`
 	Config       *struct {
 		FilterType    string          `json:"filterType"`
 		FilterDefault json.RawMessage `json:"filterDefault"`
 	} `json:"config"`
 }
 
+// extractCalcFieldExprs 从数据集 FieldsConfig JSON 中提取计算字段的原始名称→表达式映射
+func extractCalcFieldExprs(fieldsConfigJSON string) map[string]string {
+	result := make(map[string]string)
+	var fieldsConfig []map[string]interface{}
+	if err := json.Unmarshal([]byte(fieldsConfigJSON), &fieldsConfig); err != nil {
+		return result
+	}
+	for _, field := range fieldsConfig {
+		origName, _ := field["originalName"].(string)
+		isCalc, _ := field["isCalculated"].(bool)
+		expr, _ := field["expression"].(string)
+		if origName != "" && isCalc && expr != "" {
+			result[origName] = expr
+		}
+	}
+	return result
+}
+
 // buildChartSQL 根据图表配置生成聚合SQL，带输入校验防止SQL注入
-func buildChartSQL(configJSON string, chartType string, datasetSQL string, filters []FilterCondition) (string, error) {
+// dsCalcExprs 是从数据集 FieldsConfig 提取的计算字段表达式映射，用于解析筛选中的计算字段
+func buildChartSQL(configJSON string, chartType string, datasetSQL string, filters []FilterCondition, dsCalcExprs map[string]string) (string, error) {
 	var config struct {
 		RowFields       []fieldConfig              `json:"rowFields"`
 		ColFields       []fieldConfig              `json:"colFields"`
@@ -574,7 +642,11 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 	}
 
 	// 收集所有维度字段的计算表达式，用于筛选条件中替换字段名
+	// 优先使用数据集 FieldsConfig 中的表达式（最权威），再用图表配置中维度字段的表达式
 	calcExprMap := make(map[string]string)
+	for name, expr := range dsCalcExprs {
+		calcExprMap[name] = expr
+	}
 	allDimFields := make([]fieldConfig, 0)
 	allDimFields = append(allDimFields, config.RowFields...)
 	allDimFields = append(allDimFields, config.ColFields...)
@@ -582,7 +654,9 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 	allDimFields = append(allDimFields, config.GroupFields...)
 	for _, f := range allDimFields {
 		if f.IsCalculated && f.Expression != "" && isValidExpression(f.Expression) {
-			calcExprMap[f.OriginalName] = f.Expression
+			if _, exists := calcExprMap[f.OriginalName]; !exists {
+				calcExprMap[f.OriginalName] = f.Expression
+			}
 		}
 	}
 
@@ -612,6 +686,30 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 		if ff.Config != nil && ff.Config.FilterType != "" {
 			filterType = ff.Config.FilterType
 		}
+
+		// 日期区间：尝试解析 DateRangeFilterValue 对象（前端动态/静态日期范围）
+		if filterType == "dateRange" {
+			var drv dateRangeFilterValue
+			if err := json.Unmarshal(rawVal, &drv); err == nil && drv.StartType != "" {
+				start, end, err := resolveDateRangeFilterVal(drv)
+				if err == nil && start != "" && end != "" {
+					fc := FilterCondition{
+						Field:    ff.OriginalName,
+						Type:     "dateRange",
+						DataType: "text",
+						Values:   []string{start, end},
+					}
+					if ff.IsCalculated && ff.Expression != "" && isValidExpression(ff.Expression) {
+						fc.Expression = ff.Expression
+					} else {
+						fc = resolveFilterExpr(fc)
+					}
+					chartFilters = append(chartFilters, fc)
+				}
+				continue
+			}
+		}
+
 		var values []string
 		var arr []interface{}
 		if err := json.Unmarshal(rawVal, &arr); err == nil {
@@ -629,12 +727,19 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 		if len(values) == 0 {
 			continue
 		}
-		chartFilters = append(chartFilters, resolveFilterExpr(FilterCondition{
+		fc := FilterCondition{
 			Field:    ff.OriginalName,
 			Type:     filterType,
 			DataType: "text",
 			Values:   values,
-		}))
+		}
+		// 计算字段：优先使用 filterField 自身存储的表达式，其次查 calcExprMap
+		if ff.IsCalculated && ff.Expression != "" && isValidExpression(ff.Expression) {
+			fc.Expression = ff.Expression
+		} else {
+			fc = resolveFilterExpr(fc)
+		}
+		chartFilters = append(chartFilters, fc)
 	}
 
 	// 构建内层 SQL：数据集 + 图表级筛选

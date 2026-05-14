@@ -470,6 +470,24 @@ export interface MonitorRequest {
 /** 监控列表响应 */
 export type MonitorListResponse = PaginationResult<Monitor>;
 
+/** 告警执行记录 */
+export interface MonitorRecord {
+  id: string;
+  monitorId: string;
+  currentValue: number;
+  threshold: number;
+  operator: string;
+  aggFunc: string;
+  metric: string;
+  triggered: boolean;
+  notifySuccess: boolean;
+  notifyErrors: string[] | string;
+  sql: string;
+  resultRows: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ==================== 通用响应 ====================
 
 /** 通用成功响应 */

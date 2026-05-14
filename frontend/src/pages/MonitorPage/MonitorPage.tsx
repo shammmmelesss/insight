@@ -6,7 +6,7 @@ import axios from 'axios';
 import dayjs from 'dayjs';
 import {
   Monitor, MonitorOperator, MonitorScheduleFrequency,
-  DatasetOption, FieldConfig, LarkUser,
+  DatasetOption, FieldConfig, LarkUser, MonitorRecord,
 } from '@shared/api.interface';
 
 const formatDateTime = (val: string) => {
@@ -49,7 +49,7 @@ const MonitorPage: React.FC = () => {
   const [larkUserOptions, setLarkUserOptions] = useState<LarkUser[]>([]);
   const [larkUserSearching, setLarkUserSearching] = useState(false);
   const [historyVisible, setHistoryVisible] = useState(false);
-  const [historyRecords, setHistoryRecords] = useState<any[]>([]);
+  const [historyRecords, setHistoryRecords] = useState<MonitorRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [triggering, setTriggering] = useState(false);
   const [triggerResult, setTriggerResult] = useState<{ triggered: boolean; rows: { dimension: string; value: number }[]; threshold: number; operator: string; metric: string; aggFunc: string; sql: string; notifyErrors?: string[] } | null>(null);
@@ -518,6 +518,24 @@ const MonitorPage: React.FC = () => {
               render: (v: boolean) => v
                 ? <span style={{ color: '#ff4d4f' }}>已触发</span>
                 : <span style={{ color: '#52c41a' }}>未触发</span>,
+            },
+            {
+              title: '通知状态',
+              key: 'notifyStatus',
+              render: (_: unknown, r: MonitorRecord) => {
+                if (!r.triggered) return <span style={{ color: '#bfbfbf' }}>-</span>;
+                const errors = parseJson<string[]>(r.notifyErrors, []);
+                if (r.notifySuccess) {
+                  return <span style={{ color: '#52c41a' }}><CheckCircleOutlined /> 已发送</span>;
+                }
+                return (
+                  <Tooltip title={<pre style={{ margin: 0, whiteSpace: 'pre-wrap', maxWidth: 360 }}>{errors.join('\n')}</pre>}>
+                    <span style={{ color: '#ff4d4f', cursor: 'pointer' }}>
+                      <CloseCircleOutlined /> 发送失败
+                    </span>
+                  </Tooltip>
+                );
+              },
             },
             { title: '指标', dataIndex: 'metric', key: 'metric' },
             { title: '聚合', dataIndex: 'aggFunc', key: 'aggFunc' },

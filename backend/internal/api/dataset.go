@@ -426,7 +426,7 @@ func GetDatasetFieldValues(c *gin.Context) {
 			}
 			isCalc, _ := field["isCalculated"].(bool)
 			expr, _ := field["expression"].(string)
-			if isCalc && expr != "" && isValidExpression(expr) {
+			if isCalc && expr != "" {
 				queryExpr = expr
 			}
 			break

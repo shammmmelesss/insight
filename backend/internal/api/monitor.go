@@ -479,7 +479,7 @@ func StartMonitorScheduler() {
 
 func runScheduledMonitors() {
 	var monitors []models.Monitor
-	if err := database.DB.Where("trigger_schedule != '' AND trigger_schedule != '{}'").Find(&monitors).Error; err != nil {
+	if err := database.DB.Where("trigger_schedule IS NOT NULL AND trigger_schedule::text != '{}'").Find(&monitors).Error; err != nil {
 		return
 	}
 

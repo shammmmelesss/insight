@@ -323,7 +323,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
       createAndRenderG2Chart((chart) => {
         chart.axis('x', xAxisConfig);
-        chart.axis(actualYField, {
+        chart.axis('y', {
           title: { text: getFieldLabel(actualYField), style: { fontSize: 12 } },
           labelFormatter: (v: any) => formatValue(v, yFormatLookup[actualYField], true),
         });
@@ -388,7 +388,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
       createAndRenderG2Chart((chart) => {
         chart.axis('x', xAxisConfig);
-        chart.axis('_value', {
+        chart.axis('y', {
           title: { text: '值', style: { fontSize: 12 } },
           labelFormatter: (v: any) => formatAxisValue(v),
         });
@@ -493,7 +493,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
       createAndRenderG2Chart((chart) => {
         chart.axis('x', xAxisConfig);
-        chart.axis(actualYField, {
+        chart.axis('y', {
           title: { text: getFieldLabel(actualYField), style: { fontSize: 12 } },
           labelFormatter: (v: any) => formatValue(v, yFormatLookup[actualYField], true),
         });
@@ -573,7 +573,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
       createAndRenderG2Chart((chart) => {
         chart.axis('x', xAxisConfig);
-        chart.axis('_value', {
+        chart.axis('y', {
           title: { text: '值', style: { fontSize: 12 } },
           labelFormatter: (v: any) => formatAxisValue(v),
         });

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"data-analysis-platform/internal/database"
 	"data-analysis-platform/internal/models"
@@ -383,6 +384,12 @@ func GetChartData(c *gin.Context) {
 				}
 			} else if floatVal, ok := val.(float64); ok {
 				row[colName] = safeFloat(floatVal)
+			} else if t, ok := val.(time.Time); ok {
+				if columnTypes[i].DatabaseTypeName() == "DATE" {
+					row[colName] = t.Format("2006-01-02")
+				} else {
+					row[colName] = t.Format("2006-01-02 15:04:05")
+				}
 			} else {
 				row[colName] = val
 			}
@@ -506,6 +513,12 @@ func PreviewChartData(c *gin.Context) {
 				}
 			} else if floatVal, ok := val.(float64); ok {
 				row[colName] = safeFloat(floatVal)
+			} else if t, ok := val.(time.Time); ok {
+				if columnTypes[i].DatabaseTypeName() == "DATE" {
+					row[colName] = t.Format("2006-01-02")
+				} else {
+					row[colName] = t.Format("2006-01-02 15:04:05")
+				}
 			} else {
 				row[colName] = val
 			}

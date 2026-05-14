@@ -7,7 +7,7 @@ import { Dashboard, ChartOption, FilterField, DashboardLayoutItem } from '@share
 import DashboardList from '../../components/DashboardList/DashboardList';
 import ChartRenderer from '../../components/ChartRenderer';
 import { dashboardCache } from '../../utils/dashboardCache';
-import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel, resolvedPresetName } from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
+import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel} from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
 
 const ROW_HEIGHT = 30;
 const GRID_MARGIN = 10;
@@ -77,6 +77,7 @@ const DashboardsPage: React.FC = () => {
   const visibleChartIds = useRef<Set<string>>(new Set());
   const [filters, setFilters] = useState<FilterField[]>([]);
   const [filterValues, setFilterValues] = useState<Record<string, unknown>>({});
+  const [datePickerOpen, setDatePickerOpen] = useState<Record<string, boolean>>({});
   const [filterFieldOptions, setFilterFieldOptions] = useState<Record<string, unknown[]>>({});
   const [datasetFieldTypes, setDatasetFieldTypes] = useState<Record<string, string>>({});
   const [siderCollapsed, setSiderCollapsed] = useState(false);
@@ -298,7 +299,12 @@ const DashboardsPage: React.FC = () => {
 
     const initialValues: Record<string, unknown> = {};
     savedFilters.forEach(f => {
-      initialValues[f.id] = f.type === 'dateRange' ? DEFAULT_DATE_RANGE_VALUE : f.defaultValue;
+      if (f.type === 'dateRange') {
+        const dv = f.defaultValue as DateRangeFilterValue | undefined;
+        initialValues[f.id] = dv?.startType ? dv : DEFAULT_DATE_RANGE_VALUE;
+      } else {
+        initialValues[f.id] = f.defaultValue;
+      }
     });
     setFilterValues(initialValues);
 
@@ -454,10 +460,16 @@ const DashboardsPage: React.FC = () => {
                   <Popover
                     trigger="click"
                     placement="bottomLeft"
+                    open={!!datePickerOpen[filter.id]}
+                    onOpenChange={open => setDatePickerOpen(prev => ({ ...prev, [filter.id]: open }))}
                     content={
                       <DateRangeFilterPicker
                         value={filterValues[filter.id] as DateRangeFilterValue | undefined}
-                        onChange={(val) => setFilterValues(prev => ({ ...prev, [filter.id]: val }))}
+                        onChange={(val) => {
+                          setFilterValues(prev => ({ ...prev, [filter.id]: val }));
+                          setDatePickerOpen(prev => ({ ...prev, [filter.id]: false }));
+                        }}
+                        onCancel={() => setDatePickerOpen(prev => ({ ...prev, [filter.id]: false }))}
                       />
                     }
                   >

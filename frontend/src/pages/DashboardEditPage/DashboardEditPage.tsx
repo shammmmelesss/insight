@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Button, Input, Layout, Space, Card, Modal, message, Spin, Dropdown, Tooltip, Select, Popover } from 'antd';
 import { ArrowLeftOutlined, SearchOutlined, EllipsisOutlined, CodeOutlined, SettingOutlined, CalendarOutlined } from '@ant-design/icons';
-import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel, resolvedPresetName } from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
+import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel} from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { dashboardCache } from '../../utils/dashboardCache';
@@ -110,8 +110,9 @@ const DashboardEditPage: React.FC = () => {
         } else if (Array.isArray(dashboardData.layout)) {
           layout = dashboardData.layout;
         }
-        setSelectedCharts(layout);
-        setRglLayout(toRGLLayout(layout));
+        const dedupedLayout = layout.filter((item, idx, arr) => arr.findIndex(a => a.chartId === item.chartId) === idx);
+        setSelectedCharts(dedupedLayout);
+        setRglLayout(toRGLLayout(dedupedLayout));
 
         let savedFilters: FilterField[] = [];
         if (typeof dashboardData.filters === 'string') {

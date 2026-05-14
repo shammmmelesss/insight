@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Layout, Form, Select, Radio, message } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Modal, Button, Layout, Form, Select, Radio, message, Popover } from 'antd';
+import { PlusOutlined, DeleteOutlined, CalendarOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { FilterField } from '@shared/api.interface';
-import DateRangeFilterPicker, { DateRangeFilterValue, resolvedRangeLabel } from '../DateRangeFilterPicker/DateRangeFilterPicker';
+import DateRangeFilterPicker, { DateRangeFilterValue, resolvedRangeLabel, DEFAULT_DATE_RANGE_VALUE } from '../DateRangeFilterPicker/DateRangeFilterPicker';
 
 const { Sider, Content } = Layout;
 const { Option } = Select;
@@ -305,7 +305,7 @@ const FilterConfigModal: React.FC<FilterConfigModalProps> = ({ visible, onCancel
               <Form.Item label="筛选器类型">
                 <Radio.Group
                   value={selectedField.type}
-                  onChange={(e) => updateField(selectedField.id, { type: e.target.value, defaultValue: e.target.value === 'dateRange' ? [] : [] })}
+                  onChange={(e) => updateField(selectedField.id, { type: e.target.value, defaultValue: e.target.value === 'dateRange' ? DEFAULT_DATE_RANGE_VALUE : [] })}
                 >
                   <Radio value="multiple">多选</Radio>
                   <Radio value="single">单选</Radio>
@@ -315,17 +315,10 @@ const FilterConfigModal: React.FC<FilterConfigModalProps> = ({ visible, onCancel
               
               <Form.Item label="筛选默认值">
                 {selectedField.type === 'dateRange' ? (
-                  <div style={{ marginTop: 4 }}>
-                    {selectedField.defaultValue?.startType && (
-                      <div style={{ fontSize: 12, color: '#595959', marginBottom: 6 }}>
-                        已选：{resolvedRangeLabel(selectedField.defaultValue as DateRangeFilterValue)}
-                      </div>
-                    )}
-                    <DateRangeFilterPicker
-                      value={selectedField.defaultValue?.startType ? selectedField.defaultValue as DateRangeFilterValue : undefined}
-                      onChange={(val) => updateField(selectedField.id, { defaultValue: val })}
-                    />
-                  </div>
+                  <DateRangePickerTrigger
+                    value={(selectedField.defaultValue as DateRangeFilterValue)?.startType ? selectedField.defaultValue as DateRangeFilterValue : DEFAULT_DATE_RANGE_VALUE}
+                    onChange={(val) => updateField(selectedField.id, { defaultValue: val })}
+                  />
                 ) : (
                   <Select
                     style={{ width: 200 }}
@@ -376,6 +369,53 @@ const FilterConfigModal: React.FC<FilterConfigModalProps> = ({ visible, onCancel
         </Button>
       </div>
     </Modal>
+  );
+};
+
+interface DateRangePickerTriggerProps {
+  value?: DateRangeFilterValue;
+  onChange: (val: DateRangeFilterValue) => void;
+}
+
+const DateRangePickerTrigger: React.FC<DateRangePickerTriggerProps> = ({ value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  const label = value?.startType ? resolvedRangeLabel(value) : '请选择日期范围';
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={setOpen}
+      trigger="click"
+      placement="bottomLeft"
+      overlayInnerStyle={{ padding: 0 }}
+      content={
+        <DateRangeFilterPicker
+          value={value}
+          onChange={(val) => { onChange(val); setOpen(false); }}
+          onCancel={() => setOpen(false)}
+        />
+      }
+    >
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '4px 10px',
+          border: '1px solid #d9d9d9',
+          borderRadius: 6,
+          cursor: 'pointer',
+          background: '#fff',
+          fontSize: 13,
+          color: value?.startType ? '#262626' : '#bfbfbf',
+          minWidth: 200,
+          userSelect: 'none',
+        }}
+      >
+        <CalendarOutlined style={{ color: '#8c8c8c', fontSize: 13 }} />
+        {label}
+      </div>
+    </Popover>
   );
 };
 

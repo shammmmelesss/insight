@@ -17,15 +17,22 @@ export interface DateRangeFilterValue {
   presetId?: string;
 }
 
+const toDayjs = (v: Dayjs | string | null | undefined, fallback: Dayjs): Dayjs => {
+  if (!v) return fallback;
+  if (dayjs.isDayjs(v)) return v;
+  const d = dayjs(v as string);
+  return d.isValid() ? d : fallback;
+};
+
 export function resolveDateRangeValue(value: DateRangeFilterValue): [Dayjs, Dayjs] {
   const start =
     value.startType === 'dynamic'
       ? dayjs().subtract(value.startDynamic, 'day').startOf('day')
-      : (value.startStatic ?? dayjs().startOf('day'));
+      : toDayjs(value.startStatic, dayjs().startOf('day'));
   const end =
     value.endType === 'dynamic'
       ? dayjs().subtract(value.endDynamic, 'day').endOf('day')
-      : (value.endStatic ?? dayjs().endOf('day'));
+      : toDayjs(value.endStatic, dayjs().endOf('day'));
   return [start, end];
 }
 
@@ -37,6 +44,7 @@ export function resolvedRangeLabel(value: DateRangeFilterValue): string {
 interface Props {
   value?: DateRangeFilterValue;
   onChange: (value: DateRangeFilterValue) => void;
+  onCancel?: () => void;
 }
 
 // Presets grouped in 2-column pairs
@@ -60,6 +68,10 @@ const PRESET_ROWS: { label: string; id: string; value: DateRangeFilterValue }[][
   [
     { label: '过去30天', id: 'past-30', value: { startType: 'dynamic', startDynamic: 30, startStatic: null, endType: 'dynamic', endDynamic: 1, endStatic: null, presetId: 'past-30' } },
     { label: '最近30天', id: 'last-30', value: { startType: 'dynamic', startDynamic: 29, startStatic: null, endType: 'dynamic', endDynamic: 0, endStatic: null, presetId: 'last-30' } },
+  ],
+  [
+    { label: '过去60天', id: 'past-60', value: { startType: 'dynamic', startDynamic: 60, startStatic: null, endType: 'dynamic', endDynamic: 1, endStatic: null, presetId: 'past-60' } },
+    { label: '最近60天', id: 'last-60', value: { startType: 'dynamic', startDynamic: 59, startStatic: null, endType: 'dynamic', endDynamic: 0, endStatic: null, presetId: 'last-60' } },
   ],
   [
     { label: '从某日至昨日', id: 'to-yesterday', value: { startType: 'static', startDynamic: 0, startStatic: null, endType: 'dynamic', endDynamic: 1, endStatic: null, presetId: 'to-yesterday' } },
@@ -86,18 +98,23 @@ const CAL_STYLE = `
 .drfp-cal .ant-picker-content td { padding: 1px 0 !important; }
 .drfp-cal .ant-picker-panel { background: transparent; }
 .drfp-cal .ant-picker-body { padding: 4px 6px !important; }
+.drfp-cal .ant-picker-content { width: 100% !important; table-layout: fixed !important; }
+.drfp-cal table { width: 100% !important; table-layout: fixed !important; }
 `;
 
-const DateRangeFilterPicker: React.FC<Props> = ({ value, onChange }) => {
+const DateRangeFilterPicker: React.FC<Props> = ({ value, onChange, onCancel }) => {
   const [draft, setDraft] = useState<DateRangeFilterValue>(() => value ?? DEFAULT_VALUE);
+  const [error, setError] = useState<string | null>(null);
 
-  const update = (patch: Partial<DateRangeFilterValue>) =>
+  const update = (patch: Partial<DateRangeFilterValue>) => {
+    setError(null);
     setDraft(prev => ({ ...prev, ...patch, presetId: undefined }));
+  };
 
   return (
     <ConfigProvider locale={zhCN}>
       <style>{CAL_STYLE}</style>
-      <div style={{ display: 'flex', background: '#fff', borderRadius: 8, overflow: 'hidden', width: 580 }}>
+      <div style={{ display: 'flex', background: '#fff', borderRadius: 8, overflow: 'hidden', width: 620 }}>
 
         {/* 左侧预设 */}
         <div style={{ width: 128, borderRight: '1px solid #f0f0f0', padding: '10px 8px', flexShrink: 0 }}>
@@ -107,7 +124,14 @@ const DateRangeFilterPicker: React.FC<Props> = ({ value, onChange }) => {
                 {row.map(p => (
                   <button
                     key={p.id}
-                    onClick={() => setDraft(p.value)}
+                    onClick={() => setDraft(prev => {
+                      const v = p.value;
+                      const [resolvedStart] = resolveDateRangeValue(prev);
+                      return {
+                        ...v,
+                        startStatic: v.startType === 'static' && v.startStatic == null ? resolvedStart.startOf('day') : v.startStatic,
+                      };
+                    })}
                     style={{
                       flex: 1,
                       padding: '3px 0',
@@ -136,7 +160,12 @@ const DateRangeFilterPicker: React.FC<Props> = ({ value, onChange }) => {
               type={draft.startType}
               dynamic={draft.startDynamic}
               staticDate={draft.startStatic}
-              onTypeChange={t => update({ startType: t })}
+              onTypeChange={t => update({
+                startType: t,
+                ...(t === 'static' && draft.startStatic == null
+                  ? { startStatic: dayjs().subtract(draft.startDynamic, 'day').startOf('day') }
+                  : {}),
+              })}
               onDynamicChange={n => update({ startDynamic: n })}
               onStaticChange={d => update({ startStatic: d })}
             />
@@ -145,15 +174,31 @@ const DateRangeFilterPicker: React.FC<Props> = ({ value, onChange }) => {
               type={draft.endType}
               dynamic={draft.endDynamic}
               staticDate={draft.endStatic}
-              onTypeChange={t => update({ endType: t })}
+              onTypeChange={t => update({
+                endType: t,
+                ...(t === 'static' && draft.endStatic == null
+                  ? { endStatic: dayjs().subtract(draft.endDynamic, 'day').startOf('day') }
+                  : {}),
+              })}
               onDynamicChange={n => update({ endDynamic: n })}
               onStaticChange={d => update({ endStatic: d })}
+              minStaticDate={draft.startType === 'static' ? (draft.startStatic ?? undefined) : undefined}
             />
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid #f0f0f0', paddingTop: 10, marginTop: 10 }}>
-            <Button size="small" onClick={() => onChange(value ?? DEFAULT_VALUE)}>取消</Button>
-            <Button size="small" type="primary" onClick={() => onChange(draft)}>应用</Button>
+          <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 10, marginTop: 10 }}>
+            {error && <div style={{ color: '#ff4d4f', fontSize: 11, marginBottom: 6, textAlign: 'right' }}>{error}</div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <Button size="small" onClick={() => { setError(null); onCancel ? onCancel() : onChange(value ?? DEFAULT_VALUE); }}>取消</Button>
+              <Button size="small" type="primary" onClick={() => {
+                const [start, end] = resolveDateRangeValue(draft);
+                if (end.isBefore(start, 'day')) {
+                  setError('结束时间不能早于开始时间');
+                  return;
+                }
+                onChange(draft);
+              }}>应用</Button>
+            </div>
           </div>
         </div>
       </div>
@@ -168,16 +213,19 @@ interface SidePanelProps {
   onTypeChange: (t: 'dynamic' | 'static') => void;
   onDynamicChange: (n: number) => void;
   onStaticChange: (d: Dayjs | null) => void;
+  minStaticDate?: Dayjs;
 }
 
 const SidePanel: React.FC<SidePanelProps> = ({
   type, dynamic, staticDate,
-  onTypeChange, onDynamicChange, onStaticChange,
+  onTypeChange, onDynamicChange, onStaticChange, minStaticDate,
 }) => {
   const selectedDate: Dayjs = type === 'dynamic'
     ? dayjs().subtract(dynamic ?? 0, 'day')
-    : (staticDate ?? dayjs());
-  const [panelDate, setPanelDate] = useState<Dayjs>(selectedDate);
+    : toDayjs(staticDate, dayjs());
+  const [panelDate, setPanelDate] = useState<Dayjs>(() =>
+    dayjs.isDayjs(selectedDate) ? selectedDate : dayjs()
+  );
 
   const cellRender: CalendarProps<Dayjs>['cellRender'] = (date, info) => {
     if (info.type !== 'date') return null;
@@ -255,9 +303,14 @@ const SidePanel: React.FC<SidePanelProps> = ({
         <Calendar
           fullscreen={false}
           value={panelDate}
-          onSelect={type === 'static' ? (d) => { onStaticChange(d); setPanelDate(d); } : undefined}
+          onSelect={type === 'static' ? (d) => {
+            if (minStaticDate && d.isBefore(minStaticDate, 'day')) return;
+            onStaticChange(d);
+            setPanelDate(d);
+          } : undefined}
           onPanelChange={(d) => setPanelDate(d)}
           cellRender={cellRender}
+          disabledDate={minStaticDate ? (d) => d.isBefore(minStaticDate, 'day') : undefined}
           style={{ pointerEvents: type === 'dynamic' ? 'none' : undefined, opacity: type === 'dynamic' ? 0.7 : 1 }}
           headerRender={({ value: hv, onChange: hOnChange }) => (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', borderBottom: '1px solid #f0f0f0' }}>

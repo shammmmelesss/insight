@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Button, Card, Modal, Layout, Skeleton, Select, Tooltip, Dropdown, Popover } from 'antd';
-import { EditOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined, InboxOutlined, PlusOutlined, CalendarOutlined } from '@ant-design/icons';
+import { EditOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined, InboxOutlined, PlusOutlined, CalendarOutlined, FilterOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { Dashboard, ChartOption, FilterField, DashboardLayoutItem } from '@shared/api.interface';
@@ -522,9 +522,28 @@ const DashboardsPage: React.FC = () => {
                 { key: 'sql', label: '查看SQL', icon: <CodeOutlined />, onClick: () => { setCurrentSQLChartId(item.chartId); setSqlModalVisible(true); } },
                 { key: 'edit', label: '编辑图表', onClick: () => navigate(`/chart-config?chartId=${item.chartId}`) },
               ];
+              const appliedFilters = filters.filter(f => f.charts.length === 0 || f.charts.includes(item.chartId));
               const cardTitle = (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 500, fontSize: 13, color: '#262626' }}>{chart?.name || `图表${index + 1}`}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
+                    <span style={{ fontWeight: 500, fontSize: 13, color: '#262626', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {chart?.name || `图表${index + 1}`}
+                    </span>
+                    {appliedFilters.length > 0 && (
+                      <Tooltip
+                        title={
+                          <div>
+                            <div style={{ marginBottom: 4, fontWeight: 500 }}>命中筛选器：</div>
+                            {appliedFilters.map(f => (
+                              <div key={f.id} style={{ fontSize: 12 }}>{f.name}（{f.field}）</div>
+                            ))}
+                          </div>
+                        }
+                      >
+                        <FilterOutlined style={{ fontSize: 12, color: '#1677ff', flexShrink: 0, cursor: 'default' }} />
+                      </Tooltip>
+                    )}
+                  </div>
                   <Dropdown menu={{ items: chartMenuItems }} trigger={['click']} placement="bottomRight">
                     <Button type="text" size="small" icon={<EllipsisOutlined style={{ fontSize: 13, color: '#8c8c8c' }} />} onClick={e => e.stopPropagation()} />
                   </Dropdown>

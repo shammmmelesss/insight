@@ -94,10 +94,10 @@ const CAL_STYLE = `
 .drfp-cal .ant-picker-calendar-date-value { display: none !important; }
 .drfp-cal .ant-picker-calendar-date-content { height: auto !important; overflow: visible !important; }
 .drfp-cal .ant-picker-cell-inner.ant-picker-calendar-date { padding: 1px 0 !important; min-height: 0 !important; background: transparent !important; border: none !important; }
-.drfp-cal .ant-picker-content th { font-size: 11px; color: #8c8c8c; padding: 2px 0; }
-.drfp-cal .ant-picker-content td { padding: 1px 0 !important; }
+.drfp-cal .ant-picker-content th { font-size: 11px; color: #8c8c8c; padding: 1px 0; }
+.drfp-cal .ant-picker-content td { padding: 0 !important; }
 .drfp-cal .ant-picker-panel { background: transparent; }
-.drfp-cal .ant-picker-body { padding: 4px 6px !important; }
+.drfp-cal .ant-picker-body { padding: 2px 6px !important; }
 .drfp-cal .ant-picker-content { width: 100% !important; table-layout: fixed !important; }
 .drfp-cal table { width: 100% !important; table-layout: fixed !important; }
 `;
@@ -114,7 +114,7 @@ const DateRangeFilterPicker: React.FC<Props> = ({ value, onChange, onCancel }) =
   return (
     <ConfigProvider locale={zhCN}>
       <style>{CAL_STYLE}</style>
-      <div style={{ display: 'flex', background: '#fff', borderRadius: 8, overflow: 'hidden', width: 620 }}>
+      <div style={{ display: 'flex', background: '#fff', borderRadius: 8, overflow: 'hidden', width: 620, maxWidth: 'calc(100vw - 16px)' }}>
 
         {/* 左侧预设 */}
         <div style={{ width: 128, borderRight: '1px solid #f0f0f0', padding: '10px 8px', flexShrink: 0 }}>
@@ -155,6 +155,37 @@ const DateRangeFilterPicker: React.FC<Props> = ({ value, onChange, onCancel }) =
 
         {/* 右侧：两列日历 */}
         <div style={{ flex: 1, padding: '10px 10px', display: 'flex', flexDirection: 'column' }}>
+
+          {/* 预览头 */}
+          {(() => {
+            const [ps, pe] = resolveDateRangeValue(draft);
+            const label = draft.presetId ? ALL_PRESETS.find(p => p.id === draft.presetId)?.label : null;
+            return (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                background: '#f5f7ff',
+                border: '1px solid #d4e0ff',
+                borderRadius: 6,
+                padding: '5px 10px',
+                marginBottom: 10,
+                fontSize: 12,
+                color: '#262626',
+                minHeight: 28,
+              }}>
+                {label && (
+                  <span style={{ color: '#165DFF', fontWeight: 600, marginRight: 4 }}>{label}</span>
+                )}
+                <span style={{ color: '#165DFF', fontWeight: 500 }}>{ps.format('YYYY/MM/DD')}</span>
+                <span style={{ color: '#8c8c8c', margin: '0 2px' }}>~</span>
+                <span style={{ color: '#165DFF', fontWeight: 500 }}>{pe.format('YYYY/MM/DD')}</span>
+                <span style={{ color: '#8c8c8c', fontSize: 11 }}>（{pe.diff(ps, 'day') + 1} 天）</span>
+              </div>
+            );
+          })()}
+
           <div style={{ display: 'flex', gap: 8, flex: 1 }}>
             <SidePanel
               type={draft.startType}
@@ -164,6 +195,9 @@ const DateRangeFilterPicker: React.FC<Props> = ({ value, onChange, onCancel }) =
                 startType: t,
                 ...(t === 'static' && draft.startStatic == null
                   ? { startStatic: dayjs().subtract(draft.startDynamic, 'day').startOf('day') }
+                  : {}),
+                ...(t === 'dynamic' && draft.startStatic != null
+                  ? { startDynamic: dayjs().startOf('day').diff(toDayjs(draft.startStatic, dayjs()).startOf('day'), 'day') }
                   : {}),
               })}
               onDynamicChange={n => update({ startDynamic: n })}
@@ -178,6 +212,9 @@ const DateRangeFilterPicker: React.FC<Props> = ({ value, onChange, onCancel }) =
                 endType: t,
                 ...(t === 'static' && draft.endStatic == null
                   ? { endStatic: dayjs().subtract(draft.endDynamic, 'day').startOf('day') }
+                  : {}),
+                ...(t === 'dynamic' && draft.endStatic != null
+                  ? { endDynamic: dayjs().startOf('day').diff(toDayjs(draft.endStatic, dayjs()).startOf('day'), 'day') }
                   : {}),
               })}
               onDynamicChange={n => update({ endDynamic: n })}
@@ -234,8 +271,8 @@ const SidePanel: React.FC<SidePanelProps> = ({
     const isCurrentMonth = date.month() === panelDate.month();
     return (
       <div style={{
-        width: 22,
-        height: 22,
+        width: 20,
+        height: 20,
         margin: '0 auto',
         display: 'flex',
         alignItems: 'center',

@@ -230,7 +230,7 @@ const DashboardsPage: React.FC = () => {
   ): FilterParam[] => {
     const params: FilterParam[] = [];
     activeFilters.forEach(f => {
-      if (!f.charts.includes(chartId)) return;
+      if (f.charts.length > 0 && !f.charts.includes(chartId)) return;
       const val = activeValues[f.id];
       if (val === undefined || val === null) return;
       const dataType = datasetFieldTypes[`${f.dataset}:${f.field}`] || 'text';
@@ -459,7 +459,7 @@ const DashboardsPage: React.FC = () => {
                 {filter.type === 'dateRange' ? (
                   <Popover
                     trigger="click"
-                    placement="bottomLeft"
+                    placement="bottomRight"
                     open={!!datePickerOpen[filter.id]}
                     onOpenChange={open => setDatePickerOpen(prev => ({ ...prev, [filter.id]: open }))}
                     content={
@@ -508,8 +508,10 @@ const DashboardsPage: React.FC = () => {
               const cfg = chartConfigs[item.chartId] || {};
               const isLarge = isWide(item);
               const chartH = chartAreaHeight(resolveH(item));
-              const isLoading = chartLoadingMap[item.chartId] ?? true;
-              const hasData = item.chartId in chartData;
+              const isLoading = chartLoadingMap[item.chartId] ?? false;
+              const dataRows = chartData[item.chartId] as Record<string, unknown>[] | undefined;
+              const hasData = dataRows !== undefined;
+              const isEmpty = hasData && dataRows!.length === 0;
               const chartMenuItems = [
                 { key: 'refresh', label: '刷新数据', onClick: () => refetchSingleChart(item.chartId) },
                 { key: 'sql', label: '查看SQL', icon: <CodeOutlined />, onClick: () => { setCurrentSQLChartId(item.chartId); setSqlModalVisible(true); } },
@@ -537,12 +539,16 @@ const DashboardsPage: React.FC = () => {
                     onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-1px)'; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'; (e.currentTarget as HTMLDivElement).style.transform = 'translateY(0)'; }}
                   >
-                    {(!hasData || isLoading) ? (
+                    {isLoading && !hasData ? (
                       <Skeleton active paragraph={{ rows: 4 }} style={{ height: chartH }} />
-                    ) : (
+                    ) : isEmpty ? (
+                      <div style={{ height: chartH, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bfbfbf', fontSize: 13 }}>
+                        <InboxOutlined style={{ fontSize: 24, marginRight: 8 }} />暂无数据
+                      </div>
+                    ) : hasData ? (
                       <ChartRenderer
                         chartType={chart?.type ?? 'bar'}
-                        chartData={chartData[item.chartId] as Record<string, unknown>[] || []}
+                        chartData={dataRows!}
                         rowFields={extractNames(cfg.rowFields)}
                         colFields={extractNames(cfg.colFields)}
                         measureFields={extractNames(cfg.measureFields)}
@@ -555,6 +561,8 @@ const DashboardsPage: React.FC = () => {
                         fieldFormats={buildFieldFormats(cfg)}
                         fieldLabelMap={buildFieldLabelMap(cfg)}
                       />
+                    ) : (
+                      <div style={{ height: chartH }} />
                     )}
                   </Card>
                 </LazyChartCard>

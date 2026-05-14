@@ -95,6 +95,7 @@ const DashboardEditPage: React.FC = () => {
   const [sqlModalVisible, setSqlModalVisible] = useState(false);
   const [currentSQL, setCurrentSQL] = useState('');
   const [configChartId, setConfigChartId] = useState<string | null>(null);
+  const [datePickerOpen, setDatePickerOpen] = useState<Record<string, boolean>>({});
 
   const loadedChartIds = useRef<Set<string>>(new Set());
 
@@ -327,7 +328,7 @@ const DashboardEditPage: React.FC = () => {
   const buildFilterParamsForChart = (chartId: string): Array<{ field: string; type: string; dataType: string; values: string[] }> => {
     const params: Array<{ field: string; type: string; dataType: string; values: string[] }> = [];
     filters.forEach(f => {
-      if (!f.charts.includes(chartId)) return;
+      if (f.charts.length > 0 && !f.charts.includes(chartId)) return;
       const val = filterValues[f.id];
       if (val === undefined || val === null) return;
       const dataType = datasetFieldTypes[`${f.dataset}:${f.field}`] || 'text';
@@ -407,18 +408,21 @@ const DashboardEditPage: React.FC = () => {
         <Content style={{ padding: '10px', background: '#f0f2f5', overflow: 'auto' }}>
           {/* 筛选器展示区域 */}
           {filters.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, padding: '12px 16px', marginBottom: 10, background: '#fff', borderRadius: 4, border: '1px solid #f0f0f0' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, padding: '10px 12px', marginBottom: 10, background: '#fff', borderRadius: 6, border: '1px solid #ebebeb' }}>
               {filters.map(filter => (
-                <div key={filter.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 'calc(100% / 6 - 14px)' }}>
+                <div key={filter.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
                   <span style={{ fontSize: 12, color: '#666' }}>{filter.name}</span>
                   {filter.type === 'dateRange' ? (
                     <Popover
                       trigger="click"
-                      placement="bottomLeft"
+                      placement="bottomRight"
+                      open={!!datePickerOpen[filter.id]}
+                      onOpenChange={(v) => setDatePickerOpen(prev => ({ ...prev, [filter.id]: v }))}
                       content={
                         <DateRangeFilterPicker
                           value={filterValues[filter.id] as DateRangeFilterValue | undefined}
-                          onChange={(val) => setFilterValues(prev => ({ ...prev, [filter.id]: val }))}
+                          onChange={(val) => { setFilterValues(prev => ({ ...prev, [filter.id]: val })); setDatePickerOpen(prev => ({ ...prev, [filter.id]: false })); }}
+                          onCancel={() => setDatePickerOpen(prev => ({ ...prev, [filter.id]: false }))}
                         />
                       }
                     >
@@ -431,7 +435,7 @@ const DashboardEditPage: React.FC = () => {
                   ) : (
                     <Select
                       size="small"
-                      style={{ width: '100%', height: 32 }}
+                      style={{ width: '100%' }}
                       mode={filter.type === 'multiple' ? 'multiple' : undefined}
                       maxTagCount="responsive"
                       value={filterValues[filter.id]}

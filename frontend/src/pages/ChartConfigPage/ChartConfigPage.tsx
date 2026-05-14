@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { App, Button, Input, Select, Modal, Tag, Tooltip, Space, Radio, DatePicker } from 'antd';
+import { App, Button, Input, Select, Modal, Tag, Tooltip, Space, Radio, Popover } from 'antd';
+import { CalendarOutlined as CalendarIcon } from '@ant-design/icons';
+import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel } from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
 import {
   ArrowLeftOutlined,
   SettingOutlined,
@@ -306,6 +308,7 @@ const ChartConfigPage: React.FC = () => {
   const [tempAreaFieldEdits, setTempAreaFieldEdits] = useState<Record<string, { displayName?: string; description?: string; config?: FieldConfig['config'] }>>({});
   const [selectedAreaRows, setSelectedAreaRows] = useState<Set<string>>(new Set());
 
+  const [datePickerOpen, setDatePickerOpen] = useState<Record<string, boolean>>({});
   const [isSQLModalVisible, setIsSQLModalVisible] = useState(false);
   const [sqlContent, setSqlContent] = useState('');
 
@@ -383,6 +386,10 @@ const ChartConfigPage: React.FC = () => {
         const vals = filterValues[f.originalName];
         if (!vals) return null;
         if (filterType === 'dateRange') {
+          if (vals && typeof vals === 'object' && 'startType' in vals) {
+            const [s, e] = resolveDateRangeValue(vals as DateRangeFilterValue);
+            return `${f.originalName} BETWEEN '${s.format('YYYY-MM-DD')}' AND '${e.format('YYYY-MM-DD')}'`;
+          }
           if (Array.isArray(vals) && vals.length === 2 && vals[0] && vals[1]) {
             return `${f.originalName} BETWEEN '${vals[0]}' AND '${vals[1]}'`;
           }
@@ -544,11 +551,24 @@ const ChartConfigPage: React.FC = () => {
 
   useEffect(() => {
     filterFields.forEach(f => fetchFilterFieldOptions(f.originalName));
-    // clean up values for removed fields
     setFilterValues(prev => {
       const names = new Set(filterFields.map(f => f.originalName));
+      // remove values for deleted fields
       const next = Object.fromEntries(Object.entries(prev).filter(([k]) => names.has(k)));
-      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+      // init default values for new fields that have no value yet
+      filterFields.forEach(f => {
+        if (!(f.originalName in next) && f.config?.filterDefault != null) {
+          const dv = f.config.filterDefault;
+          if (f.config.filterType === 'dateRange') {
+            next[f.originalName] = (dv && typeof dv === 'object' && 'startType' in dv)
+              ? dv
+              : DEFAULT_DATE_RANGE_VALUE;
+          } else if (Array.isArray(dv) ? dv.length > 0 : dv !== '') {
+            next[f.originalName] = dv;
+          }
+        }
+      });
+      return next;
     });
   }, [filterFields, fetchFilterFieldOptions]);
 
@@ -1023,13 +1043,26 @@ const ChartConfigPage: React.FC = () => {
                   <div key={f.originalName} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 160, maxWidth: 240 }}>
                     <span style={{ fontSize: 12, color: '#595959' }}>{f.displayName || f.originalName}</span>
                     {filterType === 'dateRange' ? (
-                      <DatePicker.RangePicker
-                        size="small"
-                        style={{ width: '100%' }}
-                        onChange={(_dates, dateStrings) =>
-                          setFilterValues(prev => ({ ...prev, [f.originalName]: dateStrings }))
+                      <Popover
+                        trigger="click"
+                        placement="bottomLeft"
+                        open={!!datePickerOpen[f.originalName]}
+                        onOpenChange={(v) => setDatePickerOpen(prev => ({ ...prev, [f.originalName]: v }))}
+                        overlayInnerStyle={{ padding: 0 }}
+                        content={
+                          <DateRangeFilterPicker
+                            value={(value && typeof value === 'object' && 'startType' in value) ? value as DateRangeFilterValue : DEFAULT_DATE_RANGE_VALUE}
+                            onChange={(val) => { setFilterValues(prev => ({ ...prev, [f.originalName]: val })); setDatePickerOpen(prev => ({ ...prev, [f.originalName]: false })); }}
+                            onCancel={() => setDatePickerOpen(prev => ({ ...prev, [f.originalName]: false }))}
+                          />
                         }
-                      />
+                      >
+                        <Button size="small" icon={<CalendarIcon />} style={{ width: '100%', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {(value && typeof value === 'object' && 'startType' in value)
+                            ? resolvedRangeLabel(value as DateRangeFilterValue)
+                            : '选择日期范围'}
+                        </Button>
+                      </Popover>
                     ) : (
                       <Select
                         size="small"
@@ -1109,7 +1142,7 @@ const ChartConfigPage: React.FC = () => {
                   <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>筛选器类型</div>
                   <Radio.Group
                     value={tempFieldConfig.filterType || 'multiple'}
-                    onChange={(e) => setTempFieldConfig(p => ({ ...p, filterType: e.target.value, filterDefault: [] }))}
+                    onChange={(e) => setTempFieldConfig(p => ({ ...p, filterType: e.target.value, filterDefault: e.target.value === 'dateRange' ? DEFAULT_DATE_RANGE_VALUE : [] }))}
                   >
                     <Radio value="multiple">多选</Radio>
                     <Radio value="single">单选</Radio>
@@ -1120,11 +1153,11 @@ const ChartConfigPage: React.FC = () => {
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>筛选默认值</div>
                   {tempFieldConfig.filterType === 'dateRange' ? (
-                    <DatePicker.RangePicker
-                      style={{ width: '100%' }}
-                      onChange={(_dates, dateStrings) =>
-                        setTempFieldConfig(p => ({ ...p, filterDefault: dateStrings }))
-                      }
+                    <ChartDateRangePickerTrigger
+                      value={(tempFieldConfig.filterDefault && typeof tempFieldConfig.filterDefault === 'object' && 'startType' in tempFieldConfig.filterDefault)
+                        ? tempFieldConfig.filterDefault as DateRangeFilterValue
+                        : DEFAULT_DATE_RANGE_VALUE}
+                      onChange={(val) => setTempFieldConfig(p => ({ ...p, filterDefault: val }))}
                     />
                   ) : (
                     <Select
@@ -1443,6 +1476,30 @@ const ChartConfigPage: React.FC = () => {
         </div>
       </Modal>
     </div>
+  );
+};
+
+const ChartDateRangePickerTrigger: React.FC<{ value: DateRangeFilterValue; onChange: (val: DateRangeFilterValue) => void }> = ({ value, onChange }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover
+      open={open}
+      onOpenChange={setOpen}
+      trigger="click"
+      placement="bottomLeft"
+      overlayInnerStyle={{ padding: 0 }}
+      content={
+        <DateRangeFilterPicker
+          value={value}
+          onChange={(val) => { onChange(val); setOpen(false); }}
+          onCancel={() => setOpen(false)}
+        />
+      }
+    >
+      <Button icon={<CalendarIcon />} style={{ width: '100%', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {resolvedRangeLabel(value)}
+      </Button>
+    </Popover>
   );
 };
 

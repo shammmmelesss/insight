@@ -841,7 +841,7 @@ func runScheduledExtracts() {
 	}
 
 	var datasets []models.Dataset
-	if err := database.DB.Where("type = ? AND extract_schedule != '' AND extract_schedule != '{}'", models.DatasetTypeExtract).Find(&datasets).Error; err != nil {
+	if err := database.DB.Where("type = ? AND extract_schedule IS NOT NULL AND extract_schedule::text != '{}'", models.DatasetTypeExtract).Find(&datasets).Error; err != nil {
 		return
 	}
 

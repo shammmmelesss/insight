@@ -483,7 +483,8 @@ func runScheduledMonitors() {
 		return
 	}
 
-	now := time.Now()
+	loc, _ := time.LoadLocation("Asia/Shanghai")
+	now := time.Now().In(loc)
 	currentTime := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())
 	currentWeekday := int(now.Weekday()) // 0=Sunday
 	currentDay := now.Day()

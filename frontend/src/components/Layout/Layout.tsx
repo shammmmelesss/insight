@@ -12,6 +12,7 @@ import {
   DeleteOutlined,
   SettingOutlined,
   MonitorOutlined,
+  CodeOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
@@ -50,6 +51,11 @@ const menuItems = [
     key: '/monitor',
     icon: <MonitorOutlined />,
     label: <Link to="/monitor">监控</Link>,
+  },
+  {
+    key: '/sql',
+    icon: <CodeOutlined />,
+    label: <Link to="/sql">SQL 查询</Link>,
   },
 ];
 

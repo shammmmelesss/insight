@@ -68,7 +68,7 @@ function ResultTable({ columns, rows }: { columns: Column[]; rows: any[] }) {
 export default function SQLQueryPage() {
   const { currentWorkspace } = useWorkspace();
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
-  const [dsId, setDsId] = useState<string | undefined>();
+  const [dsId, setDsId] = useState<string | undefined>(() => localStorage.getItem('sql_query_dsid') || undefined);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<any>(null);
   const qcRef = useRef(0);
@@ -127,7 +127,21 @@ export default function SQLQueryPage() {
       .catch(() => {});
   }, [currentWorkspace?.id]);
 
-  useEffect(() => { tabsRef.current = tabs; }, [tabs]);
+  useEffect(() => {
+    tabsRef.current = tabs;
+    try {
+      const toSave = tabs.map(t => ({ ...t, results: [], activeResultId: undefined }));
+      localStorage.setItem('sql_query_tabs', JSON.stringify(toSave));
+    } catch {}
+  }, [tabs]);
+
+  useEffect(() => {
+    localStorage.setItem('sql_query_active_tab', activeTabId);
+  }, [activeTabId]);
+
+  useEffect(() => {
+    if (dsId) localStorage.setItem('sql_query_dsid', dsId);
+  }, [dsId]);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
 
@@ -229,6 +243,8 @@ export default function SQLQueryPage() {
   const handleMount: OnMount = (ed, monaco) => {
     editorRef.current = ed; monacoRef.current = monaco;
     ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runQuery);
+    const currentTab = tabsRef.current.find(t => t.id === activeTabIdRef.current);
+    if (currentTab) ed.setValue(currentTab.sql);
     ed.focus();
   };
 
@@ -304,7 +320,7 @@ export default function SQLQueryPage() {
       <div ref={containerRef} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {/* editor */}
         <div style={{ height: `${editorPct}%`, minHeight: 0, border: '1px solid #e8e8e8', borderRadius: 6, overflow: 'hidden' }}>
-          <Editor defaultLanguage="sql" defaultValue={SQL_PLACEHOLDER} onMount={handleMount} onChange={handleEditorChange}
+          <Editor defaultLanguage="sql" defaultValue={tabs.find(t => t.id === activeTabId)?.sql ?? SQL_PLACEHOLDER} onMount={handleMount} onChange={handleEditorChange}
             options={{ fontSize: 14, minimap: { enabled: false }, lineNumbers: 'on', scrollBeyondLastLine: false, automaticLayout: true, tabSize: 2, wordWrap: 'on', suggestOnTriggerCharacters: true, quickSuggestions: true }} />
         </div>
 

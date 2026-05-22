@@ -24,5 +24,7 @@ func RegisterRoutes(r *gin.Engine) {
 		RegisterLarkRoutes(api)
 		// 首页最近更新路由
 		RegisterHomeRoutes(api)
+		// SQL查询历史记录路由
+		RegisterQueryHistoryRoutes(api)
 	}
 }

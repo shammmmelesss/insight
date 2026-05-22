@@ -155,6 +155,19 @@ type MonitorRecord struct {
 	ResultRows   string  `json:"resultRows" gorm:"type:text;default:'[]'"`
 }
 
+// QueryHistory SQL查询历史记录
+type QueryHistory struct {
+	BaseModel
+	WorkspaceID  string  `json:"workspaceId" gorm:"column:workspace_id;type:uuid;index"`
+	DataSourceID string  `json:"dataSourceId" gorm:"column:data_source_id;type:uuid"`
+	DataSourceName string `json:"dataSourceName" gorm:"column:data_source_name"`
+	SQL          string  `json:"sql" gorm:"type:text"`
+	Status       string  `json:"status"` // success | error
+	Elapsed      *int64  `json:"elapsed"`
+	RowCount     *int    `json:"rowCount"`
+	ErrorMsg     string  `json:"errorMsg" gorm:"type:text"`
+}
+
 // BeforeCreate 创建前钩子，生成UUID
 func (m *BaseModel) BeforeCreate(tx *gorm.DB) error {
 	if m.ID == uuid.Nil {

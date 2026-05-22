@@ -16,19 +16,9 @@ const { Text } = Typography;
 interface DataSource { id: string; name: string; type: string; }
 interface Column { name: string; type: string; }
 interface HistoryEntry {
-  id: string; sql: string; dsId: string; dsName: string;
-  executedAt: number; status: 'success' | 'error';
-  elapsed: number | null; rowCount?: number; error?: string;
-}
-
-const HISTORY_KEY = 'sql_query_history';
-const MAX_HISTORY = 100;
-
-function loadHistory(): HistoryEntry[] {
-  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
-}
-function saveHistory(h: HistoryEntry[]) {
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, MAX_HISTORY)));
+  id: string; sql: string; dataSourceId: string; dataSourceName: string;
+  createdAt: string; status: 'success' | 'error';
+  elapsed: number | null; rowCount?: number; errorMsg?: string;
 }
 
 interface QueryResult {
@@ -83,16 +73,49 @@ export default function SQLQueryPage() {
   const monacoRef = useRef<any>(null);
   const qcRef = useRef(0);
 
-  const [tabs, setTabs] = useState<QueryTab[]>(() => [makeTab()]);
+  const [tabs, setTabs] = useState<QueryTab[]>(() => {
+    try {
+      const saved = localStorage.getItem('sql_query_tabs');
+      if (saved) {
+        const parsed: QueryTab[] = JSON.parse(saved);
+        if (parsed.length > 0) {
+          parsed.forEach(t => { t.results = []; t.activeResultId = undefined; });
+          return parsed;
+        }
+      }
+    } catch {}
+    return [makeTab()];
+  });
   const tabsRef = useRef<QueryTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string>(() => `t${_tc}`);
+  const [activeTabId, setActiveTabId] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem('sql_query_tabs');
+      const activeId = localStorage.getItem('sql_query_active_tab');
+      if (saved && activeId) {
+        const parsed: QueryTab[] = JSON.parse(saved);
+        if (parsed.find(t => t.id === activeId)) return activeId;
+        if (parsed.length > 0) return parsed[0].id;
+      }
+    } catch {}
+    return `t${_tc}`;
+  });
   const activeTabIdRef = useRef('');
 
   const [editorPct, setEditorPct] = useState(45);
   const dragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const fetchHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await axios.get('/api/query-history');
+      setHistory(res.data.items || []);
+    } catch { /* silently ignore */ }
+    finally { setHistoryLoading(false); }
+  }, []);
 
   useEffect(() => {
     axios.get('/api/data-sources')
@@ -164,10 +187,11 @@ export default function SQLQueryPage() {
       activeResultId: id,
     }));
 
-    const dsName = dataSources.find(d => d.id === dsId)?.name ?? dsId ?? '';
-    const addHistoryEntry = (entry: Omit<HistoryEntry, 'id' | 'sql' | 'dsId' | 'dsName' | 'executedAt'>) => {
-      const h: HistoryEntry = { id, sql, dsId: dsId!, dsName, executedAt: t0, ...entry };
-      setHistory(prev => { const next = [h, ...prev].slice(0, MAX_HISTORY); saveHistory(next); return next; });
+    const dsName = dataSources.find(d => d.id === dsId)?.name ?? '';
+    const recordHistory = (entry: { status: 'success' | 'error'; elapsed: number; rowCount?: number; errorMsg?: string }) => {
+      axios.post('/api/query-history', {
+        sql, dataSourceId: dsId, dataSourceName: dsName, ...entry,
+      }).catch(() => {});
     };
 
     try {
@@ -183,7 +207,7 @@ export default function SQLQueryPage() {
           elapsed,
         }),
       }));
-      addHistoryEntry({ status: 'success', elapsed, rowCount: rows.length });
+      recordHistory({ status: 'success', elapsed, rowCount: rows.length });
     } catch (err: any) {
       const errMsg = err.response?.data?.error || '查询失败';
       const elapsed = Date.now() - t0;
@@ -196,7 +220,7 @@ export default function SQLQueryPage() {
           error: errMsg,
         }),
       }));
-      addHistoryEntry({ status: 'error', elapsed, error: errMsg });
+      recordHistory({ status: 'error', elapsed, errorMsg: errMsg });
     }
   }, [dsId, activeTabId, dataSources]);
 
@@ -273,7 +297,7 @@ export default function SQLQueryPage() {
         <Button icon={<AlignLeftOutlined />} onClick={formatSQL}>格式化</Button>
         <Button icon={<CopyOutlined />} onClick={() => navigator.clipboard.writeText(editorRef.current?.getValue() || '').then(() => message.success('已复制'))}>复制 SQL</Button>
         <Button icon={<ClearOutlined />} onClick={() => { editorRef.current?.setValue(''); editorRef.current?.focus(); }}>清空</Button>
-        <Button icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}>历史记录</Button>
+        <Button icon={<HistoryOutlined />} onClick={() => { setHistoryOpen(true); fetchHistory(); }}>历史记录</Button>
         {active?.status === 'success' && <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>{active.rows.length} 行 · {active.elapsed} ms</Text>}
       </div>
 
@@ -332,7 +356,7 @@ export default function SQLQueryPage() {
             <span>查询历史记录</span>
             {history.length > 0 && (
               <Popconfirm title="确认清空所有历史记录？" okText="清空" cancelText="取消"
-                onConfirm={() => { setHistory([]); saveHistory([]); }}>
+                onConfirm={() => axios.delete('/api/query-history').then(() => setHistory([])).catch(() => message.error('清空失败'))}>
                 <Button type="text" size="small" icon={<DeleteOutlined />} danger>清空</Button>
               </Popconfirm>
             )}
@@ -341,52 +365,54 @@ export default function SQLQueryPage() {
         open={historyOpen} onClose={() => setHistoryOpen(false)}
         width={480} bodyStyle={{ padding: 0 }}
       >
-        {history.length === 0 ? (
-          <Empty description="暂无历史记录" style={{ marginTop: 80 }} />
-        ) : (
-          <List
-            dataSource={history}
-            renderItem={entry => (
-              <List.Item
-                style={{ padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }}
-                onClick={() => {
-                  editorRef.current?.setValue(entry.sql);
-                  editorRef.current?.focus();
-                  if (entry.dsId) setDsId(entry.dsId);
-                  setHistoryOpen(false);
-                }}
-                actions={[
-                  <Tooltip key="copy" title="复制 SQL">
-                    <Button type="text" size="small" icon={<CopyOutlined />}
-                      onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(entry.sql).then(() => message.success('已复制')); }} />
-                  </Tooltip>,
-                ]}
-              >
-                <List.Item.Meta
-                  title={
-                    <Space size={6} wrap>
-                      {entry.status === 'success'
-                        ? <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 12 }} />
-                        : <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: 12 }} />}
-                      <Text style={{ fontSize: 12, color: '#8c8c8c' }}>
-                        {new Date(entry.executedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                      </Text>
-                      <Tag style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}>{entry.dsName}</Tag>
-                      {entry.status === 'success' && entry.elapsed != null && (
-                        <Text style={{ fontSize: 11, color: '#aaa' }}>{entry.rowCount} 行 · {entry.elapsed} ms</Text>
-                      )}
-                    </Space>
-                  }
-                  description={
-                    <pre style={{ margin: 0, fontSize: 12, color: entry.status === 'error' ? '#ff4d4f' : '#262626', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 72, overflow: 'hidden', fontFamily: 'monospace' }}>
-                      {entry.sql.length > 200 ? entry.sql.slice(0, 200) + '…' : entry.sql}
-                    </pre>
-                  }
-                />
-              </List.Item>
-            )}
-          />
-        )}
+        <Spin spinning={historyLoading}>
+          {history.length === 0 && !historyLoading ? (
+            <Empty description="暂无历史记录" style={{ marginTop: 80 }} />
+          ) : (
+            <List
+              dataSource={history}
+              renderItem={entry => (
+                <List.Item
+                  style={{ padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }}
+                  onClick={() => {
+                    editorRef.current?.setValue(entry.sql);
+                    editorRef.current?.focus();
+                    if (entry.dataSourceId) setDsId(entry.dataSourceId);
+                    setHistoryOpen(false);
+                  }}
+                  actions={[
+                    <Tooltip key="copy" title="复制 SQL">
+                      <Button type="text" size="small" icon={<CopyOutlined />}
+                        onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(entry.sql).then(() => message.success('已复制')); }} />
+                    </Tooltip>,
+                  ]}
+                >
+                  <List.Item.Meta
+                    title={
+                      <Space size={6} wrap>
+                        {entry.status === 'success'
+                          ? <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 12 }} />
+                          : <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: 12 }} />}
+                        <Text style={{ fontSize: 12, color: '#8c8c8c' }}>
+                          {new Date(entry.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </Text>
+                        <Tag style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}>{entry.dataSourceName}</Tag>
+                        {entry.status === 'success' && entry.elapsed != null && (
+                          <Text style={{ fontSize: 11, color: '#aaa' }}>{entry.rowCount} 行 · {entry.elapsed} ms</Text>
+                        )}
+                      </Space>
+                    }
+                    description={
+                      <pre style={{ margin: 0, fontSize: 12, color: entry.status === 'error' ? '#ff4d4f' : '#262626', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 72, overflow: 'hidden', fontFamily: 'monospace' }}>
+                        {entry.sql.length > 200 ? entry.sql.slice(0, 200) + '…' : entry.sql}
+                      </pre>
+                    }
+                  />
+                </List.Item>
+              )}
+            />
+          )}
+        </Spin>
       </Drawer>
     </div>
   );

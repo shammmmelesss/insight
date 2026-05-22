@@ -1,8 +1,9 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Button, Select, Space, Table, Typography, message, Spin, Tag, Tooltip } from 'antd';
+import { Button, Select, Space, Table, Typography, message, Spin, Tag, Tooltip, Drawer, List, Empty, Popconfirm } from 'antd';
 import {
   PlayCircleOutlined, CopyOutlined, ClearOutlined,
   CloseOutlined, CheckCircleOutlined, CloseCircleOutlined, AlignLeftOutlined, PlusOutlined,
+  HistoryOutlined, DeleteOutlined,
 } from '@ant-design/icons';
 import Editor, { OnMount } from '@monaco-editor/react';
 import { format } from 'sql-formatter';
@@ -14,6 +15,22 @@ const { Text } = Typography;
 
 interface DataSource { id: string; name: string; type: string; }
 interface Column { name: string; type: string; }
+interface HistoryEntry {
+  id: string; sql: string; dsId: string; dsName: string;
+  executedAt: number; status: 'success' | 'error';
+  elapsed: number | null; rowCount?: number; error?: string;
+}
+
+const HISTORY_KEY = 'sql_query_history';
+const MAX_HISTORY = 100;
+
+function loadHistory(): HistoryEntry[] {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch { return []; }
+}
+function saveHistory(h: HistoryEntry[]) {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, MAX_HISTORY)));
+}
+
 interface QueryResult {
   id: string; label: string; sql: string;
   status: 'running' | 'success' | 'error';
@@ -67,15 +84,18 @@ export default function SQLQueryPage() {
   const qcRef = useRef(0);
 
   const [tabs, setTabs] = useState<QueryTab[]>(() => [makeTab()]);
-  const [activeTabId, setActiveTabId] = useState<string>('t1');
+  const tabsRef = useRef<QueryTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string>(() => `t${_tc}`);
+  const activeTabIdRef = useRef('');
 
   const [editorPct, setEditorPct] = useState(45);
   const dragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<HistoryEntry[]>(() => loadHistory());
 
   useEffect(() => {
-    if (!currentWorkspace?.id) return;
-    axios.get('/api/data-sources', { params: { workspaceId: currentWorkspace.id } })
+    axios.get('/api/data-sources')
       .then(res => {
         const items: DataSource[] = res.data.items || res.data || [];
         setDataSources(items);
@@ -84,19 +104,20 @@ export default function SQLQueryPage() {
       .catch(() => {});
   }, [currentWorkspace?.id]);
 
+  useEffect(() => { tabsRef.current = tabs; }, [tabs]);
+
   const activeTab = tabs.find(t => t.id === activeTabId);
 
   const switchTab = useCallback((toId: string) => {
     const curSql = editorRef.current?.getValue() ?? '';
-    setTabs(prev => {
-      const target = prev.find(t => t.id === toId);
-      if (target && editorRef.current) {
-        editorRef.current.setValue(target.sql);
-        editorRef.current.focus();
-      }
-      return prev.map(t => t.id === activeTabId ? { ...t, sql: curSql } : t);
-    });
+    const target = tabsRef.current.find(t => t.id === toId);
+    setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, sql: curSql } : t));
+    activeTabIdRef.current = toId;
     setActiveTabId(toId);
+    if (target && editorRef.current) {
+      editorRef.current.setValue(target.sql);
+      editorRef.current.focus();
+    }
   }, [activeTabId]);
 
   const addTab = () => {
@@ -104,6 +125,7 @@ export default function SQLQueryPage() {
     const t = makeTab();
     setTabs(prev => [...prev.map(tab => tab.id === activeTabId ? { ...tab, sql: curSql } : tab), t]);
     setActiveTabId(t.id);
+    activeTabIdRef.current = t.id;
     setTimeout(() => { editorRef.current?.setValue(t.sql); editorRef.current?.focus(); }, 0);
   };
 
@@ -142,34 +164,54 @@ export default function SQLQueryPage() {
       activeResultId: id,
     }));
 
+    const dsName = dataSources.find(d => d.id === dsId)?.name ?? dsId ?? '';
+    const addHistoryEntry = (entry: Omit<HistoryEntry, 'id' | 'sql' | 'dsId' | 'dsName' | 'executedAt'>) => {
+      const h: HistoryEntry = { id, sql, dsId: dsId!, dsName, executedAt: t0, ...entry };
+      setHistory(prev => { const next = [h, ...prev].slice(0, MAX_HISTORY); saveHistory(next); return next; });
+    };
+
     try {
       const res = await axios.post('/api/datasets/preview', { sql, dataSourceId: dsId });
+      const elapsed = Date.now() - t0;
+      const rows = res.data.data || [];
       setTabs(prev => prev.map(t => t.id !== activeTabId ? t : {
         ...t,
         results: t.results.map(r => r.id !== id ? r : {
           ...r, status: 'success' as const,
           columns: res.data.columns || [],
-          rows: res.data.data || [],
-          elapsed: Date.now() - t0,
+          rows,
+          elapsed,
         }),
       }));
+      addHistoryEntry({ status: 'success', elapsed, rowCount: rows.length });
     } catch (err: any) {
+      const errMsg = err.response?.data?.error || '查询失败';
+      const elapsed = Date.now() - t0;
+      message.error(errMsg);
       setTabs(prev => prev.map(t => t.id !== activeTabId ? t : {
         ...t,
         results: t.results.map(r => r.id !== id ? r : {
           ...r, status: 'error' as const,
-          elapsed: Date.now() - t0,
-          error: err.response?.data?.error || '查询失败',
+          elapsed,
+          error: errMsg,
         }),
       }));
+      addHistoryEntry({ status: 'error', elapsed, error: errMsg });
     }
-  }, [dsId, activeTabId]);
+  }, [dsId, activeTabId, dataSources]);
+
+  useEffect(() => { activeTabIdRef.current = activeTabId; }, [activeTabId]);
 
   const handleMount: OnMount = (ed, monaco) => {
     editorRef.current = ed; monacoRef.current = monaco;
     ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runQuery);
     ed.focus();
   };
+
+  const handleEditorChange = useCallback((value: string | undefined) => {
+    const sql = value ?? '';
+    setTabs(prev => prev.map(t => t.id === activeTabIdRef.current ? { ...t, sql } : t));
+  }, []);
 
   useEffect(() => {
     const ed = editorRef.current; const m = monacoRef.current;
@@ -208,18 +250,16 @@ export default function SQLQueryPage() {
   const isRunning = activeTab?.results.some(r => r.status === 'running') ?? false;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {/* query tabs */}
-      <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #e8e8e8', flexShrink: 0 }}>
-        <div style={{ display: 'flex', flex: 1, overflowX: 'auto' }}>
-          {tabs.map(tab => (
-            <div key={tab.id} onClick={() => tab.id !== activeTabId && switchTab(tab.id)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap', userSelect: 'none', borderBottom: tab.id === activeTabId ? '2px solid #165DFF' : '2px solid transparent', color: tab.id === activeTabId ? '#165DFF' : '#595959', marginBottom: -1 }}>
-              {tab.name}
-              {tabs.length > 1 && <CloseOutlined style={{ fontSize: 10, color: '#bbb' }} onClick={e => closeTab(tab.id, e)} />}
-            </div>
-          ))}
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #e8e8e8', flexShrink: 0, overflowX: 'auto' }}>
+        {tabs.map(tab => (
+          <div key={tab.id} onClick={() => tab.id !== activeTabId && switchTab(tab.id)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap', userSelect: 'none', borderBottom: tab.id === activeTabId ? '2px solid #165DFF' : '2px solid transparent', color: tab.id === activeTabId ? '#165DFF' : '#595959', marginBottom: -1, flexShrink: 0 }}>
+            {tab.name}
+            {tabs.length > 1 && <CloseOutlined style={{ fontSize: 10, color: '#bbb' }} onClick={e => closeTab(tab.id, e)} />}
+          </div>
+        ))}
         <Button type="text" icon={<PlusOutlined />} onClick={addTab} style={{ flexShrink: 0, color: '#8c8c8c' }} title="新建查询" />
       </div>
 
@@ -233,13 +273,14 @@ export default function SQLQueryPage() {
         <Button icon={<AlignLeftOutlined />} onClick={formatSQL}>格式化</Button>
         <Button icon={<CopyOutlined />} onClick={() => navigator.clipboard.writeText(editorRef.current?.getValue() || '').then(() => message.success('已复制'))}>复制 SQL</Button>
         <Button icon={<ClearOutlined />} onClick={() => { editorRef.current?.setValue(''); editorRef.current?.focus(); }}>清空</Button>
+        <Button icon={<HistoryOutlined />} onClick={() => setHistoryOpen(true)}>历史记录</Button>
         {active?.status === 'success' && <Text type="secondary" style={{ marginLeft: 8, fontSize: 12 }}>{active.rows.length} 行 · {active.elapsed} ms</Text>}
       </div>
 
       <div ref={containerRef} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {/* editor */}
         <div style={{ height: `${editorPct}%`, minHeight: 0, border: '1px solid #e8e8e8', borderRadius: 6, overflow: 'hidden' }}>
-          <Editor defaultLanguage="sql" defaultValue={SQL_PLACEHOLDER} onMount={handleMount}
+          <Editor defaultLanguage="sql" defaultValue={SQL_PLACEHOLDER} onMount={handleMount} onChange={handleEditorChange}
             options={{ fontSize: 14, minimap: { enabled: false }, lineNumbers: 'on', scrollBeyondLastLine: false, automaticLayout: true, tabSize: 2, wordWrap: 'on', suggestOnTriggerCharacters: true, quickSuggestions: true }} />
         </div>
 
@@ -284,6 +325,69 @@ export default function SQLQueryPage() {
           )}
         </div>
       </div>
+
+      <Drawer
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>查询历史记录</span>
+            {history.length > 0 && (
+              <Popconfirm title="确认清空所有历史记录？" okText="清空" cancelText="取消"
+                onConfirm={() => { setHistory([]); saveHistory([]); }}>
+                <Button type="text" size="small" icon={<DeleteOutlined />} danger>清空</Button>
+              </Popconfirm>
+            )}
+          </div>
+        }
+        open={historyOpen} onClose={() => setHistoryOpen(false)}
+        width={480} bodyStyle={{ padding: 0 }}
+      >
+        {history.length === 0 ? (
+          <Empty description="暂无历史记录" style={{ marginTop: 80 }} />
+        ) : (
+          <List
+            dataSource={history}
+            renderItem={entry => (
+              <List.Item
+                style={{ padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }}
+                onClick={() => {
+                  editorRef.current?.setValue(entry.sql);
+                  editorRef.current?.focus();
+                  if (entry.dsId) setDsId(entry.dsId);
+                  setHistoryOpen(false);
+                }}
+                actions={[
+                  <Tooltip key="copy" title="复制 SQL">
+                    <Button type="text" size="small" icon={<CopyOutlined />}
+                      onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(entry.sql).then(() => message.success('已复制')); }} />
+                  </Tooltip>,
+                ]}
+              >
+                <List.Item.Meta
+                  title={
+                    <Space size={6} wrap>
+                      {entry.status === 'success'
+                        ? <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 12 }} />
+                        : <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: 12 }} />}
+                      <Text style={{ fontSize: 12, color: '#8c8c8c' }}>
+                        {new Date(entry.executedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </Text>
+                      <Tag style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}>{entry.dsName}</Tag>
+                      {entry.status === 'success' && entry.elapsed != null && (
+                        <Text style={{ fontSize: 11, color: '#aaa' }}>{entry.rowCount} 行 · {entry.elapsed} ms</Text>
+                      )}
+                    </Space>
+                  }
+                  description={
+                    <pre style={{ margin: 0, fontSize: 12, color: entry.status === 'error' ? '#ff4d4f' : '#262626', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 72, overflow: 'hidden', fontFamily: 'monospace' }}>
+                      {entry.sql.length > 200 ? entry.sql.slice(0, 200) + '…' : entry.sql}
+                    </pre>
+                  }
+                />
+              </List.Item>
+            )}
+          />
+        )}
+      </Drawer>
     </div>
   );
 }

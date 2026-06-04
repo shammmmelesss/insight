@@ -433,26 +433,45 @@ func GetDatasetFieldValues(c *gin.Context) {
 		}
 	}
 
-	var dataSource models.DataSource
-	if err := database.DB.First(&dataSource, "id = ?", dataset.DataSourceID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "数据源不存在"})
-		return
-	}
-
-	db, err := connectToDataSource(dataSource)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "连接数据源失败: " + err.Error()})
-		return
-	}
-	defer db.Close()
-
 	alias := sanitizeAlias(fieldName)
 	selectExpr := queryExpr
 	if queryExpr != fieldName {
 		selectExpr = fmt.Sprintf("%s AS %s", queryExpr, alias)
 	}
-	query := fmt.Sprintf("SELECT %s FROM (%s) AS dataset WHERE 1=1 GROUP BY %s ORDER BY %s LIMIT 1000",
-		selectExpr, dataset.SQL, queryExpr, queryExpr)
+
+	var db *sql.DB
+	var query string
+
+	if dataset.Type == models.DatasetTypeExtract {
+		if database.ClickHouseDB == nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ClickHouse 未连接"})
+			return
+		}
+		if dataset.ExtractStatus != models.ExtractStatusSuccess {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "数据尚未抽取成功，请先执行抽取"})
+			return
+		}
+		ckTable := "ds_" + strings.ReplaceAll(dataset.ID.String(), "-", "_")
+		ckSQL := fmt.Sprintf("SELECT * FROM insight.%s", ckTable)
+		query = fmt.Sprintf("SELECT %s FROM (%s) AS dataset GROUP BY %s ORDER BY %s LIMIT 1000",
+			selectExpr, ckSQL, queryExpr, queryExpr)
+		db = database.ClickHouseDB
+	} else {
+		var dataSource models.DataSource
+		if err := database.DB.First(&dataSource, "id = ?", dataset.DataSourceID).Error; err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "数据源不存在"})
+			return
+		}
+		var err error
+		db, err = connectToDataSource(dataSource)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "连接数据源失败: " + err.Error()})
+			return
+		}
+		defer db.Close()
+		query = fmt.Sprintf("SELECT %s FROM (%s) AS dataset WHERE 1=1 GROUP BY %s ORDER BY %s LIMIT 1000",
+			selectExpr, dataset.SQL, queryExpr, queryExpr)
+	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), queryTimeout)
 	defer cancel()

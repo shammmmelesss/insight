@@ -32,6 +32,7 @@ function AppRoutes() {
         <Route path="/dashboards" element={<DashboardsPage />} />
         <Route path="/dashboards/create" element={<DashboardEditPage />} />
         <Route path="/dashboards/edit/:id" element={<DashboardEditPage />} />
+        <Route path="/dashboards/:id" element={<DashboardsPage />} />
         <Route path="/monitor" element={<MonitorPage />} />
         <Route path="/sql" element={<SQLQueryPage />} />
         <Route path="*" element={<NotFound />} />

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Button, Card, Modal, Layout, Skeleton, Select, Tooltip, Dropdown, Popover } from 'antd';
 import { EditOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined, InboxOutlined, PlusOutlined, CalendarOutlined, FilterOutlined } from '@ant-design/icons';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { Dashboard, ChartOption, FilterField, DashboardLayoutItem } from '@shared/api.interface';
 import DashboardList from '../../components/DashboardList/DashboardList';
@@ -65,7 +65,7 @@ function parseFilters(raw: FilterField[] | string | unknown): FilterField[] {
 
 const DashboardsPage: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { id: urlId } = useParams<{ id: string }>();
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedDashboard, setSelectedDashboard] = useState<Dashboard | null>(null);
@@ -91,10 +91,9 @@ const DashboardsPage: React.FC = () => {
   const applyDashboardList = (items: Dashboard[], fromCache: boolean) => {
     setDashboards(items);
     if (items.length > 0 && !fromCache) {
-      const selectedId = searchParams.get('selected');
       setSelectedDashboard(prev => {
         if (prev) return prev;
-        if (selectedId) return items.find(d => d.id === selectedId) ?? items[0];
+        if (urlId) return items.find(d => d.id === urlId) ?? items[0];
         return items[0];
       });
     }
@@ -133,6 +132,15 @@ const DashboardsPage: React.FC = () => {
   useEffect(() => {
     fetchDashboards();
   }, []);
+
+  useEffect(() => {
+    if (!dashboards.length) return;
+    setSelectedDashboard(prev => {
+      if (!urlId) return prev;
+      if (prev?.id === urlId) return prev;
+      return dashboards.find(d => d.id === urlId) ?? prev;
+    });
+  }, [urlId, dashboards]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -407,7 +415,7 @@ const DashboardsPage: React.FC = () => {
           dashboards={dashboards}
           loading={loading}
           selectedDashboard={selectedDashboard}
-          onSelectDashboard={setSelectedDashboard}
+          onSelectDashboard={(dashboard) => navigate(`/dashboards/${dashboard.id}`)}
           onAddDashboard={() => navigate('/dashboards/create')}
           onEditDashboard={(dashboard) => navigate(`/dashboards/edit/${dashboard.id}`)}
           onDeleteDashboard={handleDelete}

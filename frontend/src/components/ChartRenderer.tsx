@@ -416,10 +416,16 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .interaction('elementHighlight')
           .tooltip({
             title: (d: any) => String(d[actualXField] ?? ''),
-            items: actualYFields.map(yField => (d: any) => ({
-              name: getFieldLabel(yField),
-              value: formatValue(xMetricsMap[String(d[actualXField] ?? '')]?.[yField], yFormatLookup[yField]),
-            })),
+            items: [
+              (d: any) => {
+                const metric = String(d._metric ?? '');
+                const yField = actualYFields.find(f => getFieldLabel(f) === metric) ?? '';
+                return {
+                  name: metric,
+                  value: formatValue(xMetricsMap[String(d[actualXField] ?? '')]?.[yField], yFormatLookup[yField]),
+                };
+              },
+            ],
           });
 
         chart.legend('color', { position: 'bottom', layout: { justifyContent: 'center' } });
@@ -622,10 +628,16 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .interaction('elementHighlight')
           .tooltip({
             title: (d: any) => String(d[actualXField] ?? ''),
-            items: actualYFields.map(yField => (d: any) => ({
-              name: getFieldLabel(yField),
-              value: formatValue(lineXMetricsMap[String(d[actualXField] ?? '')]?.[yField], yFormatLookup[yField]),
-            })),
+            items: [
+              (d: any) => {
+                const metric = String(d._metric ?? '');
+                const yField = actualYFields.find(f => getFieldLabel(f) === metric) ?? '';
+                return {
+                  name: metric,
+                  value: formatValue(lineXMetricsMap[String(d[actualXField] ?? '')]?.[yField], yFormatLookup[yField]),
+                };
+              },
+            ],
           });
 
         chart.legend(false);
@@ -745,10 +757,15 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           })
           .tooltip({
             title: (d: any) => String(d[actualXField] ?? ''),
-            items: allMetrics.map(m => (d: any) => ({
-              name: getFieldLabel(m),
-              value: formatValue(xMetricsMap[String(d[actualXField] ?? '')]?.[m], dualFormatLookup[m]),
-            })),
+            items: [
+              (d: any) => {
+                const rawField = String(d._rawMetricL ?? '');
+                return {
+                  name: getFieldLabel(rawField),
+                  value: formatValue(xMetricsMap[String(d[actualXField] ?? '')]?.[rawField], dualFormatLookup[rawField]),
+                };
+              },
+            ],
           });
 
         if (actualLeftFields.length > 1) {

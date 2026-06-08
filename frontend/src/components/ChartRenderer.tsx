@@ -1025,20 +1025,61 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
     const allNames = series.map(s => s.name);
     const container = legendContainerRef.current;
     container.innerHTML = '';
-    container.style.cssText = 'display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:12px;padding:4px 12px;';
+    container.style.cssText = 'display:flex;align-items:center;gap:4px;padding:4px 0;min-height:28px;';
+
+    // scrollable inner list
+    const scrollWrap = document.createElement('div');
+    scrollWrap.style.cssText = 'flex:1;overflow:hidden;min-width:0;';
+
+    const list = document.createElement('div');
+    list.style.cssText = 'display:flex;align-items:center;gap:12px;overflow-x:auto;padding:0 4px;scrollbar-width:none;';
+    // hide webkit scrollbar
+    const styleTag = document.createElement('style');
+    styleTag.textContent = '.legend-list::-webkit-scrollbar{display:none}';
+    list.classList.add('legend-list');
+    document.head.appendChild(styleTag);
+
+    const makeArrow = (dir: 'left' | 'right') => {
+      const btn = document.createElement('button');
+      btn.style.cssText = 'flex-shrink:0;display:none;align-items:center;justify-content:center;width:20px;height:20px;border:none;background:transparent;cursor:pointer;color:#8c8c8c;padding:0;transition:color 0.15s;';
+      btn.addEventListener('mouseenter', () => { btn.style.color = '#1783FF'; });
+      btn.addEventListener('mouseleave', () => { btn.style.color = '#8c8c8c'; });
+      const d = dir === 'left'
+        ? 'M7 10L4 7l3-3'
+        : 'M5 4l3 3-3 3';
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 12 14" fill="none"><polyline points="${d}" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      return btn;
+    };
+
+    const leftBtn = makeArrow('left');
+    const rightBtn = makeArrow('right');
+
+    const SCROLL_STEP = 120;
+    leftBtn.addEventListener('click', () => { list.scrollBy({ left: -SCROLL_STEP, behavior: 'smooth' }); });
+    rightBtn.addEventListener('click', () => { list.scrollBy({ left: SCROLL_STEP, behavior: 'smooth' }); });
+
+    const updateArrows = () => {
+      const canScroll = list.scrollWidth > list.clientWidth + 2;
+      leftBtn.style.display = canScroll ? 'inline-flex' : 'none';
+      rightBtn.style.display = canScroll ? 'inline-flex' : 'none';
+      leftBtn.style.opacity = list.scrollLeft > 2 ? '1' : '0.3';
+      rightBtn.style.opacity = list.scrollLeft < list.scrollWidth - list.clientWidth - 2 ? '1' : '0.3';
+    };
+
+    list.addEventListener('scroll', updateArrows);
 
     series.forEach(({ name, color }) => {
       const isHidden = hiddenSeriesRef.current.has(name);
       const isSolo = !isHidden && hiddenSeriesRef.current.size > 0;
 
       const item = document.createElement('div');
-      item.style.cssText = `display:flex;align-items:center;gap:4px;cursor:pointer;opacity:${isHidden ? 0.35 : 1};user-select:none;transition:opacity 0.15s;`;
+      item.style.cssText = `display:inline-flex;align-items:center;gap:4px;cursor:pointer;opacity:${isHidden ? 0.35 : 1};user-select:none;transition:opacity 0.15s;flex-shrink:0;`;
 
       const dot = document.createElement('span');
       dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;`;
 
       const label = document.createElement('span');
-      label.style.cssText = 'font-size:12px;color:#595959;';
+      label.style.cssText = 'font-size:12px;color:#595959;white-space:nowrap;';
       label.textContent = name;
 
       const soloBtn = document.createElement('span');
@@ -1076,8 +1117,16 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       item.appendChild(dot);
       item.appendChild(label);
       item.appendChild(soloBtn);
-      container.appendChild(item);
+      list.appendChild(item);
     });
+
+    scrollWrap.appendChild(list);
+    container.appendChild(leftBtn);
+    container.appendChild(scrollWrap);
+    container.appendChild(rightBtn);
+
+    // check after layout
+    requestAnimationFrame(updateArrows);
   };
 
   // 渲染默认内容

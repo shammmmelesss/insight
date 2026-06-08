@@ -307,6 +307,15 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
             s2Instance.handleGroupSort(event, meta);
           },
         },
+        {
+          icons: ['SortDown'],
+          belongsCell: 'rowCell',
+          defaultHide: true,
+          displayCondition: (meta: any) => !meta.isTotals,
+          onClick: ({ event, meta }: any) => {
+            s2Instance.handleGroupSort(event, meta);
+          },
+        },
       ],
     };
 

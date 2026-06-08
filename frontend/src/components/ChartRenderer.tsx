@@ -8,6 +8,7 @@ const LINE_LEGEND_HEIGHT = 36;
 import {
   S2Options,
   PivotSheet,
+  S2Event,
 } from '@antv/s2';
 import { Chart } from '@antv/g2';
 
@@ -48,6 +49,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const lastWidthRef = useRef<number>(0);
   const hiddenSeriesRef = useRef<Set<string>>(new Set());
+  const crossTableSortParamsRef = useRef<any[]>([]);
   const legendContainerRef = useRef<HTMLDivElement>(null);
   const renderChartCallbackRef = useRef<() => void>(() => {});
 
@@ -178,6 +180,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
   useEffect(() => {
     hiddenSeriesRef.current = new Set();
+    crossTableSortParamsRef.current = [];
     renderChart();
     if (chartRef.current) {
       lastWidthRef.current = chartRef.current.clientWidth;
@@ -238,7 +241,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         })),
       ],
       data: chartData,
-      sortParams: [],
+      sortParams: crossTableSortParamsRef.current,
     };
 
     const detectedHeight = containerHeight || chartRef.current.clientHeight;
@@ -254,14 +257,34 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       },
       seriesNumber: { enable: false },
       tooltip: {
+        enable: true,
         operation: {
           sort: true,
         },
       },
+      headerActionIcons: [
+        {
+          icons: ['SortDown'],
+          belongsCell: 'colCell',
+          defaultHide: true,
+          displayCondition: (meta: any) => !meta.isTotals,
+          onClick: ({ event, meta }: any) => {
+            s2Instance.handleGroupSort(event, meta);
+          },
+        },
+      ],
     };
 
-    chartInstanceRef.current = new PivotSheet(chartRef.current, s2DataConfig, s2Options);
-    chartInstanceRef.current.render();
+    let s2Instance: PivotSheet;
+    const s2 = new PivotSheet(chartRef.current, s2DataConfig, s2Options);
+    s2Instance = s2;
+    s2.on(S2Event.RANGE_SORT, (params) => {
+      crossTableSortParamsRef.current = params;
+      s2.setDataCfg({ ...s2DataConfig, sortParams: params });
+      s2.render(false);
+    });
+    chartInstanceRef.current = s2;
+    s2.render();
   };
 
   // 渲染柱状图
@@ -708,7 +731,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       chartData.forEach(item => {
         actualLeftFields.forEach(f => {
           const value = Number(item[f]);
-          if (!isNaN(value)) {
+          if (!isNaN(value) && !hiddenSeriesRef.current.has(getFieldLabel(f))) {
             leftLongData.push({ ...item, _metricL: getFieldLabel(f), _rawMetricL: f, _valueL: value });
           }
         });
@@ -721,7 +744,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       chartData.forEach(item => {
         actualRightFields.forEach(f => {
           const value = Number(item[f]);
-          if (!isNaN(value)) {
+          if (!isNaN(value) && !hiddenSeriesRef.current.has(getFieldLabel(f))) {
             rightLongData.push({ ...item, _metricR: getFieldLabel(f), _rawMetricR: f, _valueR: value });
           }
         });
@@ -814,8 +837,16 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .tooltip(false);
       }
 
-      chart.legend('color', { position: 'bottom', layout: { justifyContent: 'center' } });
-    });
+      chart.legend(false);
+    }, LINE_LEGEND_HEIGHT);
+
+    // 合并左右轴系列构建统一自定义图例
+    const orangeColors = ['#FA8C16', '#F5222D', '#FADB14', '#52C41A', '#722ED1', '#13C2C2'];
+    const dualLegendItems = [
+      ...actualLeftFields.map((f, i) => ({ name: getFieldLabel(f), color: G2_COLORS[i % G2_COLORS.length] })),
+      ...actualRightFields.map((f, i) => ({ name: getFieldLabel(f), color: actualRightFields.length > 1 ? orangeColors[i % orangeColors.length] : '#FA8C16' })),
+    ];
+    renderCustomLegend(dualLegendItems);
   };
 
   // 渲染饼图

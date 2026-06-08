@@ -1,17 +1,14 @@
 # 使用官方的Go镜像作为基础镜像
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # 设置工作目录
 WORKDIR /app
 
-# 复制go.mod和go.sum文件
-COPY backend/go.mod backend/go.sum ./
+# 复制整个后端代码（包含local replace所需的internal目录）
+COPY backend/ ./
 
 # 下载依赖
 RUN go mod download
-
-# 复制整个后端代码
-COPY backend/ ./
 
 # 构建应用
 RUN go build -o main ./cmd/main.go

@@ -140,6 +140,7 @@ npm run dev
 # 服务运行在 http://localhost:3000
 ```
 
+
 前端开发服务器会自动将 `/api` 请求代理到后端 `http://localhost:8080`，修改源码后页面自动热更新。
 
 ---
@@ -245,3 +246,23 @@ tail -f /home/ubuntu/vite.log             # 前端日志
 ## 许可证
 
 MIT
+
+
+## Docker 全栈（前端 :80，后端 :8080）
+
+本地开发重启命令：
+
+  后端（端口 8080）：
+  lsof -ti:8080 | xargs kill -9 2>/dev/null; cd backend; go run cmd/main.go
+
+  前端（端口 3000）：
+  cd frontend && npm run dev
+
+
+
+  如果要切换成本地开发模式（前端 :3000 热更新），需要：
+
+  1. 停掉 backend/frontend 容器，只保留数据库：
+  docker-compose stop backend frontend
+  2. 启动后端：lsof -ti:8080 | xargs kill -9 2>/dev/null; cd /Users/mac/project_dev/insight/backend && go run cmd/main.go
+  3. 启动前端：cd frontend && npm run dev

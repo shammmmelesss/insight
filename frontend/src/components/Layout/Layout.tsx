@@ -65,6 +65,7 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
+  const isDashboardRoute = location.pathname === '/dashboards' || location.pathname.startsWith('/dashboards/');
   const { modal } = App.useApp();
   const { workspaces, currentWorkspace, setCurrentWorkspace, refreshWorkspaces } = useWorkspace();
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -188,7 +189,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </Space>
         </div>
       </Header>
-      {(location.pathname === '/dashboards' || location.pathname.startsWith('/dashboards/edit/') || location.pathname === '/dashboards/create') ? (
+      {isDashboardRoute ? (
         children
       ) : (
         <Content style={{ padding: '10px', background: '#f0f2f5', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>

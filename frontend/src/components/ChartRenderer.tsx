@@ -258,9 +258,44 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       seriesNumber: { enable: false },
       tooltip: {
         enable: true,
-        operation: {
-          sort: true,
-        },
+        render: (_s2Inst: any): any => ({
+          show(opts: any) {
+            const operator = opts?.options?.operator;
+            if (!operator?.menu?.items?.length) return;
+            // 移除旧菜单
+            document.querySelectorAll('.s2-sort-menu').forEach(el => el.remove());
+            const menu = document.createElement('div');
+            menu.className = 's2-sort-menu';
+            Object.assign(menu.style, {
+              position: 'fixed', zIndex: '9999', background: '#fff',
+              boxShadow: '0 2px 8px rgba(0,0,0,.15)', borderRadius: '6px',
+              padding: '4px 0', minWidth: '100px',
+              left: `${opts.position.x}px`, top: `${opts.position.y}px`,
+            });
+            operator.menu.items.forEach((item: any) => {
+              const row = document.createElement('div');
+              row.textContent = item.label;
+              Object.assign(row.style, {
+                padding: '7px 16px', cursor: 'pointer', fontSize: '14px', color: '#000',
+              });
+              row.onmouseenter = () => { row.style.background = '#f5f5f5'; };
+              row.onmouseleave = () => { row.style.background = ''; };
+              row.onclick = () => {
+                operator.menu.onClick({ key: item.key });
+                menu.remove();
+              };
+              menu.appendChild(row);
+            });
+            document.body.appendChild(menu);
+            // 点击外部关闭
+            const close = (e: MouseEvent) => {
+              if (!menu.contains(e.target as Node)) { menu.remove(); document.removeEventListener('click', close, true); }
+            };
+            setTimeout(() => document.addEventListener('click', close, true), 0);
+          },
+          hide() { document.querySelectorAll('.s2-sort-menu').forEach(el => el.remove()); },
+          destroy() { document.querySelectorAll('.s2-sort-menu').forEach(el => el.remove()); },
+        }),
       },
       headerActionIcons: [
         {

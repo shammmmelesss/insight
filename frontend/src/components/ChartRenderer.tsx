@@ -252,6 +252,11 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         hoverHighlight: true,
       },
       seriesNumber: { enable: false },
+      tooltip: {
+        operation: {
+          sort: true,
+        },
+      },
     };
 
     chartInstanceRef.current = new PivotSheet(chartRef.current, s2DataConfig, s2Options);

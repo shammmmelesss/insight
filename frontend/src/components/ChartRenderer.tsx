@@ -238,6 +238,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         })),
       ],
       data: chartData,
+      sortParams: [],
     };
 
     const detectedHeight = containerHeight || chartRef.current.clientHeight;
@@ -737,7 +738,6 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       });
     });
 
-    const allMetrics = [...actualLeftFields, ...actualRightFields];
     const dualFormatLookup = buildFormatLookup([...yAxisFields, ...y2AxisFields].filter(f => f), dataFields);
 
     createAndRenderG2Chart((chart) => {

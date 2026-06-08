@@ -27,6 +27,7 @@ services:
       - CLICKHOUSE_PASSWORD=
     volumes:
       - clickhouse_data:/var/lib/clickhouse
+      - ./clickhouse/users.d:/etc/clickhouse-server/users.d
     healthcheck:
       test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
       interval: 10s

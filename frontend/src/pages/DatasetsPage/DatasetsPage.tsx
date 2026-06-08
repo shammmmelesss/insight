@@ -411,6 +411,14 @@ const DatasetsPage: React.FC = () => {
       title: '数据集名称',
       dataIndex: 'name',
       key: 'name',
+      render: (name: string, record: Dataset) => (
+        <div>
+          <div>{name}</div>
+          {record.description && (
+            <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{record.description}</div>
+          )}
+        </div>
+      ),
     },
     {
       title: '类型',

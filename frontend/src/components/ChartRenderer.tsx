@@ -212,7 +212,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
         chartInstanceRef.current = null;
       }
     };
-  }, [chartType, chartData, rowFields, colFields, measureFields, xAxisFields, yAxisFields, y2AxisFields, groupFields, indicatorFields, fieldFormats]);
+  }, [chartType, chartData, rowFields, colFields, measureFields, xAxisFields, yAxisFields, y2AxisFields, groupFields, indicatorFields, containerHeight, fieldFormats]);
 
   // 渲染交叉表
   const renderCrossTable = () => {
@@ -613,7 +613,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
         if (actualGroupField) {
           area.encode('color', actualGroupField);
-          area.scale('color', { range: G2_COLORS });
+          area.scale('color', { domain: seriesItems.map(s => s.name), range: seriesItems.map(s => s.color) });
         }
 
         const line = chart
@@ -636,7 +636,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
         if (actualGroupField) {
           line.encode('color', actualGroupField);
-          line.scale('color', { range: G2_COLORS });
+          line.scale('color', { domain: seriesItems.map(s => s.name), range: seriesItems.map(s => s.color) });
         }
 
         chart.legend(false);
@@ -696,7 +696,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .encode('y', '_value')
           .encode('color', '_metric')
           .encode('shape', 'smooth')
-          .scale('color', { range: G2_COLORS })
+          .scale('color', { domain: multiSeriesItems.map(s => s.name), range: multiSeriesItems.map(s => s.color) })
           .style({ lineWidth: 2 })
           .interaction('elementHighlight')
           .tooltip({
@@ -1089,7 +1089,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   renderChartCallbackRef.current = renderChart;
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'visible' }}>
+    <div style={{ width: '100%', height: containerHeight ? `${containerHeight}px` : '100%', display: 'flex', flexDirection: 'column', overflow: 'visible' }}>
       <div
         ref={chartRef}
         style={{ flex: 1, minHeight: 0, overflow: 'visible' }}

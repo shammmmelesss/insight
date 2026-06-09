@@ -10,9 +10,11 @@ import {
   PivotSheet,
   S2Event,
 } from '@antv/s2';
+import { asyncGetAllPlainData } from '@antv/s2';
 import { Chart } from '@antv/g2';
 
 interface ChartRendererProps {
+  showDownload?: boolean;
   chartType: ChartType;
   chartData?: any[];
   rowFields?: string[];
@@ -42,6 +44,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   containerHeight,
   fieldFormats = {},
   fieldLabelMap = {},
+  showDownload = false,
 }) => {
   const getFieldLabel = (key: string): string => fieldLabelMap[key] || key;
   const chartRef = useRef<HTMLDivElement>(null);
@@ -1140,8 +1143,33 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
   renderChartCallbackRef.current = renderChart;
 
+  const handleDownloadCrossTable = async () => {
+    const s2 = chartInstanceRef.current as PivotSheet;
+    if (!s2) return;
+    const data = await asyncGetAllPlainData({ sheetInstance: s2, split: ',', formatOptions: true });
+    const blob = new Blob([`﻿${data}`], { type: 'text/csv;charset=utf-8' });
+    const link = document.createElement('a');
+    link.download = 'cross_table.csv';
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
   return (
-    <div style={{ width: '100%', height: containerHeight ? `${containerHeight}px` : '100%', display: 'flex', flexDirection: 'column', overflow: 'visible' }}>
+    <div style={{ width: '100%', height: containerHeight ? `${containerHeight}px` : '100%', display: 'flex', flexDirection: 'column', overflow: 'visible', position: 'relative' }}>
+      {showDownload && chartType === 'crossTable' && (
+        <button
+          onClick={handleDownloadCrossTable}
+          style={{
+            position: 'absolute', top: 6, right: 8, zIndex: 10,
+            padding: '3px 10px', fontSize: 12, cursor: 'pointer',
+            background: '#fff', border: '1px solid #d9d9d9', borderRadius: 4,
+            color: '#595959', lineHeight: '20px',
+          }}
+        >
+          下载 CSV
+        </button>
+      )}
       <div
         ref={chartRef}
         style={{ flex: 1, minHeight: 0, overflow: 'visible' }}

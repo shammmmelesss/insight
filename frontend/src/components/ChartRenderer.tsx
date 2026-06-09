@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 
 // 图表类型
 type ChartType = 'crossTable' | 'bar' | 'line' | 'pie' | 'indicator' | 'dualAxis';
@@ -13,8 +13,11 @@ import {
 import { asyncGetAllPlainData } from '@antv/s2';
 import { Chart } from '@antv/g2';
 
+export interface ChartRendererHandle {
+  downloadCrossTable: (fileName?: string) => Promise<void>;
+}
+
 interface ChartRendererProps {
-  showDownload?: boolean;
   chartType: ChartType;
   chartData?: any[];
   rowFields?: string[];
@@ -30,7 +33,7 @@ interface ChartRendererProps {
   fieldLabelMap?: Record<string, string>;
 }
 
-const ChartRenderer: React.FC<ChartRendererProps> = ({
+const ChartRenderer = forwardRef<ChartRendererHandle, ChartRendererProps>(({
   chartType,
   chartData = [],
   rowFields = [],
@@ -44,8 +47,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   containerHeight,
   fieldFormats = {},
   fieldLabelMap = {},
-  showDownload = false,
-}) => {
+}, ref) => {
   const getFieldLabel = (key: string): string => fieldLabelMap[key] || key;
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<PivotSheet | Chart | null>(null);
@@ -1051,9 +1053,9 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       btn.addEventListener('mouseenter', () => { btn.style.color = '#1783FF'; });
       btn.addEventListener('mouseleave', () => { btn.style.color = '#8c8c8c'; });
       const d = dir === 'left'
-        ? 'M7 10L4 7l3-3'
-        : 'M5 4l3 3-3 3';
-      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 12 14" fill="none"><polyline points="${d}" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        ? 'M8 10L5 7l3-3'
+        : 'M4 4l3 3-3 3';
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 12 12" fill="none"><polyline points="${d}" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
       return btn;
     };
 
@@ -1143,17 +1145,19 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
   renderChartCallbackRef.current = renderChart;
 
-  const handleDownloadCrossTable = async () => {
+  const handleDownloadCrossTable = async (fileName = 'cross_table') => {
     const s2 = chartInstanceRef.current as PivotSheet;
     if (!s2) return;
     const data = await asyncGetAllPlainData({ sheetInstance: s2, split: ',', formatOptions: true });
     const blob = new Blob([`﻿${data}`], { type: 'text/csv;charset=utf-8' });
     const link = document.createElement('a');
-    link.download = 'cross_table.csv';
+    link.download = `${fileName}.csv`;
     link.href = URL.createObjectURL(blob);
     link.click();
     URL.revokeObjectURL(link.href);
   };
+
+  useImperativeHandle(ref, () => ({ downloadCrossTable: handleDownloadCrossTable }));
 
   return (
     <div style={{ width: '100%', height: containerHeight ? `${containerHeight}px` : '100%', display: 'flex', flexDirection: 'column', overflow: 'visible' }}>
@@ -1164,6 +1168,6 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
       <div ref={legendContainerRef} style={{ flexShrink: 0 }} />
     </div>
   );
-};
+});
 
 export default ChartRenderer;

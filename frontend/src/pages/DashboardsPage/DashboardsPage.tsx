@@ -5,7 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { Dashboard, ChartOption, FilterField, DashboardLayoutItem } from '@shared/api.interface';
 import DashboardList from '../../components/DashboardList/DashboardList';
-import ChartRenderer from '../../components/ChartRenderer';
+import ChartRenderer, { ChartRendererHandle } from '../../components/ChartRenderer';
 import { dashboardCache } from '../../utils/dashboardCache';
 import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel} from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
 
@@ -73,6 +73,11 @@ const DashboardsPage: React.FC = () => {
   const [chartData, setChartData] = useState<Record<string, unknown[]>>({});
   const [chartConfigs, setChartConfigs] = useState<Record<string, Record<string, unknown>>>({});
   const [chartLoadingMap, setChartLoadingMap] = useState<Record<string, boolean>>({});
+  const chartRendererRefs = useRef<Record<string, React.RefObject<ChartRendererHandle>>>({});
+  const getChartRef = (id: string) => {
+    if (!chartRendererRefs.current[id]) chartRendererRefs.current[id] = React.createRef<ChartRendererHandle>();
+    return chartRendererRefs.current[id];
+  };
   const loadedChartIds = useRef<Set<string>>(new Set());
   const visibleChartIds = useRef<Set<string>>(new Set());
   const [filters, setFilters] = useState<FilterField[]>([]);
@@ -87,6 +92,15 @@ const DashboardsPage: React.FC = () => {
   const [chartSQLs, setChartSQLs] = useState<Record<string, string>>({});
   const [sqlModalVisible, setSqlModalVisible] = useState(false);
   const [currentSQLChartId, setCurrentSQLChartId] = useState('');
+
+  // 交叉表自定义表头：已确认的可见字段 (null = 全部可见)
+  const [crossTableVisible, setCrossTableVisible] = useState<Record<string, { rowFields: string[]; colFields: string[]; measureFields: string[] } | null>>({});
+  // Popover 开关
+  const [fieldPickerOpen, setFieldPickerOpen] = useState<Record<string, boolean>>({});
+  // Popover 内临时选中状态（未确认）
+  const [fieldPickerTemp, setFieldPickerTemp] = useState<Record<string, { rowFields: Set<string>; colFields: Set<string>; measureFields: Set<string> }>>({});
+  // 搜索关键词
+  const [fieldPickerSearch, setFieldPickerSearch] = useState<Record<string, string>>({});
 
   const applyDashboardList = (items: Dashboard[], fromCache: boolean) => {
     setDashboards(items);
@@ -348,6 +362,195 @@ const DashboardsPage: React.FC = () => {
   const extractNames = (fields: Array<{ originalName: string }> | unknown) =>
     (Array.isArray(fields) ? fields : []).map((f: { originalName: string }) => f.originalName);
 
+  const openFieldPicker = (chartId: string, cfg: Record<string, unknown>) => {
+    const visible = crossTableVisible[chartId];
+    const allRow = extractNames(cfg.rowFields);
+    const allCol = extractNames(cfg.colFields);
+    const allMeasure = extractNames(cfg.measureFields);
+    setFieldPickerTemp(prev => ({
+      ...prev,
+      [chartId]: {
+        rowFields: new Set(visible ? visible.rowFields : allRow),
+        colFields: new Set(visible ? visible.colFields : allCol),
+        measureFields: new Set(visible ? visible.measureFields : allMeasure),
+      },
+    }));
+    setFieldPickerSearch(prev => ({ ...prev, [chartId]: '' }));
+    setFieldPickerOpen(prev => ({ ...prev, [chartId]: true }));
+  };
+
+  const confirmFieldPicker = (chartId: string) => {
+    const temp = fieldPickerTemp[chartId];
+    if (!temp) return;
+    setCrossTableVisible(prev => ({
+      ...prev,
+      [chartId]: {
+        rowFields: [...temp.rowFields],
+        colFields: [...temp.colFields],
+        measureFields: [...temp.measureFields],
+      },
+    }));
+    setFieldPickerOpen(prev => ({ ...prev, [chartId]: false }));
+  };
+
+  const renderFieldPicker = (chartId: string, cfg: Record<string, unknown>, labelMap: Record<string, string>, visibleOverride?: { rowFields: string[]; colFields: string[]; measureFields: string[] } | null) => {
+    const allRow = extractNames(cfg.rowFields);
+    const allCol = extractNames(cfg.colFields);
+    const allMeasure = extractNames(cfg.measureFields);
+    const temp = fieldPickerTemp[chartId] ?? {
+      rowFields: new Set(visibleOverride ? visibleOverride.rowFields : allRow),
+      colFields: new Set(visibleOverride ? visibleOverride.colFields : allCol),
+      measureFields: new Set(visibleOverride ? visibleOverride.measureFields : allMeasure),
+    };
+    const search = (fieldPickerSearch[chartId] || '').toLowerCase();
+
+    const filterBySearch = (names: string[]) =>
+      search ? names.filter(n => (labelMap[n] || n).toLowerCase().includes(search)) : names;
+
+    const visibleRow = filterBySearch(allRow);
+    const visibleCol = filterBySearch(allCol);
+    const visibleMeasure = filterBySearch(allMeasure);
+
+    const allVisible = [...visibleRow, ...visibleCol, ...visibleMeasure];
+    const allChecked = allVisible.every(n =>
+      (visibleRow.includes(n) ? temp.rowFields : visibleCol.includes(n) ? temp.colFields : temp.measureFields).has(n)
+    );
+    const allIndeterminate = !allChecked && allVisible.some(n =>
+      (visibleRow.includes(n) ? temp.rowFields : visibleCol.includes(n) ? temp.colFields : temp.measureFields).has(n)
+    );
+
+    const toggle = (set: 'rowFields' | 'colFields' | 'measureFields', name: string) => {
+      setFieldPickerTemp(prev => {
+        const cur = prev[chartId];
+        if (!cur) return prev;
+        const next = new Set(cur[set]);
+        next.has(name) ? next.delete(name) : next.add(name);
+        return { ...prev, [chartId]: { ...cur, [set]: next } };
+      });
+    };
+
+    const toggleGroup = (set: 'rowFields' | 'colFields' | 'measureFields', names: string[], checked: boolean) => {
+      setFieldPickerTemp(prev => {
+        const cur = prev[chartId];
+        if (!cur) return prev;
+        const next = new Set(cur[set]);
+        names.forEach(n => checked ? next.add(n) : next.delete(n));
+        return { ...prev, [chartId]: { ...cur, [set]: next } };
+      });
+    };
+
+    const toggleAll = (checked: boolean) => {
+      setFieldPickerTemp(prev => {
+        const cur = prev[chartId];
+        if (!cur) return prev;
+        return {
+          ...prev,
+          [chartId]: {
+            rowFields: checked ? new Set([...cur.rowFields, ...visibleRow]) : new Set([...cur.rowFields].filter(n => !visibleRow.includes(n))),
+            colFields: checked ? new Set([...cur.colFields, ...visibleCol]) : new Set([...cur.colFields].filter(n => !visibleCol.includes(n))),
+            measureFields: checked ? new Set([...cur.measureFields, ...visibleMeasure]) : new Set([...cur.measureFields].filter(n => !visibleMeasure.includes(n))),
+          },
+        };
+      });
+    };
+
+    const groups: { label: string; set: 'rowFields' | 'colFields' | 'measureFields'; names: string[] }[] = [
+      { label: '行维度', set: 'rowFields', names: visibleRow },
+      { label: '列维度', set: 'colFields', names: visibleCol },
+      { label: '指标', set: 'measureFields', names: visibleMeasure },
+    ];
+
+    return (
+      <div style={{ width: 240 }} onMouseDown={e => e.stopPropagation()}>
+        {/* 搜索框 */}
+        <div style={{ padding: '8px 12px 4px' }}>
+          <input
+            placeholder="搜索字段"
+            value={fieldPickerSearch[chartId] || ''}
+            onChange={e => setFieldPickerSearch(prev => ({ ...prev, [chartId]: e.target.value }))}
+            style={{ width: '100%', padding: '4px 8px', border: '1px solid #d9d9d9', borderRadius: 4, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+          />
+        </div>
+        {/* 分组列表 */}
+        <div style={{ maxHeight: 260, overflowY: 'auto', padding: '4px 0' }}>
+          {groups.map(({ label, set, names }) => {
+            if (names.length === 0 && search) return null;
+            const checkedCount = names.filter(n => temp[set].has(n)).length;
+            const groupChecked = names.length > 0 && checkedCount === names.length;
+            const groupIndeterminate = checkedCount > 0 && !groupChecked;
+            return (
+              <div key={set}>
+                {/* 分组标题 */}
+                <div
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', cursor: names.length > 0 ? 'pointer' : 'default' }}
+                  onClick={() => names.length > 0 && toggleGroup(set, names, !groupChecked)}
+                >
+                  <input
+                    type="checkbox"
+                    checked={groupChecked}
+                    ref={el => { if (el) el.indeterminate = groupIndeterminate; }}
+                    onChange={e => toggleGroup(set, names, e.target.checked)}
+                    onClick={e => e.stopPropagation()}
+                    style={{ cursor: 'pointer', accentColor: '#1677ff' }}
+                  />
+                  <span style={{ fontSize: 13, fontWeight: 500, color: '#262626' }}>
+                    {label}({checkedCount}/{names.length})
+                  </span>
+                </div>
+                {/* 字段列表 */}
+                {names.map(name => (
+                  <div
+                    key={name}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 12px 3px 28px', cursor: 'pointer' }}
+                    onClick={() => toggle(set, name)}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={temp[set].has(name)}
+                      onChange={() => toggle(set, name)}
+                      onClick={e => e.stopPropagation()}
+                      style={{ cursor: 'pointer', accentColor: '#1677ff' }}
+                    />
+                    <span style={{ fontSize: 13, color: '#595959', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {labelMap[name] || name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+        {/* 底部：全选 + 按钮 */}
+        <div style={{ borderTop: '1px solid #f0f0f0', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
+            <input
+              type="checkbox"
+              checked={allChecked}
+              ref={el => { if (el) el.indeterminate = allIndeterminate; }}
+              onChange={e => toggleAll(e.target.checked)}
+              style={{ cursor: 'pointer', accentColor: '#1677ff' }}
+            />
+            全选
+          </label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => setFieldPickerOpen(prev => ({ ...prev, [chartId]: false }))}
+              style={{ padding: '3px 12px', fontSize: 13, border: '1px solid #d9d9d9', borderRadius: 4, background: '#fff', cursor: 'pointer' }}
+            >
+              取消
+            </button>
+            <button
+              onClick={() => confirmFieldPicker(chartId)}
+              style={{ padding: '3px 12px', fontSize: 13, border: 'none', borderRadius: 4, background: '#1677ff', color: '#fff', cursor: 'pointer' }}
+            >
+              确定
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const chineseAggToAlias = (agg: string): string => {
     switch (agg) {
       case '求和': return 'sum';
@@ -532,24 +735,17 @@ const DashboardsPage: React.FC = () => {
                 ...(chart?.type === 'crossTable' ? [{
                   key: 'download',
                   label: '下载数据',
-                  onClick: () => {
-                    const rows = chartData[item.chartId] as Record<string, unknown>[] | undefined;
-                    if (!rows || rows.length === 0) return;
-                    const headers = Object.keys(rows[0]);
-                    const csv = [headers.join(','), ...rows.map(r => headers.map(h => {
-                      const v = String(r[h] ?? '');
-                      return v.includes(',') || v.includes('"') || v.includes('\n') ? `"${v.replace(/"/g, '""')}"` : v;
-                    }).join(','))].join('\n');
-                    const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' });
-                    const link = document.createElement('a');
-                    link.download = `${chart?.name || 'cross_table'}.csv`;
-                    link.href = URL.createObjectURL(blob);
-                    link.click();
-                    URL.revokeObjectURL(link.href);
-                  },
+                  onClick: () => getChartRef(item.chartId).current?.downloadCrossTable(chart?.name || 'cross_table'),
                 }] : []),
               ];
               const appliedFilters = filters.filter(f => f.charts.length === 0 || f.charts.includes(item.chartId));
+              const isCrossTable = chart?.type === 'crossTable';
+              const labelMap = buildFieldLabelMap(cfg);
+              const visibleFields = crossTableVisible[item.chartId];
+              const allFieldCount = extractNames(cfg.rowFields).length + extractNames(cfg.colFields).length + extractNames(cfg.measureFields).length;
+              const selectedFieldCount = visibleFields
+                ? visibleFields.rowFields.length + visibleFields.colFields.length + visibleFields.measureFields.length
+                : allFieldCount;
               const cardTitle = (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
@@ -571,9 +767,37 @@ const DashboardsPage: React.FC = () => {
                       </Tooltip>
                     )}
                   </div>
-                  <Dropdown menu={{ items: chartMenuItems }} trigger={['click']} placement="bottomRight">
-                    <Button type="text" size="small" icon={<EllipsisOutlined style={{ fontSize: 13, color: '#8c8c8c' }} />} onClick={e => e.stopPropagation()} />
-                  </Dropdown>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                    {isCrossTable && allFieldCount > 0 && (
+                      <Popover
+                        open={!!fieldPickerOpen[item.chartId]}
+                        onOpenChange={open => {
+                          if (open) openFieldPicker(item.chartId, cfg);
+                          else setFieldPickerOpen(prev => ({ ...prev, [item.chartId]: false }));
+                        }}
+                        content={renderFieldPicker(item.chartId, cfg, labelMap)}
+                        trigger="click"
+                        placement="bottomRight"
+                        arrow={false}
+                        overlayInnerStyle={{ padding: 0 }}
+                      >
+                        <Button
+                          size="small"
+                          type="text"
+                          style={{ fontSize: 12, color: '#595959', padding: '0 6px', display: 'flex', alignItems: 'center', gap: 4 }}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          已选字段({selectedFieldCount})
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ marginTop: 1 }}>
+                            <path d="M2 3.5L5 6.5L8 3.5" stroke="#595959" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </Button>
+                      </Popover>
+                    )}
+                    <Dropdown menu={{ items: chartMenuItems }} trigger={['click']} placement="bottomRight">
+                      <Button type="text" size="small" icon={<EllipsisOutlined style={{ fontSize: 13, color: '#8c8c8c' }} />} onClick={e => e.stopPropagation()} />
+                    </Dropdown>
+                  </div>
                 </div>
               );
               return (
@@ -598,11 +822,12 @@ const DashboardsPage: React.FC = () => {
                       </div>
                     ) : hasData ? (
                       <ChartRenderer
+                        ref={getChartRef(item.chartId)}
                         chartType={chart?.type ?? 'bar'}
                         chartData={dataRows!}
-                        rowFields={extractNames(cfg.rowFields)}
-                        colFields={extractNames(cfg.colFields)}
-                        measureFields={extractNames(cfg.measureFields)}
+                        rowFields={visibleFields ? visibleFields.rowFields : extractNames(cfg.rowFields)}
+                        colFields={visibleFields ? visibleFields.colFields : extractNames(cfg.colFields)}
+                        measureFields={visibleFields ? visibleFields.measureFields : extractNames(cfg.measureFields)}
                         xAxisFields={extractNames(cfg.xAxisFields)}
                         yAxisFields={extractNames(cfg.yAxisFields)}
                         y2AxisFields={extractNames(cfg.y2AxisFields)}

@@ -1140,7 +1140,7 @@ const ChartConfigPage: React.FC = () => {
                 <ChartRenderer
                   chartType={chartType}
                   chartData={chartData}
-                  showDownload
+
                   rowFields={rowFields.map(f => f.originalName)}
                   colFields={colFields.map(f => f.originalName)}
                   measureFields={measureFields.map(f => f.originalName)}

@@ -379,21 +379,46 @@ const DashboardsPage: React.FC = () => {
     setFieldPickerOpen(prev => ({ ...prev, [chartId]: true }));
   };
 
-  const confirmFieldPicker = (chartId: string) => {
+  const confirmFieldPicker = async (chartId: string, cfg: Record<string, unknown>, chartType: string) => {
     const temp = fieldPickerTemp[chartId];
     if (!temp) return;
+
+    const selectedRow = [...temp.rowFields];
+    const selectedCol = [...temp.colFields];
+    const selectedMeasure = [...temp.measureFields];
+
     setCrossTableVisible(prev => ({
       ...prev,
-      [chartId]: {
-        rowFields: [...temp.rowFields],
-        colFields: [...temp.colFields],
-        measureFields: [...temp.measureFields],
-      },
+      [chartId]: { rowFields: selectedRow, colFields: selectedCol, measureFields: selectedMeasure },
     }));
     setFieldPickerOpen(prev => ({ ...prev, [chartId]: false }));
+
+    // 用选中字段过滤原始 fieldConfig，构造新 config 发请求重新聚合
+    const filterFields = <T extends { originalName: string }>(arr: T[], names: string[]): T[] =>
+      (Array.isArray(arr) ? arr : []).filter(f => names.includes(f.originalName));
+
+    const newConfig = {
+      ...cfg,
+      rowFields: filterFields(cfg.rowFields as any[], selectedRow),
+      colFields: filterFields(cfg.colFields as any[], selectedCol),
+      measureFields: filterFields(cfg.measureFields as any[], selectedMeasure),
+    };
+
+    setChartLoadingMap(prev => ({ ...prev, [chartId]: true }));
+    try {
+      const resp = await axios.post(`/api/charts/${chartId}/preview`, {
+        config: JSON.stringify(newConfig),
+        type: chartType,
+      });
+      setChartData(prev => ({ ...prev, [chartId]: resp.data.data }));
+    } catch (e) {
+      console.error('重新加载交叉表数据失败', e);
+    } finally {
+      setChartLoadingMap(prev => ({ ...prev, [chartId]: false }));
+    }
   };
 
-  const renderFieldPicker = (chartId: string, cfg: Record<string, unknown>, labelMap: Record<string, string>, visibleOverride?: { rowFields: string[]; colFields: string[]; measureFields: string[] } | null) => {
+  const renderFieldPicker = (chartId: string, cfg: Record<string, unknown>, labelMap: Record<string, string>, chartType: string, visibleOverride?: { rowFields: string[]; colFields: string[]; measureFields: string[] } | null) => {
     const allRow = extractNames(cfg.rowFields);
     const allCol = extractNames(cfg.colFields);
     const allMeasure = extractNames(cfg.measureFields);
@@ -540,7 +565,7 @@ const DashboardsPage: React.FC = () => {
               取消
             </button>
             <button
-              onClick={() => confirmFieldPicker(chartId)}
+              onClick={() => confirmFieldPicker(chartId, cfg, chartType)}
               style={{ padding: '3px 12px', fontSize: 13, border: 'none', borderRadius: 4, background: '#1677ff', color: '#fff', cursor: 'pointer' }}
             >
               确定
@@ -775,7 +800,7 @@ const DashboardsPage: React.FC = () => {
                           if (open) openFieldPicker(item.chartId, cfg);
                           else setFieldPickerOpen(prev => ({ ...prev, [item.chartId]: false }));
                         }}
-                        content={renderFieldPicker(item.chartId, cfg, labelMap, visibleFields)}
+                        content={renderFieldPicker(item.chartId, cfg, labelMap, chart?.type ?? 'crossTable', visibleFields)}
                         trigger="click"
                         placement="bottomRight"
                         arrow={false}

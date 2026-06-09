@@ -775,11 +775,12 @@ const DashboardsPage: React.FC = () => {
                           if (open) openFieldPicker(item.chartId, cfg);
                           else setFieldPickerOpen(prev => ({ ...prev, [item.chartId]: false }));
                         }}
-                        content={renderFieldPicker(item.chartId, cfg, labelMap)}
+                        content={renderFieldPicker(item.chartId, cfg, labelMap, visibleFields)}
                         trigger="click"
                         placement="bottomRight"
                         arrow={false}
                         overlayInnerStyle={{ padding: 0 }}
+                        getPopupContainer={() => document.body}
                       >
                         <Button
                           size="small"

@@ -533,6 +533,25 @@ const DashboardEditPage: React.FC = () => {
                                 label: '复制图表',
                                 onClick: () => handleCopyChart(item),
                               },
+                              ...(chart?.type === 'crossTable' ? [{
+                                key: 'download',
+                                label: '下载数据',
+                                onClick: () => {
+                                  const rows = (chartData[item.chartId] || []) as Record<string, unknown>[];
+                                  if (!rows.length) return;
+                                  const headers = Object.keys(rows[0]);
+                                  const csv = [headers.join(','), ...rows.map(r => headers.map(h => {
+                                    const v = String(r[h] ?? '');
+                                    return v.includes(',') || v.includes('"') || v.includes('\n') ? `"${v.replace(/"/g, '""')}"` : v;
+                                  }).join(','))].join('\n');
+                                  const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' });
+                                  const link = document.createElement('a');
+                                  link.download = `${chart?.name || 'cross_table'}.csv`;
+                                  link.href = URL.createObjectURL(blob);
+                                  link.click();
+                                  URL.revokeObjectURL(link.href);
+                                },
+                              }] : []),
                               { type: 'divider' as const },
                               {
                                 key: 'remove',

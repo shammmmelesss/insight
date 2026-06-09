@@ -1156,20 +1156,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   };
 
   return (
-    <div style={{ width: '100%', height: containerHeight ? `${containerHeight}px` : '100%', display: 'flex', flexDirection: 'column', overflow: 'visible', position: 'relative' }}>
-      {showDownload && chartType === 'crossTable' && (
-        <button
-          onClick={handleDownloadCrossTable}
-          style={{
-            position: 'absolute', top: 6, right: 8, zIndex: 10,
-            padding: '3px 10px', fontSize: 12, cursor: 'pointer',
-            background: '#fff', border: '1px solid #d9d9d9', borderRadius: 4,
-            color: '#595959', lineHeight: '20px',
-          }}
-        >
-          下载 CSV
-        </button>
-      )}
+    <div style={{ width: '100%', height: containerHeight ? `${containerHeight}px` : '100%', display: 'flex', flexDirection: 'column', overflow: 'visible' }}>
       <div
         ref={chartRef}
         style={{ flex: 1, minHeight: 0, overflow: 'visible' }}

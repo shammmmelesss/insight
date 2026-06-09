@@ -529,6 +529,25 @@ const DashboardsPage: React.FC = () => {
                 { key: 'refresh', label: '刷新数据', onClick: () => refetchSingleChart(item.chartId) },
                 { key: 'sql', label: '查看SQL', icon: <CodeOutlined />, onClick: () => { setCurrentSQLChartId(item.chartId); setSqlModalVisible(true); } },
                 { key: 'edit', label: '编辑图表', onClick: () => navigate(`/chart-config?chartId=${item.chartId}`) },
+                ...(chart?.type === 'crossTable' ? [{
+                  key: 'download',
+                  label: '下载数据',
+                  onClick: () => {
+                    const rows = chartData[item.chartId] as Record<string, unknown>[] | undefined;
+                    if (!rows || rows.length === 0) return;
+                    const headers = Object.keys(rows[0]);
+                    const csv = [headers.join(','), ...rows.map(r => headers.map(h => {
+                      const v = String(r[h] ?? '');
+                      return v.includes(',') || v.includes('"') || v.includes('\n') ? `"${v.replace(/"/g, '""')}"` : v;
+                    }).join(','))].join('\n');
+                    const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' });
+                    const link = document.createElement('a');
+                    link.download = `${chart?.name || 'cross_table'}.csv`;
+                    link.href = URL.createObjectURL(blob);
+                    link.click();
+                    URL.revokeObjectURL(link.href);
+                  },
+                }] : []),
               ];
               const appliedFilters = filters.filter(f => f.charts.length === 0 || f.charts.includes(item.chartId));
               const cardTitle = (

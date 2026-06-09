@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -22,6 +23,9 @@ import (
 )
 
 const queryTimeout = 30 * time.Second
+
+// extractCancels stores cancel functions for running extract goroutines, keyed by dataset ID
+var extractCancels sync.Map
 
 // RegisterDatasetRoutes 注册数据集路由
 func RegisterDatasetRoutes(rg *gin.RouterGroup) {
@@ -38,6 +42,8 @@ func RegisterDatasetRoutes(rg *gin.RouterGroup) {
 		dataset.GET("/:id/charts", GetDatasetCharts)
 		dataset.POST("/preview", PreviewDataset)
 		dataset.POST("/:id/extract", TriggerExtract)
+		dataset.POST("/:id/stop-extract", StopExtract)
+		dataset.POST("/:id/clear-data", ClearExtractData)
 	}
 }
 
@@ -684,20 +690,31 @@ func TriggerExtract(c *gin.Context) {
 	}
 
 	// 标记为运行中
-	now := time.Now()
 	database.DB.Model(&dataset).Updates(map[string]interface{}{
 		"extract_status": models.ExtractStatusRunning,
 		"extract_error":  "",
 	})
 
+	ctx, cancel := context.WithCancel(context.Background())
+	extractCancels.Store(dataset.ID.String(), cancel)
+
 	// 异步执行抽取
 	go func() {
-		err := doExtract(dataset)
-		now = time.Now()
+		defer func() {
+			extractCancels.Delete(dataset.ID.String())
+			cancel()
+		}()
+		err := doExtract(ctx, dataset)
+		now := time.Now()
 		if err != nil {
+			status := models.ExtractStatusFailed
+			errMsg := err.Error()
+			if ctx.Err() != nil {
+				errMsg = "已手动停止"
+			}
 			database.DB.Model(&dataset).Updates(map[string]interface{}{
-				"extract_status": models.ExtractStatusFailed,
-				"extract_error":  err.Error(),
+				"extract_status":  status,
+				"extract_error":   errMsg,
 				"last_extract_at": now,
 			})
 		} else {
@@ -713,7 +730,7 @@ func TriggerExtract(c *gin.Context) {
 }
 
 // doExtract 执行数据抽取：从源数据库读取并写入 ClickHouse
-func doExtract(dataset models.Dataset) error {
+func doExtract(ctx context.Context, dataset models.Dataset) error {
 	var dataSource models.DataSource
 	if err := database.DB.First(&dataSource, "id = ?", dataset.DataSourceID).Error; err != nil {
 		return fmt.Errorf("数据源不存在: %w", err)
@@ -725,7 +742,7 @@ func doExtract(dataset models.Dataset) error {
 	}
 	defer srcDB.Close()
 
-	rows, err := srcDB.Query(dataset.SQL)
+	rows, err := srcDB.QueryContext(ctx, dataset.SQL)
 	if err != nil {
 		return fmt.Errorf("执行 SQL 失败: %w", err)
 	}
@@ -738,17 +755,85 @@ func doExtract(dataset models.Dataset) error {
 
 	tableName := "ds_" + strings.ReplaceAll(dataset.ID.String(), "-", "_")
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	// 建表 DDL
 	if err := createClickHouseTable(tableName, colTypes); err != nil {
 		return fmt.Errorf("建表失败: %w", err)
 	}
 
 	// 批量写入
-	if err := insertRows(tableName, colTypes, rows); err != nil {
+	if err := insertRows(ctx, tableName, colTypes, rows); err != nil {
 		return fmt.Errorf("写入数据失败: %w", err)
 	}
 
 	return nil
+}
+
+// StopExtract 停止正在运行的抽取任务
+func StopExtract(c *gin.Context) {
+	id := c.Param("id")
+
+	var dataset models.Dataset
+	if err := database.DB.First(&dataset, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "数据集不存在"})
+		return
+	}
+	if dataset.ExtractStatus != models.ExtractStatusRunning {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "当前没有正在运行的抽取任务"})
+		return
+	}
+
+	if cancelVal, ok := extractCancels.Load(id); ok {
+		cancelVal.(context.CancelFunc)()
+	}
+
+	now := time.Now()
+	database.DB.Model(&dataset).Updates(map[string]interface{}{
+		"extract_status":  models.ExtractStatusFailed,
+		"extract_error":   "已手动停止",
+		"last_extract_at": now,
+	})
+
+	c.JSON(http.StatusOK, gin.H{"message": "抽取任务已停止"})
+}
+
+// ClearExtractData 清空数据集在 ClickHouse 中的数据并重置抽取状态
+func ClearExtractData(c *gin.Context) {
+	id := c.Param("id")
+
+	var dataset models.Dataset
+	if err := database.DB.First(&dataset, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "数据集不存在"})
+		return
+	}
+	if dataset.Type != models.DatasetTypeExtract {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "仅抽取类型数据集支持此操作"})
+		return
+	}
+	if dataset.ExtractStatus == models.ExtractStatusRunning {
+		c.JSON(http.StatusConflict, gin.H{"error": "抽取任务正在进行中，请先停止后再清空"})
+		return
+	}
+
+	if database.ClickHouseDB != nil {
+		tableName := "ds_" + strings.ReplaceAll(id, "-", "_")
+		dropSQL := fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)
+		if _, err := database.ClickHouseDB.Exec(dropSQL); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "清空数据失败: " + err.Error()})
+			return
+		}
+	}
+
+	database.DB.Model(&dataset).Updates(map[string]interface{}{
+		"extract_status":  models.ExtractStatusIdle,
+		"extract_error":   "",
+		"last_extract_at": nil,
+	})
+
+	c.JSON(http.StatusOK, gin.H{"message": "数据已清空"})
 }
 
 // createClickHouseTable 在 ClickHouse 中创建（或重建）目标表
@@ -776,7 +861,7 @@ func createClickHouseTable(tableName string, colTypes []*sql.ColumnType) error {
 }
 
 // insertRows 将查询结果批量插入 ClickHouse
-func insertRows(tableName string, colTypes []*sql.ColumnType, rows *sql.Rows) error {
+func insertRows(ctx context.Context, tableName string, colTypes []*sql.ColumnType, rows *sql.Rows) error {
 	ckDB := database.ClickHouseDB
 	colNames := make([]string, len(colTypes))
 	for i, ct := range colTypes {
@@ -806,6 +891,10 @@ func insertRows(tableName string, colTypes []*sql.ColumnType, rows *sql.Rows) er
 	}
 
 	for rows.Next() {
+		if ctx.Err() != nil {
+			tx.Rollback()
+			return ctx.Err()
+		}
 		if err := rows.Scan(ptrs...); err != nil {
 			tx.Rollback()
 			return err
@@ -963,13 +1052,23 @@ func runScheduledExtracts() {
 			"extract_status": models.ExtractStatusRunning,
 			"extract_error":  "",
 		})
+		ctx, cancel := context.WithCancel(context.Background())
+		extractCancels.Store(dataset.ID.String(), cancel)
 		go func() {
-			err := doExtract(dataset)
+			defer func() {
+				extractCancels.Delete(dataset.ID.String())
+				cancel()
+			}()
+			err := doExtract(ctx, dataset)
 			t := time.Now()
 			if err != nil {
+				errMsg := err.Error()
+				if ctx.Err() != nil {
+					errMsg = "已手动停止"
+				}
 				database.DB.Model(&dataset).Updates(map[string]interface{}{
 					"extract_status":  models.ExtractStatusFailed,
-					"extract_error":   err.Error(),
+					"extract_error":   errMsg,
 					"last_extract_at": t,
 				})
 				log.Printf("[scheduler] extract failed for dataset %s: %v", dataset.ID, err)

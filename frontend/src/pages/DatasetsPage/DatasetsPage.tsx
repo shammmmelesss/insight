@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { App, Button, Card, Table, Modal, Drawer, Form, Input, Tabs, Row, Col, Select, Radio, TimePicker, Tooltip, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined, SyncOutlined, CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined, SyncOutlined, CheckCircleOutlined, CloseCircleOutlined, StopOutlined, ClearOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { Dataset, CreateDatasetRequest, UpdateDatasetRequest, FieldConfig, DataType, DatasetType, ExtractSchedule, ExtractFrequency, ExtractStatus } from '@shared/api.interface';
@@ -390,6 +390,40 @@ const DatasetsPage: React.FC = () => {
     }
   };
 
+  const [stoppingIds, setStoppingIds] = useState<Set<string>>(new Set());
+
+  const stopExtract = async (id: string) => {
+    setStoppingIds(prev => new Set(prev).add(id));
+    try {
+      await axios.post(`/api/datasets/${id}/stop-extract`);
+      message.success('抽取任务已停止');
+      fetchDatasets();
+    } catch (error: any) {
+      message.error(error.response?.data?.error || '停止失败');
+    } finally {
+      setStoppingIds(prev => { const s = new Set(prev); s.delete(id); return s; });
+    }
+  };
+
+  const clearExtractData = async (id: string) => {
+    modal.confirm({
+      title: '确认清空数据',
+      content: '将删除该数据集在 ClickHouse 中的所有数据，并重置抽取状态。此操作不可恢复，是否继续？',
+      okText: '确认清空',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await axios.post(`/api/datasets/${id}/clear-data`);
+          message.success('数据已清空');
+          fetchDatasets();
+        } catch (error: any) {
+          message.error(error.response?.data?.error || '清空失败');
+        }
+      },
+    });
+  };
+
   const renderExtractStatus = (status: ExtractStatus | undefined, lastAt: string | undefined, error: string | undefined) => {
     if (!status || status === 'idle') return <Tag>未抽取</Tag>;
     if (status === 'running') return <Tag icon={<SyncOutlined spin />} color="processing">抽取中</Tag>;
@@ -485,15 +519,37 @@ const DatasetsPage: React.FC = () => {
             可视化
           </Button>
           {record.type === 'extract' && (
+            record.extractStatus === 'running' || extractingIds.has(record.id) ? (
+              <Button
+                size="small"
+                icon={<StopOutlined />}
+                loading={stoppingIds.has(record.id)}
+                disabled={stoppingIds.has(record.id)}
+                onClick={() => stopExtract(record.id)}
+                style={{ marginRight: 8 }}
+                danger
+              >
+                停止抽取
+              </Button>
+            ) : (
+              <Button
+                size="small"
+                icon={<SyncOutlined />}
+                onClick={() => triggerExtract(record.id)}
+                style={{ marginRight: 8 }}
+              >
+                手动抽取
+              </Button>
+            )
+          )}
+          {record.type === 'extract' && record.extractStatus !== 'idle' && record.extractStatus !== 'running' && !extractingIds.has(record.id) && (
             <Button
               size="small"
-              icon={<SyncOutlined />}
-              loading={extractingIds.has(record.id)}
-              disabled={extractingIds.has(record.id) || record.extractStatus === 'running'}
-              onClick={() => triggerExtract(record.id)}
+              icon={<ClearOutlined />}
+              onClick={() => clearExtractData(record.id)}
               style={{ marginRight: 8 }}
             >
-              手动抽取
+              清空数据
             </Button>
           )}
           <Button

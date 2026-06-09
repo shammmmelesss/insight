@@ -24,7 +24,6 @@ import (
 
 const queryTimeout = 30 * time.Second
 
-// extractCancels stores cancel functions for running extract goroutines, keyed by dataset ID
 var extractCancels sync.Map
 
 // RegisterDatasetRoutes 注册数据集路由
@@ -707,13 +706,12 @@ func TriggerExtract(c *gin.Context) {
 		err := doExtract(ctx, dataset)
 		now := time.Now()
 		if err != nil {
-			status := models.ExtractStatusFailed
 			errMsg := err.Error()
 			if ctx.Err() != nil {
 				errMsg = "已手动停止"
 			}
 			database.DB.Model(&dataset).Updates(map[string]interface{}{
-				"extract_status":  status,
+				"extract_status":  models.ExtractStatusFailed,
 				"extract_error":   errMsg,
 				"last_extract_at": now,
 			})

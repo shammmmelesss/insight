@@ -609,6 +609,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .encode('y', actualYField)
           .encode('shape', 'smooth')
           .style({ fillOpacity: 0.15 })
+          .animate('enter', { type: 'fadeIn' })
           .tooltip(false);
 
         if (actualGroupField) {
@@ -623,6 +624,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .encode('y', actualYField)
           .encode('shape', 'smooth')
           .style({ lineWidth: 2 })
+          .animate('enter', { type: 'fadeIn' })
           .interaction('elementHighlight')
           .tooltip({
             title: (d: any) => String(d[actualXField] ?? ''),
@@ -698,6 +700,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
           .encode('shape', 'smooth')
           .scale('color', { domain: multiSeriesItems.map(s => s.name), range: multiSeriesItems.map(s => s.color) })
           .style({ lineWidth: 2 })
+          .animate('enter', { type: 'fadeIn' })
           .interaction('elementHighlight')
           .tooltip({
             title: (d: any) => String(d[actualXField] ?? ''),

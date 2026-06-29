@@ -24,7 +24,9 @@ export const useWorkspace = () => useContext(WorkspaceContext);
 // 这样即使组件还没渲染完，请求也能带上正确的 header
 axios.interceptors.request.use((config) => {
   const wsId = localStorage.getItem('currentWorkspaceId');
-  if (wsId) {
+  const url = config.url || '';
+  // 只对内部 API 加 workspace header，外部域名调用不加（避免 CORS preflight 被拒）
+  if (wsId && !url.startsWith('http')) {
     config.headers['X-Workspace-Id'] = wsId;
   }
   return config;

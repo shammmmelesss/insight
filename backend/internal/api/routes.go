@@ -22,6 +22,8 @@ func RegisterRoutes(r *gin.Engine) {
 		RegisterMonitorRoutes(api)
 		// 飞书路由
 		RegisterLarkRoutes(api)
+		// 当前用户
+		api.GET("/me", GetMe)
 		// 首页最近更新路由
 		RegisterHomeRoutes(api)
 		// SQL查询历史记录路由

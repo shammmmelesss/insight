@@ -54,6 +54,8 @@ func chartResponse(chart models.Chart) map[string]interface{} {
 		"workspaceId":    chart.WorkspaceID,
 		"createdAt":      chart.CreatedAt,
 		"updatedAt":      chart.UpdatedAt,
+		"createdBy":      chart.CreatedBy,
+		"updatedBy":      chart.UpdatedBy,
 		"dashboardCount": chartDashboardCount(chart.ID.String()),
 	}
 }
@@ -132,12 +134,15 @@ func CreateChart(c *gin.Context) {
 		req.Config = "{}"
 	}
 
+	userName := GetCurrentUserName(c)
 	chart := models.Chart{
 		WorkspaceID: GetWorkspaceID(c),
 		Name:        req.Name,
 		DatasetID:   datasetUUID,
 		Type:        chartType,
 		Config:      req.Config,
+		CreatedBy:   userName,
+		UpdatedBy:   userName,
 	}
 
 	result := database.DB.Create(&chart)
@@ -223,6 +228,7 @@ func UpdateChart(c *gin.Context) {
 	chart.DatasetID = datasetUUID
 	chart.Type = chartType
 	chart.Config = req.Config
+	chart.UpdatedBy = GetCurrentUserName(c)
 
 	result = database.DB.Save(&chart)
 	if result.Error != nil {

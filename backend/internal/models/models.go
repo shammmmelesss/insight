@@ -96,6 +96,8 @@ type Chart struct {
 	DatasetID   uuid.UUID `json:"datasetId"`
 	Type        ChartType `json:"type"`
 	Config      string    `json:"config" gorm:"type:jsonb;default:'{}'"`
+	CreatedBy   string    `json:"createdBy"`
+	UpdatedBy   string    `json:"updatedBy"`
 	Dataset     Dataset   `json:"-" gorm:"foreignKey:DatasetID"`
 }
 

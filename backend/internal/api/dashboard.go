@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -26,6 +27,19 @@ func RegisterDashboardRoutes(rg *gin.RouterGroup) {
 // GetCurrentUserID 从请求头获取当前用户ID
 func GetCurrentUserID(c *gin.Context) string {
 	return c.GetHeader("X-User-Id")
+}
+
+// GetCurrentUserName 从请求头获取当前用户名（前端用 encodeURIComponent 编码）
+func GetCurrentUserName(c *gin.Context) string {
+	raw := c.GetHeader("X-User-Name")
+	if raw == "" {
+		return ""
+	}
+	decoded, err := url.QueryUnescape(raw)
+	if err != nil {
+		return raw
+	}
+	return decoded
 }
 
 // canAccessDashboard 检查用户是否有权限访问看板

@@ -22,7 +22,62 @@ func RegisterLarkRoutes(rg *gin.RouterGroup) {
 	lark := rg.Group("/lark")
 	{
 		lark.GET("/users/search", SearchLarkUsers)
+		lark.GET("/work-users", GetWorkUsers)
 	}
+}
+
+// GetMe 代理 work.learnings.ai/user/me，通过转发 Cookie 获取当前登录用户信息
+func GetMe(c *gin.Context) {
+	const meAPI = "https://work.learnings.ai/work/v1/user/me"
+	req, err := http.NewRequest("GET", meAPI, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if cookie := c.GetHeader("Cookie"); cookie != "" {
+		req.Header.Set("Cookie", cookie)
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+	data, _ := io.ReadAll(resp.Body)
+	c.Data(resp.StatusCode, "application/json", data)
+}
+
+// GetWorkUsers 代理 work.learnings.ai 用户列表接口，避免浏览器 CORS 限制
+func GetWorkUsers(c *gin.Context) {
+	const workUserAPI = "https://work.learnings.ai/work/v1/user"
+
+	keyword := c.Query("keyword")
+	url := workUserAPI
+	if keyword != "" {
+		url += "?keyword=" + keyword
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	// Forward browser cookies so work.learnings.ai can authenticate the request
+	if cookie := c.GetHeader("Cookie"); cookie != "" {
+		req.Header.Set("Cookie", cookie)
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+
+	data, _ := io.ReadAll(resp.Body)
+	c.Data(resp.StatusCode, "application/json", data)
 }
 
 // SendLarkDirectMessage 通过 Bot 给指定 open_id 用户发私信

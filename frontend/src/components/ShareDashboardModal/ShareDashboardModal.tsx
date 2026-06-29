@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Modal, Select, Avatar, Space, message } from 'antd';
+import { Modal, Select, Avatar, Space, App } from 'antd';
 import { UserOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { Dashboard, LarkUser } from '@shared/api.interface';
@@ -56,6 +56,7 @@ const ShareDashboardModal: React.FC<ShareDashboardModalProps> = ({
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { message } = App.useApp();
 
   const parseSharedWith = (raw: string | LarkUser[] | undefined): WorkUser[] => {
     if (!raw) return [];

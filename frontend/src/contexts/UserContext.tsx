@@ -18,7 +18,6 @@ const USER_INFO_KEY = 'currentUserInfo';
 
 const isDev = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 
-const WORK_USER_ME_API = 'https://work.learnings.ai/work/v1/user/me';
 
 // axios 拦截器：每个请求自动带上 X-User-Id 和 X-User-Name
 axios.interceptors.request.use((config) => {
@@ -57,7 +56,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     try {
-      const res = await axios.get(WORK_USER_ME_API, { withCredentials: true });
+      const res = await axios.get('/api/me');
       const u = res.data?.data;
       if (u) {
         setUser({

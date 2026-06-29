@@ -135,8 +135,12 @@ const DashboardEditPage: React.FC = () => {
             }
           });
         }
-      } catch (error) {
-        message.error('获取看板详情失败');
+      } catch (error: any) {
+        if (error?.response?.status === 403) {
+          message.error('无权限访问此看板');
+        } else {
+          message.error('获取看板详情失败');
+        }
         console.error('获取看板详情失败:', error);
       }
     }

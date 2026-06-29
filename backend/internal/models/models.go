@@ -115,6 +115,8 @@ type Dashboard struct {
 	Name        string `json:"name"`
 	Layout      string `json:"layout" gorm:"type:jsonb;default:'[]'"`
 	Filters     string `json:"filters" gorm:"type:jsonb;default:'[]'"`
+	SharedWith  string `json:"sharedWith" gorm:"type:jsonb;default:'[]'"`
+	CreatedBy   string `json:"createdBy"`
 }
 
 // Monitor 监控模型

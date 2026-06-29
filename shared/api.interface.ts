@@ -338,6 +338,7 @@ export interface Dashboard {
   name: string;
   layout: DashboardLayoutItem[];
   filters: FilterField[];
+  sharedWith: string;
   createdAt: string;
   updatedAt: string;
 }

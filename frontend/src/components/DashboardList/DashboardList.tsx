@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Button, Input, Modal, Dropdown, Tooltip } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, MoreOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, MoreOutlined, MenuFoldOutlined, MenuUnfoldOutlined, ShareAltOutlined } from '@ant-design/icons';
 import { Dashboard } from '@shared/api.interface';
+import ShareDashboardModal from '@/components/ShareDashboardModal/ShareDashboardModal';
 import './DashboardList.css';
 
 interface DashboardListProps {
@@ -12,6 +13,7 @@ interface DashboardListProps {
   onAddDashboard: () => void;
   onEditDashboard: (dashboard: Dashboard) => void;
   onDeleteDashboard: (id: string) => void;
+  onDashboardShared?: (dashboard: Dashboard) => void;
   collapsed?: boolean;
   onCollapse?: () => void;
 }
@@ -24,12 +26,14 @@ const DashboardList: React.FC<DashboardListProps> = ({
   onAddDashboard,
   onEditDashboard,
   onDeleteDashboard,
+  onDashboardShared,
   collapsed,
   onCollapse,
 }) => {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [dashboardToDelete, setDashboardToDelete] = useState<string | null>(null);
+  const [shareModalDashboard, setShareModalDashboard] = useState<Dashboard | null>(null);
 
   const filteredDashboards = dashboards.filter(d =>
     d.name.toLowerCase().includes(searchKeyword.toLowerCase())
@@ -113,6 +117,15 @@ const DashboardList: React.FC<DashboardListProps> = ({
                       },
                     },
                     {
+                      key: 'share',
+                      icon: <ShareAltOutlined />,
+                      label: '分享',
+                      onClick: ({ domEvent }) => {
+                        domEvent.stopPropagation();
+                        setShareModalDashboard(dashboard);
+                      },
+                    },
+                    {
                       key: 'delete',
                       icon: <DeleteOutlined />,
                       label: '删除',
@@ -150,6 +163,16 @@ const DashboardList: React.FC<DashboardListProps> = ({
       >
         <p>确定要删除此看板吗？此操作不可恢复。</p>
       </Modal>
+
+      <ShareDashboardModal
+        dashboard={shareModalDashboard}
+        open={!!shareModalDashboard}
+        onClose={() => setShareModalDashboard(null)}
+        onShared={(updated) => {
+          onDashboardShared?.(updated);
+          setShareModalDashboard(null);
+        }}
+      />
     </div>
   );
 };

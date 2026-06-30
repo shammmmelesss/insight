@@ -647,6 +647,9 @@ const DashboardsPage: React.FC = () => {
           onAddDashboard={() => navigate('/dashboards/create')}
           onEditDashboard={(dashboard) => navigate(`/dashboards/edit/${dashboard.id}`)}
           onDeleteDashboard={handleDelete}
+          onDashboardShared={(updated) =>
+            setDashboards((prev) => prev.map((d) => (d.id === updated.id ? updated : d)))
+          }
           collapsed={siderCollapsed}
           onCollapse={() => setSiderCollapsed(!siderCollapsed)}
         />

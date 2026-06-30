@@ -17,6 +17,7 @@ import {
 import axios from 'axios';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { Workspace } from '@shared/api.interface';
+import PortalSidebar from './PortalSidebar';
 
 const { Header, Content } = AntLayout;
 const { Title } = Typography;
@@ -161,6 +162,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <Header style={{ display: 'flex', alignItems: 'center', padding: '0 24px', background: '#fff', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
+            <PortalSidebar />
             <Title level={4} style={{ margin: '0 24px 0 0', color: '#165DFF', whiteSpace: 'nowrap' }}>Insight</Title>
             <Menu
               mode="horizontal"

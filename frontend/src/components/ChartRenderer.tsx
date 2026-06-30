@@ -1055,7 +1055,7 @@ const ChartRenderer = forwardRef<ChartRendererHandle, ChartRendererProps>(({
       const d = dir === 'left'
         ? 'M8 10L5 7l3-3'
         : 'M4 4l3 3-3 3';
-      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 12 12" fill="none"><polyline points="${d}" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 12 12" fill="none"><path d="${d}" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
       return btn;
     };
 

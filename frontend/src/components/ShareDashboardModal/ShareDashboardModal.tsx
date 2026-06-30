@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Modal, Select, Avatar, Space, App } from 'antd';
 import { UserOutlined } from '@ant-design/icons';
 import axios from 'axios';
@@ -32,6 +32,7 @@ const ShareDashboardModal: React.FC<ShareDashboardModalProps> = ({
   const [searchOptions, setSearchOptions] = useState<WorkUser[]>([]);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState(false);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { message } = App.useApp();
 
   // Reset state when modal opens
@@ -53,12 +54,13 @@ const ShareDashboardModal: React.FC<ShareDashboardModalProps> = ({
 
   const selectedIds = selectedUsers.map((u) => u.openId);
 
-  const handleSearch = useCallback(
-    async (keyword: string) => {
-      if (!keyword) {
-        setSearchOptions([]);
-        return;
-      }
+  const handleSearch = useCallback((keyword: string) => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (!keyword) {
+      setSearchOptions([]);
+      return;
+    }
+    searchTimer.current = setTimeout(async () => {
       setSearching(true);
       try {
         const results = await searchWorkUsers(keyword);
@@ -68,9 +70,8 @@ const ShareDashboardModal: React.FC<ShareDashboardModalProps> = ({
       } finally {
         setSearching(false);
       }
-    },
-    [],
-  );
+    }, 300);
+  }, []);
 
   const handleChange = useCallback(
     (ids: string[]) => {

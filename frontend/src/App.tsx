@@ -13,7 +13,7 @@ import NotFound from './pages/NotFound/NotFound';
 import Layout from './components/Layout/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import { WorkspaceProvider, useWorkspace } from './contexts/WorkspaceContext';
-import { UserProvider } from './contexts/UserContext';
+import AuthProvider from './contexts/AuthContext';
 import './App.css';
 
 /** 用 currentWorkspace.id 作为 key，切换空间时强制重新挂载所有页面组件 */
@@ -55,13 +55,13 @@ function App() {
       >
         <AntdApp>
           <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-            <UserProvider>
+            <AuthProvider>
               <WorkspaceProvider>
                 <Layout>
                   <AppRoutes />
                 </Layout>
               </WorkspaceProvider>
-            </UserProvider>
+            </AuthProvider>
           </Router>
         </AntdApp>
       </ConfigProvider>

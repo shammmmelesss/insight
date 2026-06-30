@@ -20,7 +20,7 @@ export const isDev =
 
 /**
  * 按关键词搜索用户
- * 生产：通过后端 /api/lark/work-users 代理（避免 CORS，转发 Cookie 认证）
+ * 生产：通过后端 /api/lark/work-users 代理 work.learnings.ai（转发 cookie，无需额外配置）
  * 开发：本地过滤 MOCK 数据
  */
 export async function searchWorkUsers(keyword: string): Promise<WorkUser[]> {

@@ -14,3 +14,6 @@ clickhouse:
   user: "default"
   password: ""
   dbname: "insight"
+lark:
+  app_id: ""
+  app_secret: ""

@@ -1,9 +1,9 @@
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { Modal, Select, Avatar, Space, App } from 'antd';
 import { UserOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { Dashboard } from '@shared/api.interface';
-import { WorkUser, searchWorkUsers } from '@/lib/workUser';
+import { WorkUser, fetchAllWorkUsers } from '@/lib/workUser';
 
 export type { WorkUser };
 
@@ -26,51 +26,46 @@ const ShareDashboardModal: React.FC<ShareDashboardModalProps> = ({
   onClose,
   onShared,
 }) => {
-  // Full user objects for currently selected users (needed to persist name/avatar on save)
   const [selectedUsers, setSelectedUsers] = useState<WorkUser[]>([]);
-  // Search result options
-  const [searchOptions, setSearchOptions] = useState<WorkUser[]>([]);
-  const [searching, setSearching] = useState(false);
+  const [allUsers, setAllUsers] = useState<WorkUser[]>([]);
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [saving, setSaving] = useState(false);
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { message } = App.useApp();
 
-  // Reset state when modal opens
+  // 打开时预加载全量用户
   useEffect(() => {
     if (!open || !dashboard) return;
-    const shared = parseSharedWith(dashboard.sharedWith);
-    setSelectedUsers(shared);
-    setSearchOptions([]);
+    setSelectedUsers(parseSharedWith(dashboard.sharedWith));
+    setSearchKeyword('');
+    setLoadingUsers(true);
+    fetchAllWorkUsers()
+      .then(setAllUsers)
+      .finally(() => setLoadingUsers(false));
   }, [open, dashboard]);
 
-  // Options to render = search results + selected users (deduped, selected always visible)
+  // 本地过滤，最多展示 100 条
+  const filteredUsers = useMemo(() => {
+    if (!searchKeyword) return allUsers.slice(0, 100);
+    const kw = searchKeyword.toLowerCase();
+    return allUsers
+      .filter((u) => u.name.toLowerCase().includes(kw) || u.openId.toLowerCase().includes(kw))
+      .slice(0, 100);
+  }, [allUsers, searchKeyword]);
+
+  // 已选用户始终显示在选项中
   const displayOptions = useMemo(() => {
     const combined: WorkUser[] = [...selectedUsers];
-    searchOptions.forEach((u) => {
+    filteredUsers.forEach((u) => {
       if (!combined.find((s) => s.openId === u.openId)) combined.push(u);
     });
     return combined;
-  }, [searchOptions, selectedUsers]);
+  }, [filteredUsers, selectedUsers]);
 
   const selectedIds = selectedUsers.map((u) => u.openId);
 
   const handleSearch = useCallback((keyword: string) => {
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (!keyword) {
-      setSearchOptions([]);
-      return;
-    }
-    searchTimer.current = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const results = await searchWorkUsers(keyword);
-        setSearchOptions(results);
-      } catch {
-        setSearchOptions([]);
-      } finally {
-        setSearching(false);
-      }
-    }, 300);
+    setSearchKeyword(keyword);
   }, []);
 
   const handleChange = useCallback(
@@ -121,11 +116,11 @@ const ShareDashboardModal: React.FC<ShareDashboardModalProps> = ({
         showSearch
         onSearch={handleSearch}
         filterOption={false}
-        loading={searching}
+        loading={loadingUsers}
         value={selectedIds}
         onChange={handleChange}
         optionLabelProp="label"
-        notFoundContent={searching ? '搜索中...' : '请输入关键词搜索用户'}
+        notFoundContent={loadingUsers ? '加载中...' : '未找到匹配用户'}
       >
         {displayOptions.map((user) => (
           <Select.Option key={user.openId} value={user.openId} label={user.name}>

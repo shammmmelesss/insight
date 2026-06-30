@@ -27,16 +27,19 @@ const ShareDashboardModal: React.FC<ShareDashboardModalProps> = ({
   onShared,
 }) => {
   const [selectedUsers, setSelectedUsers] = useState<WorkUser[]>([]);
+  const [initialSharedWith, setInitialSharedWith] = useState<WorkUser[]>([]);
   const [allUsers, setAllUsers] = useState<WorkUser[]>([]);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [saving, setSaving] = useState(false);
   const { message } = App.useApp();
 
-  // 打开时预加载全量用户
+  // 打开时预加载全量用户，并记录初始已分享用户
   useEffect(() => {
     if (!open || !dashboard) return;
-    setSelectedUsers(parseSharedWith(dashboard.sharedWith));
+    const initial = parseSharedWith(dashboard.sharedWith);
+    setSelectedUsers(initial);
+    setInitialSharedWith(initial);
     setSearchKeyword('');
     setLoadingUsers(true);
     fetchAllWorkUsers()
@@ -82,6 +85,15 @@ const ShareDashboardModal: React.FC<ShareDashboardModalProps> = ({
     if (!dashboard) return;
     setSaving(true);
     try {
+      const initialIds = new Set(initialSharedWith.map((u) => u.openId));
+      const selectedIds = new Set(selectedUsers.map((u) => u.openId));
+      const added = selectedUsers.filter((u) => !initialIds.has(u.openId));
+      const removed = initialSharedWith.filter((u) => !selectedIds.has(u.openId));
+      if (added.length || removed.length) {
+        console.log(
+          `[Share] dashboard=${dashboard.id} added=[${added.map((u) => u.name).join(', ')}] removed=[${removed.map((u) => u.name).join(', ')}]`,
+        );
+      }
       const res = await axios.put(`/api/dashboards/${dashboard.id}/share`, {
         sharedWith: JSON.stringify(selectedUsers),
       });

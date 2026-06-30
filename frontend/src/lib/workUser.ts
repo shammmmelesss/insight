@@ -18,9 +18,11 @@ export const isDev =
   (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
 
 
+const WORK_USER_API = 'https://work.learnings.ai/work/v1/user';
+
 /**
  * 按关键词搜索用户
- * 生产：通过后端 /api/lark/work-users 代理 work.learnings.ai（转发 cookie，无需额外配置）
+ * 生产：浏览器直接携带 withCredentials 调 work.learnings.ai（两个子域共享 .learnings.ai cookie）
  * 开发：本地过滤 MOCK 数据
  */
 export async function searchWorkUsers(keyword: string): Promise<WorkUser[]> {
@@ -31,7 +33,7 @@ export async function searchWorkUsers(keyword: string): Promise<WorkUser[]> {
       (u) => u.name.toLowerCase().includes(kw) || u.openId.toLowerCase().includes(kw),
     );
   }
-  const res = await axios.get('/api/lark/work-users', { params: { keyword } });
+  const res = await axios.get(WORK_USER_API, { params: { keyword }, withCredentials: true });
   const list: any[] = res.data?.data?.userList || [];
   return list
     .map((u: any) => ({

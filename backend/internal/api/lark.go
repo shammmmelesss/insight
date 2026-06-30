@@ -8,8 +8,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
+	"strings"
 	"strconv"
 	"sync"
 	"time"
@@ -49,21 +51,16 @@ func GetMe(c *gin.Context) {
 }
 
 // GetWorkUsers 代理 work.learnings.ai 用户列表接口，避免浏览器 CORS 限制
+// work.learnings.ai 不支持服务端 keyword 过滤，拉全量后在本地过滤
 func GetWorkUsers(c *gin.Context) {
 	const workUserAPI = "https://work.learnings.ai/work/v1/user"
+	keyword := strings.ToLower(c.Query("keyword"))
 
-	keyword := c.Query("keyword")
-	url := workUserAPI
-	if keyword != "" {
-		url += "?keyword=" + keyword
-	}
-
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", workUserAPI, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	// Forward browser cookies so work.learnings.ai can authenticate the request
 	if cookie := c.GetHeader("Cookie"); cookie != "" {
 		req.Header.Set("Cookie", cookie)
 	}
@@ -77,7 +74,44 @@ func GetWorkUsers(c *gin.Context) {
 	defer resp.Body.Close()
 
 	data, _ := io.ReadAll(resp.Body)
-	c.Data(resp.StatusCode, "application/json", data)
+
+	// 解析上游响应
+	var upstream struct {
+		Status struct {
+			Code int `json:"code"`
+		} `json:"status"`
+		Data struct {
+			UserList []map[string]interface{} `json:"userList"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(data, &upstream); err != nil || upstream.Status.Code != 0 {
+		log.Printf("[GetWorkUsers] upstream error: status=%d body=%s", resp.StatusCode, string(data))
+		c.Data(resp.StatusCode, "application/json", data)
+		return
+	}
+
+	// 本地按 keyword 过滤（name 或 userid 包含关键词即命中）
+	filtered := make([]map[string]interface{}, 0)
+	for _, u := range upstream.Data.UserList {
+		if keyword == "" {
+			filtered = append(filtered, u)
+			continue
+		}
+		name, _ := u["name"].(string)
+		uid, _ := u["feishu_userid"].(string)
+		if uid == "" {
+			uid, _ = u["userid"].(string)
+		}
+		if strings.Contains(strings.ToLower(name), keyword) ||
+			strings.Contains(strings.ToLower(uid), keyword) {
+			filtered = append(filtered, u)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": map[string]interface{}{"code": 0, "message": "OK"},
+		"data":   map[string]interface{}{"userList": filtered},
+	})
 }
 
 // SendLarkDirectMessage 通过 Bot 给指定 open_id 用户发私信

@@ -635,6 +635,9 @@ func extractCalcFieldExprs(fieldsConfigJSON string) map[string]string {
 
 // buildChartSQL 根据图表配置生成聚合SQL，带输入校验防止SQL注入
 // dsCalcExprs 是从数据集 FieldsConfig 提取的计算字段表达式映射，用于解析筛选中的计算字段
+// maxChartRows 单个图表查询返回的最大行数，防止数据量过大拖垮前端渲染
+const maxChartRows = 200000
+
 func buildChartSQL(configJSON string, chartType string, datasetSQL string, filters []FilterCondition, dsCalcExprs map[string]string) (string, error) {
 	var config struct {
 		RowFields       []fieldConfig              `json:"rowFields"`
@@ -878,7 +881,7 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 	}
 
 	if len(selectFields) == 0 {
-		return innerSQL, nil
+		return fmt.Sprintf("%s LIMIT %d", innerSQL, maxChartRows), nil
 	}
 
 	// 解析看板级筛选中的计算字段表达式
@@ -897,6 +900,8 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 	if len(orderByFields) > 0 {
 		sql += fmt.Sprintf(" ORDER BY %s", strings.Join(orderByFields, ", "))
 	}
+	// 限制返回行数，避免数据量过大导致前端图表渲染卡顿
+	sql += fmt.Sprintf(" LIMIT %d", maxChartRows)
 	return sql, nil
 }
 

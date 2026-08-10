@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Button, Input, Layout, Space, Card, Modal, message, Spin, Dropdown, Tooltip, Select, Popover } from 'antd';
-import { ArrowLeftOutlined, SearchOutlined, EllipsisOutlined, CodeOutlined, SettingOutlined, CalendarOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, SearchOutlined, EllipsisOutlined, CodeOutlined, SettingOutlined, CalendarOutlined, PlusOutlined } from '@ant-design/icons';
 import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel} from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
@@ -40,6 +40,75 @@ const chineseAggToAlias = (agg: string): string => {
   }
 };
 const { Sider, Content } = Layout;
+
+// 稳定的空引用，避免每次渲染生成新对象/数组导致 ChartRenderer 的 memo 失效
+const EMPTY_CFG: any = {};
+const EMPTY_DATA: any[] = [];
+
+const extractNames = (fields: any[]): string[] => (fields || []).map((f: any) => f.originalName);
+
+const buildFieldFormats = (cfg: any): Record<string, string> => {
+  const result: Record<string, string> = {};
+  [...(cfg.measureFields || []), ...(cfg.yAxisFields || []), ...(cfg.y2AxisFields || []), ...(cfg.indicatorFields || [])].forEach((f: any) => {
+    if (f.originalName && f.config?.dataFormat && f.config.dataFormat !== '原始值') {
+      result[f.originalName] = f.config.dataFormat;
+    }
+  });
+  return result;
+};
+
+const buildFieldLabelMap = (cfg: any): Record<string, string> => {
+  const map: Record<string, string> = {};
+  [...(cfg.rowFields || []), ...(cfg.colFields || []), ...(cfg.xAxisFields || []), ...(cfg.groupFields || [])].forEach((f: any) => {
+    if (f.originalName) map[f.originalName] = f.displayName || f.originalName;
+  });
+  [...(cfg.measureFields || []), ...(cfg.yAxisFields || []), ...(cfg.y2AxisFields || []), ...(cfg.indicatorFields || [])].forEach((f: any) => {
+    if (f.originalName) {
+      const chineseAgg = f.config?.aggregation || '计数';
+      const englishAlias = chineseAggToAlias(chineseAgg);
+      map[`${f.originalName}_${englishAlias}`] = f.displayName || f.originalName;
+    }
+  });
+  return map;
+};
+
+// 记忆化的图表主体：仅当自身 data / cfg / 高度 / 类型变化时才重渲染，
+// 避免看板拖拽、筛选、配置面板输入等无关状态变更触发所有图表销毁重建
+interface DashboardChartBodyProps {
+  chartType: any;
+  data: any[];
+  cfg: any;
+  chartH: number;
+}
+const DashboardChartBody: React.FC<DashboardChartBodyProps> = React.memo(({ chartType, data, cfg, chartH }) => {
+  const rowFields = useMemo(() => extractNames(cfg.rowFields), [cfg.rowFields]);
+  const colFields = useMemo(() => extractNames(cfg.colFields), [cfg.colFields]);
+  const measureFields = useMemo(() => extractNames(cfg.measureFields), [cfg.measureFields]);
+  const xAxisFields = useMemo(() => extractNames(cfg.xAxisFields), [cfg.xAxisFields]);
+  const yAxisFields = useMemo(() => extractNames(cfg.yAxisFields), [cfg.yAxisFields]);
+  const y2AxisFields = useMemo(() => extractNames(cfg.y2AxisFields), [cfg.y2AxisFields]);
+  const groupFields = useMemo(() => extractNames(cfg.groupFields), [cfg.groupFields]);
+  const indicatorFields = useMemo(() => extractNames(cfg.indicatorFields), [cfg.indicatorFields]);
+  const fieldFormats = useMemo(() => buildFieldFormats(cfg), [cfg]);
+  const fieldLabelMap = useMemo(() => buildFieldLabelMap(cfg), [cfg]);
+  return (
+    <ChartRenderer
+      chartType={chartType || 'bar'}
+      chartData={data}
+      rowFields={rowFields}
+      colFields={colFields}
+      measureFields={measureFields}
+      xAxisFields={xAxisFields}
+      yAxisFields={yAxisFields}
+      y2AxisFields={y2AxisFields}
+      groupFields={groupFields}
+      indicatorFields={indicatorFields}
+      containerHeight={chartH}
+      fieldLabelMap={fieldLabelMap}
+      fieldFormats={fieldFormats}
+    />
+  );
+});
 
 const COLS = 12;
 const ROW_HEIGHT = 30;
@@ -144,6 +213,44 @@ const DashboardEditPage: React.FC = () => {
   };
 
   const loadedChartIds = useRef<Set<string>>(new Set());
+  const draftCounter = useRef(0);
+
+  // 在看板上直接新建一张空图表（草稿），并打开右侧配置面板
+  const handleCreateChart = () => {
+    const draftId = `draft-${++draftCounter.current}`;
+    setCharts(prev => [...prev, { id: draftId, name: '未命名图表', type: 'crossTable' } as ChartOption]);
+    setSelectedCharts(prev => [...prev, { chartId: draftId, x: 0, y: 0, width: DEFAULT_W, height: DEFAULT_H }]);
+    setRglLayout(prev => [...prev, { i: draftId, x: 0, y: Infinity, w: DEFAULT_W, h: DEFAULT_H, minW: 3, minH: 4 }]);
+    // 草稿无后端数据，标记为已加载避免触发 /data 请求
+    loadedChartIds.current.add(draftId);
+    setConfigChartId(draftId);
+  };
+
+  // 关闭配置面板：未保存的草稿图表直接丢弃，已有图表仅关闭面板
+  const handleRemoveDraftOnClose = (cid: string) => {
+    if (cid.startsWith('draft-')) {
+      handleRemoveChart(cid);
+    } else {
+      setConfigChartId(null);
+    }
+  };
+
+  // 草稿保存成功后用真实 id 替换草稿 id
+  const handleChartSaved = (cid: string, newId?: string) => {
+    if (newId && newId !== cid) {
+      setSelectedCharts(prev => prev.map(item => item.chartId === cid ? { ...item, chartId: newId } : item));
+      setRglLayout(prev => prev.map(l => l.i === cid ? { ...l, i: newId } : l));
+      setCharts(prev => prev.filter(c => c.id !== cid));
+      loadedChartIds.current.delete(cid);
+      // newId 不加入 loadedChartIds，交由 selectedCharts 副作用拉取数据
+      setConfigChartId(null);
+      fetchCharts();
+    } else {
+      setConfigChartId(null);
+      loadedChartIds.current.delete(cid);
+      fetchChartData(cid);
+    }
+  };
 
   const fetchDashboardDetail = async () => {
     if (id) {
@@ -275,6 +382,11 @@ const DashboardEditPage: React.FC = () => {
   const handleRemoveChart = (chartId: string) => {
     setSelectedCharts(prev => prev.filter(item => item.chartId !== chartId));
     setRglLayout(prev => prev.filter(l => l.i !== chartId));
+    if (chartId.startsWith('draft-')) {
+      setCharts(prev => prev.filter(c => c.id !== chartId));
+      loadedChartIds.current.delete(chartId);
+      if (configChartId === chartId) setConfigChartId(null);
+    }
   };
 
   const handleCopyChart = async (item: DashboardLayoutItem) => {
@@ -300,7 +412,7 @@ const DashboardEditPage: React.FC = () => {
   };
 
   const backToDashboards = (selectedId?: string) =>
-    navigate(selectedId ? `/dashboards?selected=${selectedId}` : '/dashboards');
+    navigate(selectedId ? `/dashboards/${selectedId}` : '/dashboards');
 
   const handleBack = () => backToDashboards(id);
   const handleCancel = () => setIsCancelModalVisible(true);
@@ -309,7 +421,8 @@ const DashboardEditPage: React.FC = () => {
   const handleSave = async () => {
     if (!name.trim()) { message.error('请输入看板名称'); return; }
     try {
-      const sortedCharts = [...selectedCharts].sort((a, b) =>
+      // 过滤掉尚未保存的草稿图表，避免把无效 id 写入布局
+      const sortedCharts = [...selectedCharts].filter(item => !item.chartId.startsWith('draft-')).sort((a, b) =>
         a.y !== b.y ? a.y - b.y : a.x - b.x
       );
       const payload = { name, layout: JSON.stringify(sortedCharts), filters: JSON.stringify(filters) };
@@ -428,7 +541,7 @@ const DashboardEditPage: React.FC = () => {
   }
 
   return (
-    <div style={{ minHeight: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column' }}>
       {/* 顶部操作栏 */}
       <div style={{ padding: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -442,8 +555,9 @@ const DashboardEditPage: React.FC = () => {
             style={{ width: '300px' }}
           />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Button type="default" onClick={handleOpenFilterModal}>筛选器</Button>
+          <Button type="default" icon={<PlusOutlined />} onClick={handleCreateChart}>新增图表</Button>
         </div>
         <Space>
           <Button onClick={handleCancel}>取消</Button>
@@ -515,32 +629,8 @@ const DashboardEditPage: React.FC = () => {
             >
               {selectedCharts.map((item, index) => {
                 const chart = charts.find(c => c.id === item.chartId);
-                const cfg = chartConfigs[item.chartId] || {};
+                const cfg = chartConfigs[item.chartId] || EMPTY_CFG;
                 const key = item.chartId;
-                const extractNames = (fields: any[]) => (fields || []).map((f: any) => f.originalName);
-                const buildFieldFormats = (): Record<string, string> => {
-                  const result: Record<string, string> = {};
-                  [...(cfg.measureFields || []), ...(cfg.yAxisFields || []), ...(cfg.y2AxisFields || []), ...(cfg.indicatorFields || [])].forEach((f: any) => {
-                    if (f.originalName && f.config?.dataFormat && f.config.dataFormat !== '原始值') {
-                      result[f.originalName] = f.config.dataFormat;
-                    }
-                  });
-                  return result;
-                };
-                const buildFieldLabelMap = (): Record<string, string> => {
-                  const map: Record<string, string> = {};
-                  [...(cfg.rowFields || []), ...(cfg.colFields || []), ...(cfg.xAxisFields || []), ...(cfg.groupFields || [])].forEach((f: any) => {
-                    if (f.originalName) map[f.originalName] = f.displayName || f.originalName;
-                  });
-                  [...(cfg.measureFields || []), ...(cfg.yAxisFields || []), ...(cfg.y2AxisFields || []), ...(cfg.indicatorFields || [])].forEach((f: any) => {
-                    if (f.originalName) {
-                      const chineseAgg = f.config?.aggregation || '计数';
-                      const englishAlias = chineseAggToAlias(chineseAgg);
-                      map[`${f.originalName}_${englishAlias}`] = f.displayName || f.originalName;
-                    }
-                  });
-                  return map;
-                };
                 const layoutItem = rglLayout.find(l => l.i === key);
                 const h = layoutItem?.h ?? DEFAULT_H;
                 const chartH = chartAreaHeight(h);
@@ -616,20 +706,11 @@ const DashboardEditPage: React.FC = () => {
                         </Dropdown>
                       }
                     >
-                      <ChartRenderer
-                        chartType={chart?.type as any || 'bar'}
-                        chartData={chartData[item.chartId] || []}
-                        rowFields={extractNames(cfg.rowFields)}
-                        colFields={extractNames(cfg.colFields)}
-                        measureFields={extractNames(cfg.measureFields)}
-                        xAxisFields={extractNames(cfg.xAxisFields)}
-                        yAxisFields={extractNames(cfg.yAxisFields)}
-                        y2AxisFields={extractNames(cfg.y2AxisFields)}
-                        groupFields={extractNames(cfg.groupFields)}
-                        indicatorFields={extractNames(cfg.indicatorFields)}
-                        containerHeight={chartH}
-                        fieldLabelMap={buildFieldLabelMap()}
-                        fieldFormats={buildFieldFormats()}
+                      <DashboardChartBody
+                        chartType={chart?.type as any}
+                        data={chartData[item.chartId] || EMPTY_DATA}
+                        cfg={cfg}
+                        chartH={chartH}
                       />
                     </Card>
                   </div>
@@ -654,27 +735,28 @@ const DashboardEditPage: React.FC = () => {
           {configChartId ? (
             <ChartConfigPanel
               chartId={configChartId}
-              onClose={() => setConfigChartId(null)}
-              onSaved={(cid) => {
-                setConfigChartId(null);
-                loadedChartIds.current.delete(cid);
-                fetchChartData(cid);
-              }}
+              onClose={() => handleRemoveDraftOnClose(configChartId)}
+              onSaved={handleChartSaved}
               onChartTypeChange={(cid, type) => {
                 setCharts(prev => prev.map(c => c.id === cid ? { ...c, type } : c));
               }}
               onConfigChange={(cid, config, type) => {
+                setCharts(prev => prev.map(c => c.id === cid ? { ...c, type } : c));
+                // 草稿图表尚未持久化，无法调用 /preview，仅在本地更新类型
+                if (cid.startsWith('draft-')) {
+                  try { setChartConfigs(prev => ({ ...prev, [cid]: JSON.parse(config) })); } catch { /* ignore */ }
+                  return;
+                }
                 axios.post(`/api/charts/${cid}/preview`, { config, type })
                   .then(res => {
                     setChartData(prev => ({ ...prev, [cid]: res.data.data }));
                     setChartConfigs(prev => ({ ...prev, [cid]: JSON.parse(config) }));
-                    setCharts(prev => prev.map(c => c.id === cid ? { ...c, type } : c));
                   })
                   .catch(() => {});
               }}
             />
           ) : (
-            <>
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <div style={{ padding: '20px 20px 0' }}>
                 <Input
                   placeholder="搜索图表名称"
@@ -684,10 +766,10 @@ const DashboardEditPage: React.FC = () => {
                   style={{ width: '100%', marginBottom: 16 }}
                 />
               </div>
-              <div style={{ padding: '0 16px 16px', overflow: 'auto', flex: 1 }}>
+              <div style={{ padding: '0 16px 16px', overflow: 'auto', flex: 1, minHeight: 0 }}>
                 {filteredCharts.length > 0 ? (
                   <div>
-                    {filteredCharts.map((chart) => (
+                    {filteredCharts.filter(chart => !chart.id.startsWith('draft-')).map((chart) => (
                       <div key={chart.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, padding: '8px 12px', borderRadius: '4px', backgroundColor: '#fafafa' }}>
                         <div>{chart.name}</div>
                         {isChartAdded(chart.id) ? (
@@ -702,7 +784,7 @@ const DashboardEditPage: React.FC = () => {
                   <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>没有找到匹配的图表</div>
                 )}
               </div>
-            </>
+            </div>
           )}
         </Sider>
       </Layout>

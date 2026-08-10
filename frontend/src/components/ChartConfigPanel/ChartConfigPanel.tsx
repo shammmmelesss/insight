@@ -300,12 +300,15 @@ const DropZone: React.FC<DropZoneProps> = ({
 export interface ChartConfigPanelProps {
   chartId: string;
   onClose: () => void;
-  onSaved: (chartId: string) => void;
+  /** 保存成功回调。新建图表时 newChartId 为后端返回的真实 id，用于替换草稿 id。 */
+  onSaved: (chartId: string, newChartId?: string) => void;
   onChartTypeChange?: (chartId: string, type: ChartType) => void;
   onConfigChange?: (chartId: string, config: string, type: ChartType) => void;
 }
 
 const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, onSaved, onChartTypeChange, onConfigChange }) => {
+  // 草稿图表：尚未持久化，chartId 形如 draft-xxx，跳过详情拉取，保存时走创建接口
+  const isNew = chartId.startsWith('draft-');
   const [chartName, setChartName] = useState('');
   const [chartType, setChartType] = useState<ChartType>('crossTable');
   const [selectedDataset, setSelectedDataset] = useState('');
@@ -343,6 +346,11 @@ const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, o
   }, []);
 
   useEffect(() => {
+    if (isNew) {
+      // 新建草稿：初始化为空白配置，允许直接开始选数据集/拖字段
+      isInitialized.current = true;
+      return;
+    }
     axios.get(`/api/charts/${chartId}`).then(res => {
       const chart = res.data;
       setChartName(chart.name);
@@ -380,12 +388,20 @@ const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, o
   }, [rowFields, colFields, measureFields, xAxisFields, yAxisFields, y2AxisFields, groupFields, indicatorFields, filterFields, chartType]);
 
   const handleSave = async () => {
+    if (!chartName.trim()) { message.error('请输入图表名称'); return; }
+    if (!selectedDataset) { message.error('请选择数据集'); return; }
     setSaving(true);
     try {
       const config = JSON.stringify({ rowFields, colFields, measureFields, xAxisFields, yAxisFields, y2AxisFields, groupFields, indicatorFields, filterFields });
-      await axios.put(`/api/charts/${chartId}`, { name: chartName, datasetId: selectedDataset, type: chartType, config });
-      message.success('图表配置已保存');
-      onSaved(chartId);
+      if (isNew) {
+        const res = await axios.post('/api/charts', { name: chartName, datasetId: selectedDataset, type: chartType, config });
+        message.success('图表创建成功');
+        onSaved(chartId, res.data.id);
+      } else {
+        await axios.put(`/api/charts/${chartId}`, { name: chartName, datasetId: selectedDataset, type: chartType, config });
+        message.success('图表配置已保存');
+        onSaved(chartId);
+      }
     } catch {
       message.error('保存失败，请重试');
     } finally {

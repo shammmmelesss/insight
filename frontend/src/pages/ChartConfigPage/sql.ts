@@ -56,6 +56,9 @@ export interface GenerateSQLParams {
   dataSourceType: string;
 }
 
+// 单个图表查询返回的最大行数，需与后端 maxChartRows 保持一致
+export const MAX_CHART_ROWS = 200000;
+
 // 根据当前图表类型 / 字段配置 / 筛选值生成查询 SQL
 export const generateSQL = (params: GenerateSQLParams): string => {
   const {
@@ -101,10 +104,11 @@ export const generateSQL = (params: GenerateSQLParams): string => {
 
   const wrap = (fields: string[], aggFields: string[], groupBy: string[], orderBy: string[]) => {
     const all = [...fields, ...aggFields];
-    if (all.length === 0) return innerSQL;
+    if (all.length === 0) return `${innerSQL} LIMIT ${MAX_CHART_ROWS}`;
     let sql = `SELECT ${all.join(', ')} FROM (${innerSQL}) AS dataset WHERE 1=1`;
     if (groupBy.length > 0) sql += ` GROUP BY ${groupBy.join(', ')}`;
     if (orderBy.length > 0) sql += ` ORDER BY ${orderBy.join(', ')}`;
+    sql += ` LIMIT ${MAX_CHART_ROWS}`;
     return sql;
   };
 
@@ -145,8 +149,8 @@ export const generateSQL = (params: GenerateSQLParams): string => {
   }
   if (chartType === 'indicator') {
     const agg = indicatorFields.map(aggField);
-    if (agg.length === 0) return innerSQL;
-    return `SELECT ${agg.join(', ')} FROM (${innerSQL}) AS dataset WHERE 1=1`;
+    if (agg.length === 0) return `${innerSQL} LIMIT ${MAX_CHART_ROWS}`;
+    return `SELECT ${agg.join(', ')} FROM (${innerSQL}) AS dataset WHERE 1=1 LIMIT ${MAX_CHART_ROWS}`;
   }
-  return innerSQL;
+  return `${innerSQL} LIMIT ${MAX_CHART_ROWS}`;
 };

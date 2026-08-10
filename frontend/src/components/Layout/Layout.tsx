@@ -67,6 +67,8 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const isDashboardRoute = location.pathname === '/dashboards' || location.pathname.startsWith('/dashboards/');
+  // 新建/编辑看板为全屏编辑态，隐藏顶部导航
+  const isDashboardEditRoute = location.pathname === '/dashboards/create' || location.pathname.startsWith('/dashboards/edit');
   const { modal } = App.useApp();
   const { workspaces, currentWorkspace, setCurrentWorkspace, refreshWorkspaces } = useWorkspace();
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -158,7 +160,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   ];
 
   return (
-    <AntLayout>
+    <AntLayout style={{ height: '100vh' }}>
+      {!isDashboardEditRoute && (
       <Header style={{ display: 'flex', alignItems: 'center', padding: '0 24px', background: '#fff', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -191,6 +194,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </Space>
         </div>
       </Header>
+      )}
       {isDashboardRoute ? (
         children
       ) : (

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Button, Card, Modal, Layout, Skeleton, Select, Tooltip, Dropdown, Popover } from 'antd';
-import { EditOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined, InboxOutlined, PlusOutlined, CalendarOutlined, FilterOutlined } from '@ant-design/icons';
+import { Button, Card, Modal, Layout, Skeleton, Select, Tooltip, Dropdown, Popover, Avatar } from 'antd';
+import { EditOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined, InboxOutlined, PlusOutlined, CalendarOutlined, FilterOutlined, UserOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { fetchChartOptions } from '@/api/charts';
@@ -9,6 +9,14 @@ import DashboardList from '../../components/DashboardList/DashboardList';
 import ChartRenderer, { ChartRendererHandle } from '../../components/ChartRenderer';
 import { dashboardCache } from '../../utils/dashboardCache';
 import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel} from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
+import { WorkUser } from '@/lib/workUser';
+
+// 解析看板的 sharedWith 字段（可能是 JSON 字符串或数组）
+const parseSharedWith = (raw: string | WorkUser[] | undefined): WorkUser[] => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw as WorkUser[];
+  try { return JSON.parse(raw) || []; } catch { return []; }
+};
 
 const ROW_HEIGHT = 30;
 const GRID_MARGIN = 10;
@@ -683,14 +691,47 @@ const DashboardsPage: React.FC = () => {
             </span>
           </div>
           {selectedDashboard && (
-            <Button
-              type="primary"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => navigate(`/dashboards/edit/${selectedDashboard.id}`)}
-            >
-              编辑
-            </Button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {(() => {
+                const sharedUsers = parseSharedWith(selectedDashboard.sharedWith);
+                if (sharedUsers.length === 0) return null;
+                return (
+                  <Popover
+                    trigger="click"
+                    placement="bottomRight"
+                    title={`已分享给 ${sharedUsers.length} 位用户`}
+                    content={
+                      <div style={{ maxHeight: 260, overflow: 'auto', minWidth: 180 }}>
+                        {sharedUsers.map((u) => (
+                          <div key={u.openId} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                            <Avatar size="small" src={u.avatar} icon={<UserOutlined />}>
+                              {u.name?.slice(0, 1)}
+                            </Avatar>
+                            <span style={{ fontSize: 13 }}>{u.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    }
+                  >
+                    <Avatar.Group max={{ count: 2 }} size="small" style={{ cursor: 'pointer' }}>
+                      {sharedUsers.map((u) => (
+                        <Avatar key={u.openId} src={u.avatar} icon={<UserOutlined />}>
+                          {u.name?.slice(0, 1)}
+                        </Avatar>
+                      ))}
+                    </Avatar.Group>
+                  </Popover>
+                );
+              })()}
+              <Button
+                type="primary"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => navigate(`/dashboards/edit/${selectedDashboard.id}`)}
+              >
+                编辑
+              </Button>
+            </div>
           )}
         </div>
 

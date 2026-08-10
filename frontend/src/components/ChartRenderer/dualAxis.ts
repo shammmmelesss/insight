@@ -91,6 +91,13 @@ export const renderDualAxisChart = (ctx: RenderContext) => {
 
   const dualFormatLookup = buildFormatLookup([...yAxisFields, ...y2AxisFields].filter(f => f), dataFields);
 
+  // tooltip 标记点颜色映射（与自定义图例保持一致）
+  const dualColorMap: Record<string, string> = {};
+  actualLeftFields.forEach((f, i) => { dualColorMap[f] = G2_COLORS[i % G2_COLORS.length]; });
+  actualRightFields.forEach((f, i) => {
+    dualColorMap[f] = actualRightFields.length > 1 ? ORANGE_COLORS[i % ORANGE_COLORS.length] : '#FA8C16';
+  });
+
   createAndRenderG2Chart((chart) => {
     chart.axis('x', xAxisConfig);
     if (dataCount > 50) {
@@ -113,20 +120,24 @@ export const renderDualAxisChart = (ctx: RenderContext) => {
         })
         .tooltip({
           title: (d: any) => String(d[actualXField] ?? ''),
-          items: [
-            (d: any) => {
-              const rawField = String(d._rawMetricL ?? '');
-              return {
-                name: getFieldLabel(rawField),
-                value: formatValue(xMetricsMap[String(d[actualXField] ?? '')]?.[rawField], dualFormatLookup[rawField]),
-              };
-            },
-          ],
+          // 展示当前 x 下的全部指标（左轴柱 + 右轴线）
+          items: [...actualLeftFields, ...actualRightFields].map(rawField => (d: any) => ({
+            name: getFieldLabel(rawField),
+            value: formatValue(xMetricsMap[String(d[actualXField] ?? '')]?.[rawField], dualFormatLookup[rawField]),
+            color: dualColorMap[rawField],
+          })),
         });
 
       if (actualLeftFields.length > 1) {
         bar.encode('color', '_metricL');
+        // 固定颜色映射域，避免隐藏部分系列后颜色错位（与图例保持一致）
+        bar.scale('color', {
+          domain: actualLeftFields.map(f => getFieldLabel(f)),
+          range: G2_COLORS,
+        });
         if (useStack) bar.transform({ type: 'stackY' });
+      } else if (actualLeftFields.length === 1) {
+        bar.style({ fill: G2_COLORS[0] });
       }
     }
 
@@ -143,11 +154,27 @@ export const renderDualAxisChart = (ctx: RenderContext) => {
           position: 'right',
           title: actualRightFields.map(f => getFieldLabel(f)).join(' / '),
           labelFormatter: (v: any) => formatAxisValue(v),
-        })
-        .tooltip(false);
+        });
+
+      // 仅当没有左轴柱时，由折线承载 tooltip（展示全部指标）
+      if (leftLongData.length === 0) {
+        line.tooltip({
+          title: (d: any) => String(d[actualXField] ?? ''),
+          items: [...actualLeftFields, ...actualRightFields].map(rawField => (d: any) => ({
+            name: getFieldLabel(rawField),
+            value: formatValue(xMetricsMap[String(d[actualXField] ?? '')]?.[rawField], dualFormatLookup[rawField]),
+            color: dualColorMap[rawField],
+          })),
+        });
+      } else {
+        line.tooltip(false);
+      }
 
       if (actualRightFields.length > 1) {
-        line.encode('color', '_metricR').scale('color', { range: ORANGE_COLORS });
+        line.encode('color', '_metricR').scale('color', {
+          domain: actualRightFields.map(f => getFieldLabel(f)),
+          range: ORANGE_COLORS,
+        });
       } else {
         line.style({ stroke: '#FA8C16' });
       }

@@ -541,7 +541,7 @@ const DashboardEditPage: React.FC = () => {
   }
 
   return (
-    <div style={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* 顶部操作栏 */}
       <div style={{ padding: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -566,7 +566,7 @@ const DashboardEditPage: React.FC = () => {
       </div>
 
       {/* 主内容区域 */}
-      <Layout style={{ flex: 1, overflow: 'hidden' }}>
+      <Layout style={{ flex: 1, minHeight: 0, height: 'auto', overflow: 'hidden' }}>
         <Content style={{ padding: '10px', background: '#f0f2f5', overflow: 'auto' }}>
           {/* 筛选器展示区域 */}
           {filters.length > 0 && (

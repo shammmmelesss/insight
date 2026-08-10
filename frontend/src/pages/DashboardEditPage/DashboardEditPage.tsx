@@ -349,6 +349,9 @@ const DashboardEditPage: React.FC = () => {
     loadData();
   }, [id]);
 
+  const selectedChartIds = useMemo(() => selectedCharts.map(item => item.chartId), [selectedCharts]);
+  const selectedChartIdsKey = selectedChartIds.join(',');
+
   useEffect(() => {
     selectedCharts.forEach(item => {
       if (!loadedChartIds.current.has(item.chartId)) {
@@ -356,15 +359,15 @@ const DashboardEditPage: React.FC = () => {
         fetchChartData(item.chartId);
       }
     });
-    const currentIds = new Set(selectedCharts.map(item => item.chartId));
+    const currentIds = new Set(selectedChartIds);
     loadedChartIds.current.forEach(cid => {
       if (!currentIds.has(cid)) loadedChartIds.current.delete(cid);
     });
-  }, [selectedCharts, fetchChartData]);
+  }, [selectedChartIdsKey, fetchChartData]);
 
-  const filteredCharts = charts.filter(chart =>
+  const filteredCharts = useMemo(() => charts.filter(chart =>
     chart.name.toLowerCase().includes(searchKeyword.toLowerCase())
-  );
+  ), [charts, searchKeyword]);
 
   const isChartAdded = (chartId: string) => selectedCharts.some(item => item.chartId === chartId);
 
@@ -408,6 +411,9 @@ const DashboardEditPage: React.FC = () => {
 
   const handleLayoutChange = (layout: RGLLayout[]) => {
     setRglLayout(layout);
+  };
+
+  const handleLayoutCommit = (layout: RGLLayout[]) => {
     setSelectedCharts(prev => fromRGLLayout(layout, prev));
   };
 
@@ -622,6 +628,8 @@ const DashboardEditPage: React.FC = () => {
               rowHeight={ROW_HEIGHT}
               margin={GRID_MARGIN}
               onLayoutChange={handleLayoutChange as any}
+              onDragStop={handleLayoutCommit as any}
+              onResizeStop={handleLayoutCommit as any}
               isDraggable
               isResizable
               draggableHandle=".chart-drag-handle"

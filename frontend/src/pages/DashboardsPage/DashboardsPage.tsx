@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Button, Card, Modal, Layout, Skeleton, Select, Tooltip, Dropdown, Popover, Avatar } from 'antd';
 import { EditOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined, InboxOutlined, PlusOutlined, CalendarOutlined, FilterOutlined, UserOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -41,17 +41,21 @@ interface LazyChartCardProps {
 
 const LazyChartCard: React.FC<LazyChartCardProps> = ({ onEnter, onExit, children, style }) => {
   const ref = useRef<HTMLDivElement>(null);
+  const onEnterRef = useRef(onEnter);
+  const onExitRef = useRef(onExit);
+  onEnterRef.current = onEnter;
+  onExitRef.current = onExit;
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const observer = new IntersectionObserver(
-      ([entry]) => { entry.isIntersecting ? onEnter() : onExit(); },
+      ([entry]) => { entry.isIntersecting ? onEnterRef.current() : onExitRef.current(); },
       { threshold: 0.1 }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [onEnter, onExit]);
+  }, []);
 
   return <div ref={ref} style={style}>{children}</div>;
 };
@@ -71,6 +75,102 @@ function parseFilters(raw: FilterField[] | string | unknown): FilterField[] {
   }
   return [];
 }
+
+const chineseAggToAlias = (agg: string): string => {
+  switch (agg) {
+    case '求和': return 'sum';
+    case '平均值': return 'avg';
+    case '最大值': return 'max';
+    case '最小值': return 'min';
+    case '去重计数': return 'count_distinct';
+    default: return 'count';
+  }
+};
+
+const extractNamesStatic = (fields: Array<{ originalName: string }> | unknown) =>
+  (Array.isArray(fields) ? fields : []).map((f: { originalName: string }) => f.originalName);
+
+const buildFieldFormatsStatic = (cfg: Record<string, unknown>): Record<string, string> => {
+  const result: Record<string, string> = {};
+  const measureLike = [
+    ...((cfg.measureFields as any[]) || []),
+    ...((cfg.yAxisFields as any[]) || []),
+    ...((cfg.y2AxisFields as any[]) || []),
+    ...((cfg.indicatorFields as any[]) || []),
+  ];
+  measureLike.forEach((f: any) => {
+    if (f.originalName && f.config?.dataFormat && f.config.dataFormat !== '原始值') {
+      result[f.originalName] = f.config.dataFormat;
+    }
+  });
+  return result;
+};
+
+const buildFieldLabelMapStatic = (cfg: Record<string, unknown>): Record<string, string> => {
+  const map: Record<string, string> = {};
+  const dimFields = [
+    ...((cfg.rowFields as any[]) || []),
+    ...((cfg.colFields as any[]) || []),
+    ...((cfg.xAxisFields as any[]) || []),
+    ...((cfg.groupFields as any[]) || []),
+  ];
+  dimFields.forEach((f: any) => {
+    if (f.originalName) map[f.originalName] = f.displayName || f.originalName;
+  });
+  const measureLike = [
+    ...((cfg.measureFields as any[]) || []),
+    ...((cfg.yAxisFields as any[]) || []),
+    ...((cfg.y2AxisFields as any[]) || []),
+    ...((cfg.indicatorFields as any[]) || []),
+  ];
+  measureLike.forEach((f: any) => {
+    if (f.originalName) {
+      const chineseAgg = f.config?.aggregation || '计数';
+      const englishAlias = chineseAggToAlias(chineseAgg);
+      map[`${f.originalName}_${englishAlias}`] = f.displayName || f.originalName;
+    }
+  });
+  return map;
+};
+
+interface ViewChartBodyProps {
+  chartType: string;
+  data: Record<string, unknown>[];
+  cfg: Record<string, unknown>;
+  chartH: number;
+  visibleFields?: { rowFields: string[]; colFields: string[]; measureFields: string[] } | null;
+  chartRef: React.RefObject<ChartRendererHandle>;
+}
+const ViewChartBody: React.FC<ViewChartBodyProps> = React.memo(({ chartType, data, cfg, chartH, visibleFields, chartRef }) => {
+  const rowFields = useMemo(() => visibleFields ? visibleFields.rowFields : extractNamesStatic(cfg.rowFields), [cfg.rowFields, visibleFields]);
+  const colFields = useMemo(() => visibleFields ? visibleFields.colFields : extractNamesStatic(cfg.colFields), [cfg.colFields, visibleFields]);
+  const measureFields = useMemo(() => visibleFields ? visibleFields.measureFields : extractNamesStatic(cfg.measureFields), [cfg.measureFields, visibleFields]);
+  const xAxisFields = useMemo(() => extractNamesStatic(cfg.xAxisFields), [cfg.xAxisFields]);
+  const yAxisFields = useMemo(() => extractNamesStatic(cfg.yAxisFields), [cfg.yAxisFields]);
+  const y2AxisFields = useMemo(() => extractNamesStatic(cfg.y2AxisFields), [cfg.y2AxisFields]);
+  const groupFields = useMemo(() => extractNamesStatic(cfg.groupFields), [cfg.groupFields]);
+  const indicatorFields = useMemo(() => extractNamesStatic(cfg.indicatorFields), [cfg.indicatorFields]);
+  const fieldFormats = useMemo(() => buildFieldFormatsStatic(cfg), [cfg]);
+  const fieldLabelMap = useMemo(() => buildFieldLabelMapStatic(cfg), [cfg]);
+  return (
+    <ChartRenderer
+      ref={chartRef}
+      chartType={chartType as any}
+      chartData={data}
+      rowFields={rowFields}
+      colFields={colFields}
+      measureFields={measureFields}
+      xAxisFields={xAxisFields}
+      yAxisFields={yAxisFields}
+      y2AxisFields={y2AxisFields}
+      groupFields={groupFields}
+      indicatorFields={indicatorFields}
+      containerHeight={chartH}
+      fieldFormats={fieldFormats}
+      fieldLabelMap={fieldLabelMap}
+    />
+  );
+});
 
 const DashboardsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -295,18 +395,18 @@ const DashboardsPage: React.FC = () => {
     setChartLoadingMap(prev => ({ ...prev, [chartId]: false }));
   };
 
-  const handleChartEnter = (chartId: string) => {
+  const handleChartEnter = useCallback((chartId: string) => {
     visibleChartIds.current.add(chartId);
     if (!loadedChartIds.current.has(chartId)) {
       loadedChartIds.current.add(chartId);
       const fp = buildFilterParamsForChart(chartId, filtersRef.current, filterValuesRef.current);
       loadSingleChart(chartId, fp.length > 0 ? fp : undefined);
     }
-  };
+  }, []);
 
-  const handleChartExit = (chartId: string) => {
+  const handleChartExit = useCallback((chartId: string) => {
     visibleChartIds.current.delete(chartId);
-  };
+  }, []);
 
   useEffect(() => {
     if (!selectedDashboard) {
@@ -358,14 +458,25 @@ const DashboardsPage: React.FC = () => {
   useEffect(() => {
     filterValuesRef.current = filterValues;
     if (filters.length === 0) return;
-    // 清除已加载标记，让图表在下次可见时重新加载
-    loadedChartIds.current.clear();
-    // 立即刷新当前可见的图表
+    const affectedChartIds = new Set<string>();
+    parsedLayout.forEach(item => {
+      const isAffected = filters.some(f => f.charts.length === 0 || f.charts.includes(item.chartId));
+      if (isAffected) affectedChartIds.add(item.chartId);
+    });
+    affectedChartIds.forEach(chartId => loadedChartIds.current.delete(chartId));
     visibleChartIds.current.forEach(chartId => {
-      loadedChartIds.current.add(chartId);
-      loadSingleChart(chartId, buildFilterParamsForChart(chartId));
+      if (affectedChartIds.has(chartId)) {
+        loadedChartIds.current.add(chartId);
+        loadSingleChart(chartId, buildFilterParamsForChart(chartId));
+      }
     });
   }, [filterValues]);
+
+  const chartsById = useMemo(() => {
+    const map: Record<string, ChartOption> = {};
+    charts.forEach(c => { map[c.id] = c; });
+    return map;
+  }, [charts]);
 
   const extractNames = (fields: Array<{ originalName: string }> | unknown) =>
     (Array.isArray(fields) ? fields : []).map((f: { originalName: string }) => f.originalName);
@@ -595,21 +706,6 @@ const DashboardsPage: React.FC = () => {
     }
   };
 
-  const buildFieldFormats = (cfg: Record<string, unknown>): Record<string, string> => {
-    const result: Record<string, string> = {};
-    const measureLike = [
-      ...((cfg.measureFields as any[]) || []),
-      ...((cfg.yAxisFields as any[]) || []),
-      ...((cfg.y2AxisFields as any[]) || []),
-      ...((cfg.indicatorFields as any[]) || []),
-    ];
-    measureLike.forEach((f: any) => {
-      if (f.originalName && f.config?.dataFormat && f.config.dataFormat !== '原始值') {
-        result[f.originalName] = f.config.dataFormat;
-      }
-    });
-    return result;
-  };
 
   const buildFieldLabelMap = (cfg: Record<string, unknown>): Record<string, string> => {
     const map: Record<string, string> = {};
@@ -789,7 +885,7 @@ const DashboardsPage: React.FC = () => {
         {selectedDashboard ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
             {parsedLayout.length > 0 ? parsedLayout.map((item, index) => {
-              const chart = charts.find(c => c.id === item.chartId);
+              const chart = chartsById[item.chartId];
               const cfg = chartConfigs[item.chartId] || {};
               const isLarge = isWide(item);
               const chartH = chartAreaHeight(resolveH(item));
@@ -891,21 +987,13 @@ const DashboardsPage: React.FC = () => {
                         <InboxOutlined style={{ fontSize: 24, marginRight: 8 }} />暂无数据
                       </div>
                     ) : hasData ? (
-                      <ChartRenderer
-                        ref={getChartRef(item.chartId)}
+                      <ViewChartBody
+                        chartRef={getChartRef(item.chartId)}
                         chartType={chart?.type ?? 'bar'}
-                        chartData={dataRows!}
-                        rowFields={visibleFields ? visibleFields.rowFields : extractNames(cfg.rowFields)}
-                        colFields={visibleFields ? visibleFields.colFields : extractNames(cfg.colFields)}
-                        measureFields={visibleFields ? visibleFields.measureFields : extractNames(cfg.measureFields)}
-                        xAxisFields={extractNames(cfg.xAxisFields)}
-                        yAxisFields={extractNames(cfg.yAxisFields)}
-                        y2AxisFields={extractNames(cfg.y2AxisFields)}
-                        groupFields={extractNames(cfg.groupFields)}
-                        indicatorFields={extractNames(cfg.indicatorFields)}
-                        containerHeight={chartH}
-                        fieldFormats={buildFieldFormats(cfg)}
-                        fieldLabelMap={buildFieldLabelMap(cfg)}
+                        data={dataRows!}
+                        cfg={cfg}
+                        chartH={chartH}
+                        visibleFields={visibleFields}
                       />
                     ) : (
                       <div style={{ height: chartH }} />

@@ -172,15 +172,17 @@ const ChartRenderer = forwardRef<ChartRendererHandle, ChartRendererProps>(({
       lastWidthRef.current = chartRef.current.clientWidth;
     }
 
-    // 添加 ResizeObserver 监听容器大小变化，仅在宽度变化时重新渲染
+    // 添加 ResizeObserver 监听容器大小变化，仅在宽度变化时重新渲染（防抖）
     if (chartRef.current) {
+      let resizeTimer: ReturnType<typeof setTimeout> | null = null;
       resizeObserverRef.current = new ResizeObserver((entries) => {
         const entry = entries[0];
         if (!entry) return;
         const newWidth = entry.contentRect.width;
         if (Math.abs(newWidth - lastWidthRef.current) > 1) {
           lastWidthRef.current = newWidth;
-          renderChart();
+          if (resizeTimer) clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(() => renderChart(), 150);
         }
       });
       resizeObserverRef.current.observe(chartRef.current);

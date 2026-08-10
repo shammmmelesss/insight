@@ -8,7 +8,7 @@ logfile
 
 # Frontend
 frontend/node_modules/
-# frontend/dist/
+frontend/dist/
 frontend/.vite/
 frontend/tsconfig.tsbuildinfo
 frontend/tsconfig.node.tsbuildinfo

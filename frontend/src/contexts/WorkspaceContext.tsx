@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import api from '@/api/client';
 import { Workspace } from '@shared/api.interface';
 
 interface WorkspaceContextType {
@@ -20,17 +20,7 @@ const WorkspaceContext = createContext<WorkspaceContextType>({
 
 export const useWorkspace = () => useContext(WorkspaceContext);
 
-// 全局 axios 拦截器：直接从 localStorage 读取，不依赖 React state
-// 这样即使组件还没渲染完，请求也能带上正确的 header
-axios.interceptors.request.use((config) => {
-  const wsId = localStorage.getItem('currentWorkspaceId');
-  const url = config.url || '';
-  // 只对内部 API 加 workspace header，外部域名调用不加（避免 CORS preflight 被拒）
-  if (wsId && !url.startsWith('http')) {
-    config.headers['X-Workspace-Id'] = wsId;
-  }
-  return config;
-});
+// 注：请求拦截器（含 X-Workspace-Id）统一在 @/api/client 中注册。
 
 export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -39,12 +29,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const refreshWorkspaces = useCallback(async () => {
     try {
-      const response = await axios.get('/api/workspaces');
+      const response = await api.get('/api/workspaces');
       const items: Workspace[] = response.data.items || [];
       setWorkspaces(items);
 
       if (items.length === 0) {
-        const createRes = await axios.post('/api/workspaces', { name: '默认空间', description: '系统自动创建的默认项目空间' });
+        const createRes = await api.post('/api/workspaces', { name: '默认空间', description: '系统自动创建的默认项目空间' });
         const newWs = createRes.data;
         setWorkspaces([newWs]);
         setCurrentWorkspaceState(newWs);

@@ -3,6 +3,7 @@ import { App, Button, Card, Table, Space, message, Modal, Form, Input, Select, T
 import { CheckCircleOutlined, CloseCircleOutlined, UserOutlined } from '@ant-design/icons';
 import { PlusOutlined, EditOutlined, DeleteOutlined, CopyOutlined, HistoryOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import { fetchDatasetOptions } from '@/api/datasets';
 import dayjs from 'dayjs';
 import {
   Monitor, MonitorOperator, MonitorScheduleFrequency,
@@ -77,8 +78,7 @@ const MonitorPage: React.FC = () => {
 
   const fetchDatasets = async () => {
     try {
-      const res = await axios.get('/api/datasets/select-list');
-      setDatasets(res.data.items);
+      setDatasets(await fetchDatasetOptions());
     } catch { /* ignore */ }
   };
 

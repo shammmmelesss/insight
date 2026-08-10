@@ -14,6 +14,7 @@ import {
   SettingOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
+import { fetchDatasetOptions } from '@/api/datasets';
 import { ChartType } from '@shared/api.interface';
 
 interface FieldConfig {
@@ -336,8 +337,8 @@ const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, o
   };
 
   useEffect(() => {
-    axios.get('/api/datasets/select-list')
-      .then(res => setDatasets(res.data.items))
+    fetchDatasetOptions()
+      .then(setDatasets)
       .catch(() => {});
   }, []);
 

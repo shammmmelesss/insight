@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api, { unwrap } from '@/api/client';
 
 export interface UserInfo {
   openId: string;
@@ -15,8 +15,8 @@ export const MOCK_USER: UserInfo = { openId: 'mock_user_1', name: '张三' };
 
 export async function getUserInfo(): Promise<UserInfo> {
   if (isDev) return MOCK_USER;
-  const res = await axios.get('/api/me');
-  const u = res.data?.data ?? res.data;
+  const res = await api.get('/api/me');
+  const u = unwrap<Record<string, string>>(res.data);
   if (!u) throw new Error('No user data');
   return {
     openId: u.feishu_userid || u.userid || u.id || '',

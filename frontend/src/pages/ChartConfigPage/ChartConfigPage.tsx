@@ -19,9 +19,9 @@ import {
 } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
+import { fetchDatasetOptions } from '@/api/datasets';
 import ChartRenderer from '../../components/ChartRenderer';
-
-type ChartType = 'crossTable' | 'bar' | 'line' | 'pie' | 'indicator' | 'dualAxis';
+import type { ChartType } from '@shared/api.interface';
 
 const { Option } = Select;
 
@@ -505,8 +505,8 @@ const ChartConfigPage: React.FC = () => {
   };
 
   useEffect(() => {
-    axios.get('/api/datasets/select-list')
-      .then(res => setDatasets(res.data.items))
+    fetchDatasetOptions()
+      .then(setDatasets)
       .catch(() => message.error('获取数据集列表失败'));
   }, []);
 

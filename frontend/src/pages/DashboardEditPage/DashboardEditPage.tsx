@@ -4,6 +4,8 @@ import { ArrowLeftOutlined, SearchOutlined, EllipsisOutlined, CodeOutlined, Sett
 import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel} from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import { fetchDatasetOptions } from '@/api/datasets';
+import { fetchChartOptions } from '@/api/charts';
 import { dashboardCache } from '../../utils/dashboardCache';
 import RGL, { WidthProvider } from 'react-grid-layout/legacy';
 import 'react-grid-layout/css/styles.css';
@@ -148,8 +150,7 @@ const DashboardEditPage: React.FC = () => {
 
   const fetchCharts = async () => {
     try {
-      const response = await axios.get('/api/charts/select-list');
-      setCharts(response.data.items);
+      setCharts(await fetchChartOptions());
     } catch (error) {
       message.error('获取图表列表失败');
       console.error('获取图表列表失败:', error);
@@ -158,8 +159,7 @@ const DashboardEditPage: React.FC = () => {
 
   const fetchDatasets = async () => {
     try {
-      const response = await axios.get('/api/datasets/select-list');
-      setDatasets(response.data.items);
+      setDatasets(await fetchDatasetOptions());
     } catch (error) {
       message.error('获取数据集列表失败');
       console.error('获取数据集列表失败:', error);

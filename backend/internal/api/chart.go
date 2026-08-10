@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math"
 	"net/http"
 	"strconv"
@@ -36,10 +37,13 @@ func RegisterChartRoutes(rg *gin.RouterGroup) {
 // chartDashboardCount 统计引用该图表的看板数量
 func chartDashboardCount(chartID string) int64 {
 	var count int64
-	database.DB.Raw(
+	if err := database.DB.Raw(
 		`SELECT COUNT(*) FROM dashboards WHERE layout @> CAST(? AS jsonb)`,
 		fmt.Sprintf(`[{"chartId":"%s"}]`, chartID),
-	).Scan(&count)
+	).Scan(&count).Error; err != nil {
+		log.Printf("chartDashboardCount query failed for chart %s: %v", chartID, err)
+		return 0
+	}
 	return count
 }
 

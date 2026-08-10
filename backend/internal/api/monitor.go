@@ -236,6 +236,19 @@ func TriggerMonitor(c *gin.Context) {
 		}
 	}
 
+	// 校验指标：计算字段按表达式规则校验，普通字段按列名规则校验，防止注入
+	if aggFunc != "COUNT" {
+		if isCalculatedField || strings.Contains(metricExpr, "(") {
+			if !isValidExpression(metricExpr) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "非法的指标表达式: " + metricExpr})
+				return
+			}
+		} else if !isSafeColumnName(metricExpr) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "非法的指标字段名: " + metricExpr})
+			return
+		}
+	}
+
 	// 计算字段或已含聚合函数的表达式直接使用，普通字段包一层聚合函数
 	var aggExpr string
 	if aggFunc == "COUNT" {
@@ -252,12 +265,23 @@ func TriggerMonitor(c *gin.Context) {
 		return
 	}
 
+	// 校验比较运算符，防止 SQL 注入
+	if !isValidOperator(monitor.TriggerOperator) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "不支持的比较运算符: " + monitor.TriggerOperator})
+		return
+	}
+
 	whereClause := ""
 	if monitor.WhereClause != "" {
 		whereClause = " WHERE " + monitor.WhereClause
 	}
 
 	dim := monitor.DimensionField
+	// 校验分组维度字段名，防止反引号注入
+	if dim != "" && !isSafeColumnName(dim) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "非法的维度字段名: " + dim})
+		return
+	}
 	var querySQL string
 	var db *sql.DB
 	if dataset.Type == models.DatasetTypeExtract {

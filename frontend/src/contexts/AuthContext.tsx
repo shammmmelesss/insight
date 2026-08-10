@@ -1,6 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import axios from 'axios';
 import { getUserInfo } from '@/api/auth';
 import type { UserInfo } from '@/api/auth';
 
@@ -20,18 +19,7 @@ export const useAuth = () => {
   return ctx;
 };
 
-// ─── Axios 拦截器（全局注册一次）──────────────────────
-
-axios.interceptors.request.use((config) => {
-  const url = config.url || '';
-  if (!url.startsWith('http')) {
-    const userId = sessionStorage.getItem('current_user_id');
-    const userName = sessionStorage.getItem('current_user');
-    if (userId) config.headers['X-User-Id'] = userId;
-    if (userName) config.headers['X-User-Name'] = encodeURIComponent(userName);
-  }
-  return config;
-});
+// 注：请求拦截器统一在 @/api/client 中注册。
 
 // ─── Provider ───────────────────────────────────────
 

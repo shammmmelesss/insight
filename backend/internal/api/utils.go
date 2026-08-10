@@ -40,3 +40,25 @@ func isValidExpression(expr string) bool {
 	}
 	return validExpressionCharsRegex.MatchString(expr)
 }
+
+// allowedComparisonOperators 是监控触发条件允许的比较运算符白名单。
+var allowedComparisonOperators = map[string]bool{
+	">": true, "<": true, ">=": true, "<=": true,
+	"=": true, "!=": true, "<>": true,
+}
+
+// isValidOperator 校验比较运算符，防止注入。
+func isValidOperator(op string) bool {
+	return allowedComparisonOperators[op]
+}
+
+// isSafeColumnName 校验用于反引号包裹的列名，拒绝可能闭合反引号或注入的字符。
+// 允许中文等 Unicode 字母（列名可能非 ASCII），但拒绝反引号、引号、分号、注释符与括号。
+var unsafeColumnNameRegex = regexp.MustCompile("[`'\";()\\-]|/\\*|\\*/")
+
+func isSafeColumnName(name string) bool {
+	if name == "" {
+		return false
+	}
+	return !unsafeColumnNameRegex.MatchString(name)
+}

@@ -11,7 +11,6 @@ import (
 	"data-analysis-platform/internal/api"
 	"data-analysis-platform/internal/config"
 	"data-analysis-platform/internal/database"
-	"data-analysis-platform/internal/models"
 )
 
 func main() {
@@ -47,19 +46,14 @@ func main() {
 	log.Println("Monitor scheduler started")
 
 	// 自动迁移数据库模型
-	database.DB.AutoMigrate(
-		&models.Workspace{},
-		&models.DataSource{},
-		&models.Dataset{},
-		&models.Chart{},
-		&models.Dashboard{},
-		&models.Monitor{},
-		&models.MonitorRecord{},
-		&models.QueryHistory{},
-	)
+	if err := database.AutoMigrate(); err != nil {
+		log.Fatalf("Failed to auto migrate: %v", err)
+	}
 
 	// 将 workspace_id 为空的历史数据迁移到第一个项目空间
-	migrateOrphanedData()
+	if err := database.MigrateOrphanedData(); err != nil {
+		log.Fatalf("Failed to migrate orphaned data: %v", err)
+	}
 
 	// 创建Gin引擎
 	r := gin.Default()
@@ -90,35 +84,6 @@ func main() {
 	port := cfg.Server.Port
 	log.Printf("Server is running on port %s", port)
 	r.Run(fmt.Sprintf(":%s", port))
-}
-
-// migrateOrphanedData 将 workspace_id 为空的历史数据分配到第一个项目空间
-func migrateOrphanedData() {
-	// 检查是否有 workspace_id 为空的数据
-	var count int64
-	database.DB.Raw("SELECT COUNT(*) FROM dashboards WHERE workspace_id IS NULL").Scan(&count)
-	if count == 0 {
-		return
-	}
-
-	// 获取第一个项目空间，没有则创建
-	var workspace models.Workspace
-	result := database.DB.Order("created_at asc").First(&workspace)
-	if result.Error != nil {
-		workspace = models.Workspace{Name: "默认空间", Description: "系统自动创建的默认项目空间"}
-		database.DB.Create(&workspace)
-	}
-
-	wsID := workspace.ID.String()
-	log.Printf("Migrating orphaned data to workspace: %s (%s)", workspace.Name, wsID)
-
-	// 使用原生 SQL 避免 GORM 类型转换问题
-	tables := []string{"data_sources", "datasets", "charts", "dashboards"}
-	for _, table := range tables {
-		database.DB.Exec("UPDATE "+table+" SET workspace_id = ? WHERE workspace_id IS NULL", wsID)
-	}
-
-	log.Println("Orphaned data migration completed")
 }
 
 // corsMiddleware 设置CORS，允许来源列表从配置加载（支持环境变量 ALLOWED_ORIGINS）

@@ -3,6 +3,7 @@ import { Button, Card, Modal, Layout, Skeleton, Select, Tooltip, Dropdown, Popov
 import { EditOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined, InboxOutlined, PlusOutlined, CalendarOutlined, FilterOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
+import { fetchChartOptions } from '@/api/charts';
 import { Dashboard, ChartOption, FilterField, DashboardLayoutItem } from '@shared/api.interface';
 import DashboardList from '../../components/DashboardList/DashboardList';
 import ChartRenderer, { ChartRendererHandle } from '../../components/ChartRenderer';
@@ -168,8 +169,7 @@ const DashboardsPage: React.FC = () => {
 
   const fetchCharts = async () => {
     try {
-      const response = await axios.get('/api/charts/select-list');
-      setCharts(response.data.items);
+      setCharts(await fetchChartOptions());
     } catch (error) {
       console.error('获取图表列表失败:', error);
     }

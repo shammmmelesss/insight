@@ -1,7 +1,5 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
-
-// 图表类型
-type ChartType = 'crossTable' | 'bar' | 'line' | 'pie' | 'indicator' | 'dualAxis';
+import type { ChartType } from '@shared/api.interface';
 
 const G2_COLORS = ['#1783FF', '#00C9C9', '#F0884D', '#D580FF', '#7863FF', '#60C42D', '#BD8F24', '#FF80CA', '#2491B3', '#17C76F'];
 const LINE_LEGEND_HEIGHT = 36;

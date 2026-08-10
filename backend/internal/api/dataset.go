@@ -432,6 +432,10 @@ func GetDatasetFieldValues(c *gin.Context) {
 			isCalc, _ := field["isCalculated"].(bool)
 			expr, _ := field["expression"].(string)
 			if isCalc && expr != "" {
+				if !isValidExpression(expr) {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "非法的计算字段表达式"})
+					return
+				}
 				queryExpr = expr
 			}
 			break

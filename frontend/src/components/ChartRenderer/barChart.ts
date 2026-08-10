@@ -1,12 +1,13 @@
 import type { RenderContext, ChartDatum } from './context';
 import { showMessage } from './context';
+import { G2_COLORS, LINE_LEGEND_HEIGHT, SLIDER_CONFIG } from './constants';
 
 // 渲染柱状图
 export const renderBarChart = (ctx: RenderContext) => {
   const {
     container, chartData, xAxisFields, yAxisFields, groupFields,
     getFieldLabel, formatValue, formatAxisValue, getActualField, buildFormatLookup,
-    createAndRenderG2Chart,
+    createAndRenderG2Chart, renderCustomLegend, hiddenSeriesRef,
   } = ctx;
 
   if (chartData.length === 0) {
@@ -63,7 +64,7 @@ export const renderBarChart = (ctx: RenderContext) => {
     // 单Y轴：保持原有逻辑
     const actualYField = actualYFields[0];
 
-    const cleanedData = chartData.map(item => ({
+    let cleanedData = chartData.map(item => ({
       ...item,
       [actualYField]: Number(item[actualYField]) || 0,
     })).filter(item => !isNaN(item[actualYField]));
@@ -73,6 +74,18 @@ export const renderBarChart = (ctx: RenderContext) => {
       return;
     }
 
+    // 分组柱状：构建分组值 → 颜色映射，并支持图例反选
+    let groupValues: string[] = [];
+    let groupColorMap: Record<string, string> = {};
+    if (actualGroupField) {
+      groupValues = Array.from(new Set(cleanedData.map(d => String(d[actualGroupField] ?? ''))));
+      groupValues.forEach((g, i) => { groupColorMap[g] = G2_COLORS[i % G2_COLORS.length]; });
+      // 过滤掉被图例隐藏的分组
+      cleanedData = cleanedData.filter(d => !hiddenSeriesRef.current.has(String(d[actualGroupField] ?? '')));
+    }
+
+    const legendHeight = actualGroupField ? LINE_LEGEND_HEIGHT : undefined;
+
     createAndRenderG2Chart((chart) => {
       chart.axis('x', xAxisConfig);
       chart.axis('y', {
@@ -80,7 +93,7 @@ export const renderBarChart = (ctx: RenderContext) => {
         labelFormatter: (v: any) => formatValue(v, yFormatLookup[actualYField], true),
       });
       if (dataCount > 50) {
-        chart.slider('x', { values: [0, 1], style: { trackSize: 6, handleIconSize: 4 }, showLabelOnInteraction: true });
+        chart.slider('x', SLIDER_CONFIG);
       }
 
       const bar = chart
@@ -96,22 +109,30 @@ export const renderBarChart = (ctx: RenderContext) => {
             (d: any) => ({
               name: actualGroupField ? String(d[actualGroupField] ?? getFieldLabel(actualYField)) : getFieldLabel(actualYField),
               value: formatValue(d[actualYField], yFormatLookup[actualYField]),
+              color: actualGroupField ? groupColorMap[String(d[actualGroupField] ?? '')] : undefined,
             }),
           ],
         });
 
       if (actualGroupField) {
-        bar.encode('color', actualGroupField);
-        chart.legend('color', { position: 'bottom', layout: { justifyContent: 'center' } });
+        bar.encode('color', actualGroupField).scale('color', {
+          domain: groupValues,
+          range: G2_COLORS,
+        });
+        chart.legend(false);
       }
-    });
+    }, legendHeight);
+
+    if (actualGroupField) {
+      renderCustomLegend(groupValues.map(g => ({ name: g, color: groupColorMap[g] })));
+    }
   } else {
-    // 多Y轴：将宽格式数据转换为长格式
+    // 多Y轴：将宽格式数据转换为长格式（跳过被图例隐藏的系列）
     const longData: ChartDatum[] = [];
     chartData.forEach(item => {
       actualYFields.forEach(yField => {
         const value = Number(item[yField]) || 0;
-        if (!isNaN(value)) {
+        if (!isNaN(value) && !hiddenSeriesRef.current.has(getFieldLabel(yField))) {
           longData.push({
             ...item,
             _metric: getFieldLabel(yField),
@@ -136,6 +157,10 @@ export const renderBarChart = (ctx: RenderContext) => {
       });
     });
 
+    // tooltip 标记点颜色映射（与图例/柱子保持一致）
+    const barColorMap: Record<string, string> = {};
+    actualYFields.forEach((f, i) => { barColorMap[f] = G2_COLORS[i % G2_COLORS.length]; });
+
     createAndRenderG2Chart((chart) => {
       chart.axis('x', xAxisConfig);
       chart.axis('y', {
@@ -143,7 +168,7 @@ export const renderBarChart = (ctx: RenderContext) => {
         labelFormatter: (v: any) => formatAxisValue(v),
       });
       if (dataCount > 50) {
-        chart.slider('x', { values: [0, 1], style: { trackSize: 6, handleIconSize: 4 }, showLabelOnInteraction: true });
+        chart.slider('x', SLIDER_CONFIG);
       }
 
       chart
@@ -153,23 +178,28 @@ export const renderBarChart = (ctx: RenderContext) => {
         .encode('x', actualXField)
         .encode('y', '_value')
         .encode('color', '_metric')
+        // 固定颜色映射域，避免隐藏部分系列后颜色错位（与图例保持一致）
+        .scale('color', {
+          domain: actualYFields.map(f => getFieldLabel(f)),
+          range: G2_COLORS,
+        })
         .style({ fillOpacity: 1, lineWidth: 0 })
         .interaction('elementHighlight')
         .tooltip({
           title: (d: any) => String(d[actualXField] ?? ''),
-          items: [
-            (d: any) => {
-              const metric = String(d._metric ?? '');
-              const yField = actualYFields.find(f => getFieldLabel(f) === metric) ?? '';
-              return {
-                name: metric,
-                value: formatValue(xMetricsMap[String(d[actualXField] ?? '')]?.[yField], yFormatLookup[yField]),
-              };
-            },
-          ],
+          // 展示当前 x 下的全部指标
+          items: actualYFields
+            .filter(yField => !hiddenSeriesRef.current.has(getFieldLabel(yField)))
+            .map(yField => (d: any) => ({
+              name: getFieldLabel(yField),
+              value: formatValue(xMetricsMap[String(d[actualXField] ?? '')]?.[yField], yFormatLookup[yField]),
+              color: barColorMap[yField],
+            })),
         });
 
-      chart.legend('color', { position: 'bottom', layout: { justifyContent: 'center' } });
-    });
+      chart.legend(false);
+    }, LINE_LEGEND_HEIGHT);
+
+    renderCustomLegend(actualYFields.map(f => ({ name: getFieldLabel(f), color: barColorMap[f] })));
   }
 };

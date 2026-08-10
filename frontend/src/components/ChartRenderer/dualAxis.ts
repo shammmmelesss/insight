@@ -1,6 +1,6 @@
 import type { RenderContext, ChartDatum } from './context';
 import { showMessage } from './context';
-import { G2_COLORS, ORANGE_COLORS, LINE_LEGEND_HEIGHT } from './constants';
+import { G2_COLORS, ORANGE_COLORS, LINE_LEGEND_HEIGHT, SLIDER_CONFIG } from './constants';
 
 // 渲染双Y轴图（左柱右线）
 export const renderDualAxisChart = (ctx: RenderContext) => {
@@ -101,7 +101,7 @@ export const renderDualAxisChart = (ctx: RenderContext) => {
   createAndRenderG2Chart((chart) => {
     chart.axis('x', xAxisConfig);
     if (dataCount > 50) {
-      chart.slider('x', { values: [0, 1], style: { trackSize: 6, handleIconSize: 4 }, showLabelOnInteraction: true });
+      chart.slider('x', SLIDER_CONFIG);
     }
 
     if (leftLongData.length > 0) {

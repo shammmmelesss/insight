@@ -1,6 +1,6 @@
 import type { RenderContext, ChartDatum, SeriesItem } from './context';
 import { showMessage } from './context';
-import { G2_COLORS, LINE_LEGEND_HEIGHT } from './constants';
+import { G2_COLORS, LINE_LEGEND_HEIGHT, SLIDER_CONFIG } from './constants';
 
 // 渲染折线图
 export const renderLineChart = (ctx: RenderContext) => {
@@ -95,7 +95,7 @@ export const renderLineChart = (ctx: RenderContext) => {
         labelFormatter: (v: any) => formatValue(v, yFormatLookup[actualYField], true),
       });
       if (dataCount > 50) {
-        chart.slider('x', { values: [0, 1], style: { trackSize: 6, handleIconSize: 4 }, showLabelOnInteraction: true });
+        chart.slider('x', SLIDER_CONFIG);
       }
 
       const area = chart
@@ -182,7 +182,7 @@ export const renderLineChart = (ctx: RenderContext) => {
         labelFormatter: (v: any) => formatAxisValue(v),
       });
       if (dataCount > 50) {
-        chart.slider('x', { values: [0, 1], style: { trackSize: 6, handleIconSize: 4 }, showLabelOnInteraction: true });
+        chart.slider('x', SLIDER_CONFIG);
       }
 
       chart

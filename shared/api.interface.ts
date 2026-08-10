@@ -404,6 +404,8 @@ export interface FilterField {
   dataset: string;
   field: string;
   type: 'multiple' | 'single' | 'dateRange';
+  /** 排除模式：true 时使用 NOT IN 而非 IN（仅单选/多选有效） */
+  exclude?: boolean;
   defaultValue: any;
   charts: string[];
 }

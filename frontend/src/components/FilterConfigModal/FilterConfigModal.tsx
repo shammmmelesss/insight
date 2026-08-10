@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Button, Layout, Form, Select, Radio, message, Popover } from 'antd';
+import { Modal, Button, Layout, Form, Select, Radio, message, Popover, Switch } from 'antd';
 import { PlusOutlined, DeleteOutlined, CalendarOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { FilterField } from '@shared/api.interface';
@@ -312,7 +312,17 @@ const FilterConfigModal: React.FC<FilterConfigModalProps> = ({ visible, onCancel
                   <Radio value="dateRange">日期区间</Radio>
                 </Radio.Group>
               </Form.Item>
-              
+
+              {selectedField.type !== 'dateRange' && (
+                <Form.Item label="排除模式">
+                  <Switch
+                    checked={!!selectedField.exclude}
+                    onChange={(checked) => updateField(selectedField.id, { exclude: checked })}
+                  />
+                  <span style={{ marginLeft: 8, color: '#888', fontSize: 12 }}>开启后仅排除所选值（NOT IN）</span>
+                </Form.Item>
+              )}
+
               <Form.Item label="筛选默认值">
                 {selectedField.type === 'dateRange' ? (
                   <DateRangePickerTrigger

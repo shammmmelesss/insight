@@ -1,11 +1,9 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { App, Button, Input, Select, Modal, Tag, Tooltip, Space, Radio, Popover } from 'antd';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { App, Button, Input, Select, Modal, Tag, Tooltip, Space, Popover } from 'antd';
 import { CalendarOutlined as CalendarIcon } from '@ant-design/icons';
-import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel } from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
+import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolvedRangeLabel } from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
 import {
   ArrowLeftOutlined,
-  SettingOutlined,
-  DeleteOutlined,
   TableOutlined,
   BarChartOutlined,
   LineChartOutlined,
@@ -13,262 +11,22 @@ import {
   DashboardOutlined,
   FundOutlined,
   SearchOutlined,
-  DragOutlined,
   SaveOutlined,
   CodeOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { fetchDatasetOptions } from '@/api/datasets';
 import ChartRenderer from '../../components/ChartRenderer';
 import type { ChartType } from '@shared/api.interface';
+import type { FieldConfig } from './types';
+import { generateSQL as buildSQL } from './sql';
+import DropZone from './DropZone';
+import { useFieldAreas } from './useFieldAreas';
+import { useDatasetSource } from './useDatasetSource';
+import FieldSettingsModal from './FieldSettingsModal';
+import AreaSettingsModal from './AreaSettingsModal';
 
 const { Option } = Select;
-
-
-interface FieldConfig {
-  originalName: string;
-  displayName: string;
-  description?: string;
-  type: string;
-  isCalculated?: boolean;
-  expression?: string;
-  config?: {
-    aggregation?: string;
-    dataFormat?: string;
-    sort?: string;
-    filterType?: 'multiple' | 'single' | 'dateRange';
-    filterDefault?: any;
-  };
-}
-
-// --- 子组件：字段 Tag ---
-interface FieldTagProps {
-  field: FieldConfig;
-  area: string;
-  index: number;
-  onSettings: (field: FieldConfig, area: string) => void;
-  onRemove: (area: string, originalName: string) => void;
-  showAggregation?: boolean;
-  onReorderDragStart: (e: React.DragEvent, area: string, index: number) => void;
-  insertBefore?: boolean;
-  insertAfter?: boolean;
-}
-
-const FieldTag: React.FC<FieldTagProps> = ({
-  field, area, index, onSettings, onRemove, showAggregation,
-  onReorderDragStart, insertBefore, insertAfter,
-}) => {
-  const aggLabel = field.config?.aggregation;
-  return (
-    <div style={{ position: 'relative' }}>
-      {insertBefore && (
-        <div style={{ height: 2, backgroundColor: '#1677ff', borderRadius: 1, marginBottom: 2 }} />
-      )}
-      <div
-        draggable
-        onDragStart={(e) => { e.stopPropagation(); onReorderDragStart(e, area, index); }}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          padding: '3px 8px',
-          backgroundColor: '#f0f5ff',
-          border: '1px solid #adc6ff',
-          borderRadius: 4,
-          fontSize: 12,
-          color: '#2f54eb',
-          width: '100%',
-          boxSizing: 'border-box',
-          cursor: 'grab',
-        }}
-      >
-        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {field.displayName || field.originalName}
-          {showAggregation && aggLabel && (
-            <span style={{ color: '#8c8c8c', marginLeft: 4, fontWeight: 400 }}>· {aggLabel}</span>
-          )}
-        </span>
-        <Tooltip title="字段设置">
-          <Button
-            size="small"
-            type="text"
-            icon={<SettingOutlined />}
-            style={{ color: '#595959', padding: 0, minWidth: 'auto', height: 'auto', flexShrink: 0 }}
-            onClick={(e) => { e.stopPropagation(); onSettings(field, area); }}
-          />
-        </Tooltip>
-        <Tooltip title="移除">
-          <Button
-            size="small"
-            type="text"
-            icon={<DeleteOutlined />}
-            style={{ color: '#ff4d4f', padding: 0, minWidth: 'auto', height: 'auto', flexShrink: 0 }}
-            onClick={(e) => { e.stopPropagation(); onRemove(area, field.originalName); }}
-          />
-        </Tooltip>
-      </div>
-      {insertAfter && (
-        <div style={{ height: 2, backgroundColor: '#1677ff', borderRadius: 1, marginTop: 2 }} />
-      )}
-    </div>
-  );
-};
-
-// --- 子组件：拖放区域 ---
-interface DropZoneProps {
-  areaKey: string;
-  label: string;
-  fields: FieldConfig[];
-  isOver: boolean;
-  showAggregation?: boolean;
-  onDragEnter: (e: React.DragEvent, area: string) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDragLeave: () => void;
-  onDrop: (e: React.DragEvent, area: string) => void;
-  onSettings: (field: FieldConfig, area: string) => void;
-  onAreaSettings?: (area: string) => void;
-  onRemove: (area: string, originalName: string) => void;
-  onReorder: (area: string, fromIndex: number, toIndex: number) => void;
-}
-
-const DropZone: React.FC<DropZoneProps> = ({
-  areaKey, label, fields, isOver, showAggregation,
-  onDragEnter, onDragOver, onDragLeave, onDrop, onSettings, onAreaSettings, onRemove, onReorder,
-}) => {
-  const [reorderFromIndex, setReorderFromIndex] = useState<number | null>(null);
-  const [insertIndex, setInsertIndex] = useState<number | null>(null);
-
-  const handleReorderDragStart = (e: React.DragEvent, area: string, index: number) => {
-    e.dataTransfer.setData('application/insight-reorder', JSON.stringify({ area, index }));
-    e.dataTransfer.effectAllowed = 'move';
-    setReorderFromIndex(index);
-  };
-
-  const handleItemDragOver = (e: React.DragEvent, index: number) => {
-    if (reorderFromIndex === null) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const mid = rect.top + rect.height / 2;
-    setInsertIndex(e.clientY < mid ? index : index + 1);
-  };
-
-  const handleZoneDrop = (e: React.DragEvent) => {
-    const reorderData = e.dataTransfer.getData('application/insight-reorder');
-    if (reorderData) {
-      e.preventDefault();
-      e.stopPropagation();
-      const { area, index: fromIndex } = JSON.parse(reorderData);
-      if (area === areaKey && insertIndex !== null && insertIndex !== fromIndex && insertIndex !== fromIndex + 1) {
-        onReorder(areaKey, fromIndex, insertIndex);
-      }
-      setReorderFromIndex(null);
-      setInsertIndex(null);
-      return;
-    }
-    setReorderFromIndex(null);
-    setInsertIndex(null);
-    onDrop(e, areaKey);
-  };
-
-  const handleZoneDragLeave = (e: React.DragEvent) => {
-    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) {
-      setReorderFromIndex(null);
-      setInsertIndex(null);
-      onDragLeave();
-    }
-  };
-
-  const isReordering = reorderFromIndex !== null;
-
-  return (
-    <div
-      style={{
-        marginBottom: 10,
-        border: '1px solid #f0f0f0',
-        borderRadius: 6,
-        overflow: 'hidden',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          padding: '6px 10px',
-          backgroundColor: '#fafafa',
-          borderBottom: '1px solid #f0f0f0',
-        }}
-      >
-        <span style={{ fontSize: 12, fontWeight: 500, color: '#595959', flex: 1 }}>{label}</span>
-        {fields.length > 0 && onAreaSettings && (
-          <Button
-            size="small"
-            type="link"
-            style={{ fontSize: 12, padding: '0 4px', height: 'auto', color: '#1677ff' }}
-            onClick={() => onAreaSettings(areaKey)}
-          >
-            设置
-          </Button>
-        )}
-      </div>
-      <div
-        style={{
-          minHeight: 44,
-          padding: '8px 10px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 6,
-          border: isOver && !isReordering ? '2px dashed #4096ff' : '2px solid transparent',
-          backgroundColor: isOver && !isReordering ? '#e6f4ff' : 'transparent',
-          borderRadius: 4,
-          transition: 'all 0.15s',
-        }}
-        onDragEnter={(e) => { if (!isReordering) onDragEnter(e, areaKey); }}
-        onDragOver={(e) => { if (!isReordering) onDragOver(e); else e.preventDefault(); }}
-        onDragLeave={handleZoneDragLeave}
-        onDrop={handleZoneDrop}
-      >
-        {fields.length > 0 ? (
-          fields.map((field, idx) => (
-            <div
-              key={field.originalName}
-              onDragOver={(e) => handleItemDragOver(e, idx)}
-            >
-              <FieldTag
-                field={field}
-                area={areaKey}
-                index={idx}
-                onSettings={onSettings}
-                onRemove={onRemove}
-                showAggregation={showAggregation}
-                onReorderDragStart={handleReorderDragStart}
-                insertBefore={insertIndex === idx && reorderFromIndex !== null && reorderFromIndex !== idx}
-                insertAfter={insertIndex === idx + 1 && reorderFromIndex !== null && reorderFromIndex !== idx}
-              />
-            </div>
-          ))
-        ) : (
-          <div
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 4,
-              color: '#bfbfbf',
-              fontSize: 12,
-              userSelect: 'none',
-            }}
-          >
-            <DragOutlined style={{ fontSize: 12 }} />
-            <span>拖入字段</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 // --- 主组件 ---
 const ChartConfigPage: React.FC = () => {
@@ -278,15 +36,8 @@ const ChartConfigPage: React.FC = () => {
   const chartId = searchParams.get('chartId');
   const [selectedDataset, setSelectedDataset] = useState(searchParams.get('datasetId') || '');
   const [chartType, setChartType] = useState<ChartType>('crossTable');
-  const [datasets, setDatasets] = useState<{ id: string; name: string }[]>([]);
-  const [datasetFields, setDatasetFields] = useState<FieldConfig[]>([]);
   const [fieldSearch, setFieldSearch] = useState('');
   const [chartData, setChartData] = useState<any[]>([]);
-  const [datasetSQL, setDatasetSQL] = useState('');
-  const [dataSourceId, setDataSourceId] = useState('');
-  const [dataSourceType, setDataSourceType] = useState('');
-  const [datasetType, setDatasetType] = useState<string>('');
-  const [loadedDatasetId, setLoadedDatasetId] = useState('');
 
   const [droppableArea, setDroppableArea] = useState<string | null>(null);
   const [draggedField, setDraggedField] = useState<FieldConfig | null>(null);
@@ -312,157 +63,75 @@ const ChartConfigPage: React.FC = () => {
   const [isSQLModalVisible, setIsSQLModalVisible] = useState(false);
   const [sqlContent, setSqlContent] = useState('');
 
-  const [rowFields, setRowFields] = useState<FieldConfig[]>([]);
-  const [colFields, setColFields] = useState<FieldConfig[]>([]);
-  const [measureFields, setMeasureFields] = useState<FieldConfig[]>([]);
-  const [xAxisFields, setXAxisFields] = useState<FieldConfig[]>([]);
-  const [yAxisFields, setYAxisFields] = useState<FieldConfig[]>([]);
-  const [y2AxisFields, setY2AxisFields] = useState<FieldConfig[]>([]);
-  const [groupFields, setGroupFields] = useState<FieldConfig[]>([]);
-  const [indicatorFields, setIndicatorFields] = useState<FieldConfig[]>([]);
-  const [filterFields, setFilterFields] = useState<FieldConfig[]>([]);
+  const {
+    rowFields, setRowFields,
+    colFields, setColFields,
+    measureFields, setMeasureFields,
+    xAxisFields, setXAxisFields,
+    yAxisFields, setYAxisFields,
+    y2AxisFields, setY2AxisFields,
+    groupFields, setGroupFields,
+    indicatorFields, setIndicatorFields,
+    filterFields, setFilterFields,
+    fieldSetters,
+    getAreaFields,
+    handleReorder,
+    handleRemoveField,
+  } = useFieldAreas();
   const [filterValues, setFilterValues] = useState<Record<string, any>>({});
-  const [filterFieldOptions, setFilterFieldOptions] = useState<Record<string, string[]>>({});
-  const loadedFilterKeys = useRef<Set<string>>(new Set());
-  const pendingFilterValues = useRef<Record<string, any> | null>(null);
+
+  const {
+    datasets,
+    datasetFields,
+    datasetSQL,
+    dataSourceId,
+    dataSourceType,
+    datasetType,
+    loadedDatasetId,
+    filterFieldOptions,
+    fetchFilterFieldOptions,
+    pendingFilterValues,
+  } = useDatasetSource({ selectedDataset, setFilterValues, onError: message.error });
 
   const navigate = useNavigate();
 
-  const fieldSetters: Record<string, React.Dispatch<React.SetStateAction<FieldConfig[]>>> = {
-    row: setRowFields,
-    col: setColFields,
-    measure: setMeasureFields,
-    xAxis: setXAxisFields,
-    yAxis: setYAxisFields,
-    y2Axis: setY2AxisFields,
-    group: setGroupFields,
-    indicator: setIndicatorFields,
-    filter: setFilterFields,
-  };
+  const generateSQL = useCallback(() => buildSQL({
+    datasetSQL, selectedDataset, chartType,
+    rowFields, colFields, measureFields, xAxisFields, yAxisFields, y2AxisFields,
+    groupFields, indicatorFields, filterFields, filterValues, dataSourceType,
+  }), [datasetSQL, selectedDataset, chartType, rowFields, colFields, measureFields, xAxisFields, yAxisFields, y2AxisFields, groupFields, indicatorFields, filterFields, filterValues, dataSourceType]);
 
-  const mapAggregationToSQL = (aggregation: string): string => {
-    const map: Record<string, string> = {
-      '求和': 'SUM',
-      '平均值': 'AVG',
-      '最大值': 'MAX',
-      '最小值': 'MIN',
-      '计数': 'COUNT',
-      '去重计数': 'COUNT(DISTINCT',
+  // 稳定 ChartRenderer 的 props 引用：避免输入图表名称/搜索字段时因整页重渲染
+  // 生成新数组/对象引用，触发图表销毁重建导致的输入抖动
+  const chartRendererProps = useMemo(() => {
+    const fieldFormats: Record<string, string> = {};
+    const fieldLabelMap: Record<string, string> = {};
+    [...rowFields, ...colFields, ...xAxisFields, ...groupFields].forEach(f => {
+      fieldLabelMap[f.originalName] = f.displayName || f.originalName;
+    });
+    [...measureFields, ...yAxisFields, ...y2AxisFields, ...indicatorFields].forEach(f => {
+      const chineseAgg = f.config?.aggregation || '计数';
+      const key = `${f.originalName}_${chineseAgg}`;
+      fieldLabelMap[key] = f.displayName || f.originalName;
+      if (f.config?.dataFormat && f.config.dataFormat !== '原始值') {
+        fieldFormats[f.originalName] = f.config.dataFormat;
+      }
+    });
+    return {
+      chartType,
+      chartData,
+      rowFields: rowFields.map(f => f.originalName),
+      colFields: colFields.map(f => f.originalName),
+      measureFields: measureFields.map(f => f.originalName),
+      xAxisFields: xAxisFields.map(f => f.originalName),
+      yAxisFields: yAxisFields.map(f => f.originalName),
+      y2AxisFields: y2AxisFields.map(f => f.originalName),
+      groupFields: groupFields.map(f => f.originalName),
+      indicatorFields: indicatorFields.map(f => f.originalName),
+      fieldFormats,
+      fieldLabelMap,
     };
-    return map[aggregation] ?? 'COUNT';
-  };
-
-  // 根据数据源类型获取标识符引号
-  const getIdentifierQuote = (): string => {
-    const dsType = dataSourceType.toLowerCase();
-    // MySQL、BigQuery 使用反引号
-    if (dsType === 'mysql' || dsType === 'bigquery') {
-      return '`';
-    }
-    // 其余（PostgreSQL、SQLite、BigQuery、Oracle、SQLServer、未知）均使用双引号（ANSI SQL 标准）
-    return '"';
-  };
-
-  const buildAggField = (field: FieldConfig) => {
-    const aggregation = field.config?.aggregation || '计数';
-    const quote = getIdentifierQuote();
-    const alias = `${quote}${field.originalName}_${aggregation}${quote}`;
-    if (field.isCalculated && field.expression) {
-      return `${field.expression} AS ${alias}`;
-    }
-    if (aggregation === '去重计数') {
-      return `COUNT(DISTINCT ${field.originalName}) AS ${alias}`;
-    }
-    const fn = mapAggregationToSQL(aggregation);
-    return `${fn}(${field.originalName}) AS ${alias}`;
-  };
-
-  const generateSQL = useCallback(() => {
-    if (!datasetSQL) return `SELECT * FROM ${selectedDataset || 'your_table'}`;
-
-    // 计算字段用表达式，普通字段用字段名
-    const fieldExpr = (f: FieldConfig) => (f.isCalculated && f.expression) ? f.expression : f.originalName;
-    const fieldSelect = (f: FieldConfig) =>
-      (f.isCalculated && f.expression) ? `${f.expression} AS ${f.originalName}` : f.originalName;
-
-    const filterClauses = filterFields
-      .map(f => {
-        const filterType = f.config?.filterType || 'multiple';
-        const vals = filterValues[f.originalName];
-        if (!vals) return null;
-        const expr = fieldExpr(f);
-        if (filterType === 'dateRange') {
-          if (vals && typeof vals === 'object' && 'startType' in vals) {
-            const [s, e] = resolveDateRangeValue(vals as DateRangeFilterValue);
-            return `${expr} BETWEEN '${s.format('YYYY-MM-DD')}' AND '${e.format('YYYY-MM-DD')}'`;
-          }
-          if (Array.isArray(vals) && vals.length === 2 && vals[0] && vals[1]) {
-            return `${expr} BETWEEN '${vals[0]}' AND '${vals[1]}'`;
-          }
-          return null;
-        }
-        const arr: string[] = Array.isArray(vals) ? vals : (vals !== '' ? [String(vals)] : []);
-        if (arr.length === 0) return null;
-        const quoted = arr.map((v: string) => `'${v.replace(/'/g, "''")}'`).join(', ');
-        return `${expr} IN (${quoted})`;
-      })
-      .filter((c): c is string => c !== null);
-
-    const innerSQL = filterClauses.length > 0
-      ? `SELECT * FROM (${datasetSQL}) AS _inner WHERE ${filterClauses.join(' AND ')}`
-      : datasetSQL;
-
-    const wrap = (fields: string[], aggFields: string[], groupBy: string[], orderBy: string[]) => {
-      const all = [...fields, ...aggFields];
-      if (all.length === 0) return innerSQL;
-      let sql = `SELECT ${all.join(', ')} FROM (${innerSQL}) AS dataset WHERE 1=1`;
-      if (groupBy.length > 0) sql += ` GROUP BY ${groupBy.join(', ')}`;
-      if (orderBy.length > 0) sql += ` ORDER BY ${orderBy.join(', ')}`;
-      return sql;
-    };
-
-    const sortDir = (f: FieldConfig) => f.config?.sort === '降序' ? 'DESC' : 'ASC';
-
-    if (chartType === 'crossTable') {
-      const rows = rowFields.map(fieldSelect);
-      const cols = colFields.map(fieldSelect);
-      return wrap(
-        [...rows, ...cols],
-        measureFields.map(buildAggField),
-        [...rowFields.map(fieldExpr), ...colFields.map(fieldExpr)],
-        rowFields.map(f => `${fieldExpr(f)} ${sortDir(f)}`),
-      );
-    }
-    if (chartType === 'bar' || chartType === 'line') {
-      const xs = xAxisFields.map(fieldSelect);
-      const gs = groupFields.map(fieldSelect);
-      return wrap(
-        [...xs, ...gs],
-        yAxisFields.map(buildAggField),
-        [...xAxisFields.map(fieldExpr), ...groupFields.map(fieldExpr)],
-        xAxisFields.map(f => `${fieldExpr(f)} ${sortDir(f)}`),
-      );
-    }
-    if (chartType === 'dualAxis') {
-      const xs = xAxisFields.map(fieldSelect);
-      return wrap(
-        xs,
-        [...yAxisFields.map(buildAggField), ...y2AxisFields.map(buildAggField)],
-        xAxisFields.map(fieldExpr),
-        xAxisFields.map(f => `${fieldExpr(f)} ${sortDir(f)}`),
-      );
-    }
-    if (chartType === 'pie') {
-      const gs = groupFields.map(fieldSelect);
-      return wrap(gs, measureFields.map(buildAggField), groupFields.map(fieldExpr), []);
-    }
-    if (chartType === 'indicator') {
-      const agg = indicatorFields.map(buildAggField);
-      if (agg.length === 0) return innerSQL;
-      return `SELECT ${agg.join(', ')} FROM (${innerSQL}) AS dataset WHERE 1=1`;
-    }
-    return innerSQL;
-  }, [datasetSQL, selectedDataset, chartType, rowFields, colFields, measureFields, xAxisFields, yAxisFields, y2AxisFields, groupFields, indicatorFields, filterFields, filterValues, dataSourceType]);
+  }, [chartType, chartData, rowFields, colFields, measureFields, xAxisFields, yAxisFields, y2AxisFields, groupFields, indicatorFields]);
 
   useEffect(() => {
     if (!chartId) return;
@@ -503,67 +172,6 @@ const ChartConfigPage: React.FC = () => {
       message.error('保存图表失败，请重试');
     }
   };
-
-  useEffect(() => {
-    fetchDatasetOptions()
-      .then(setDatasets)
-      .catch(() => message.error('获取数据集列表失败'));
-  }, []);
-
-  useEffect(() => {
-    if (!selectedDataset) {
-      setDatasetFields([]); setDatasetSQL(''); setDataSourceId('');
-      return;
-    }
-    loadedFilterKeys.current.clear();
-    setFilterFieldOptions({});
-    setFilterValues({});
-    setLoadedDatasetId('');
-    axios.get(`/api/datasets/${selectedDataset}`).then(res => {
-      setDatasetFields(res.data.fieldsConfig || []);
-      const dsType = res.data.type || 'direct';
-      setDatasetType(dsType);
-      if (dsType === 'extract') {
-        const ckTable = `ds_${res.data.id.replaceAll('-', '_')}`;
-        setDatasetSQL(`SELECT * FROM insight.${ckTable}`);
-      } else {
-        setDatasetSQL(res.data.sql || '');
-      }
-      setDataSourceId(res.data.dataSourceId || '');
-      setLoadedDatasetId(selectedDataset);
-      if (pendingFilterValues.current) {
-        setFilterValues(pendingFilterValues.current);
-        pendingFilterValues.current = null;
-      }
-      // 获取数据源类型
-      const dsId = res.data.dataSourceId;
-      if (dsId) {
-        axios.get(`/api/data-sources/${dsId}`).then(dsRes => {
-          setDataSourceType(dsRes.data.type || '');
-        }).catch(() => setDataSourceType(''));
-      } else {
-        setDataSourceType('');
-      }
-    }).catch(() => {
-      message.error('获取数据集字段失败');
-      setDatasetFields([]); setDatasetSQL(''); setDataSourceId(''); setDataSourceType(''); setDatasetType('');
-    });
-  }, [selectedDataset]);
-
-  const fetchFilterFieldOptions = useCallback(async (fieldName: string) => {
-    if (!selectedDataset) return;
-    const cacheKey = `${selectedDataset}:${fieldName}`;
-    if (loadedFilterKeys.current.has(cacheKey)) return;
-    loadedFilterKeys.current.add(cacheKey);
-    try {
-      const res = await axios.get(`/api/datasets/${selectedDataset}/field-values`, {
-        params: { field: fieldName },
-      });
-      setFilterFieldOptions(prev => ({ ...prev, [cacheKey]: res.data.values || [] }));
-    } catch {
-      loadedFilterKeys.current.delete(cacheKey);
-    }
-  }, [selectedDataset]);
 
   useEffect(() => {
     filterFields.forEach(f => fetchFilterFieldOptions(f.originalName));
@@ -644,29 +252,6 @@ const ChartConfigPage: React.FC = () => {
       }));
       return [...prev, ...toAdd];
     });
-  };
-
-  const handleReorder = (area: string, fromIndex: number, toIndex: number) => {
-    fieldSetters[area]?.(prev => {
-      const arr = [...prev];
-      const [item] = arr.splice(fromIndex, 1);
-      const insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex;
-      arr.splice(insertAt, 0, item);
-      return arr;
-    });
-  };
-
-  const handleRemoveField = (area: string, originalName: string) => {
-    fieldSetters[area]?.(prev => prev.filter(f => f.originalName !== originalName));
-  };
-
-  const getAreaFields = (area: string): FieldConfig[] => {
-    const map: Record<string, FieldConfig[]> = {
-      row: rowFields, col: colFields, measure: measureFields,
-      xAxis: xAxisFields, yAxis: yAxisFields, y2Axis: y2AxisFields,
-      group: groupFields, indicator: indicatorFields, filter: filterFields,
-    };
-    return map[area] || [];
   };
 
   const openAreaSettingsModal = (area: string) => {
@@ -1122,381 +707,37 @@ const ChartConfigPage: React.FC = () => {
           )}
 
           <div style={{ flex: 1, padding: 12, overflow: 'hidden', minHeight: 0 }}>
-            {(() => {
-              const fieldFormats: Record<string, string> = {};
-              const fieldLabelMap: Record<string, string> = {};
-              [...rowFields, ...colFields, ...xAxisFields, ...groupFields].forEach(f => {
-                fieldLabelMap[f.originalName] = f.displayName || f.originalName;
-              });
-              [...measureFields, ...yAxisFields, ...y2AxisFields, ...indicatorFields].forEach(f => {
-                const chineseAgg = f.config?.aggregation || '计数';
-                const key = `${f.originalName}_${chineseAgg}`;
-                fieldLabelMap[key] = f.displayName || f.originalName;
-                if (f.config?.dataFormat && f.config.dataFormat !== '原始值') {
-                  fieldFormats[f.originalName] = f.config.dataFormat;
-                }
-              });
-              return (
-                <ChartRenderer
-                  chartType={chartType}
-                  chartData={chartData}
-
-                  rowFields={rowFields.map(f => f.originalName)}
-                  colFields={colFields.map(f => f.originalName)}
-                  measureFields={measureFields.map(f => f.originalName)}
-                  xAxisFields={xAxisFields.map(f => f.originalName)}
-                  yAxisFields={yAxisFields.map(f => f.originalName)}
-                  y2AxisFields={y2AxisFields.map(f => f.originalName)}
-                  groupFields={groupFields.map(f => f.originalName)}
-                  indicatorFields={indicatorFields.map(f => f.originalName)}
-                  fieldFormats={fieldFormats}
-                  fieldLabelMap={fieldLabelMap}
-                />
-              );
-            })()}
+            <ChartRenderer {...chartRendererProps} />
           </div>
         </div>
       </div>
 
       {/* 字段设置弹窗 */}
-      <Modal
-        title="字段设置"
+      <FieldSettingsModal
         open={isFieldSettingsModalVisible}
+        currentField={currentField}
+        tempFieldConfig={tempFieldConfig}
+        setTempFieldConfig={setTempFieldConfig}
+        chartType={chartType}
+        filterFieldOptions={filterFieldOptions}
+        selectedDataset={selectedDataset}
         onCancel={() => { setIsFieldSettingsModalVisible(false); setCurrentField(null); }}
-        footer={null}
-        width={480}
-      >
-        {currentField && (
-          <div style={{ paddingTop: 8 }}>
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>字段名称</div>
-              <Input value={currentField.displayName || currentField.originalName} disabled />
-            </div>
-
-            {currentField.area === 'filter' ? (
-              <>
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>筛选器类型</div>
-                  <Radio.Group
-                    value={tempFieldConfig.filterType || 'multiple'}
-                    onChange={(e) => setTempFieldConfig(p => ({ ...p, filterType: e.target.value, filterDefault: e.target.value === 'dateRange' ? DEFAULT_DATE_RANGE_VALUE : [] }))}
-                  >
-                    <Radio value="multiple">多选</Radio>
-                    <Radio value="single">单选</Radio>
-                    <Radio value="dateRange">日期区间</Radio>
-                  </Radio.Group>
-                </div>
-
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>筛选默认值</div>
-                  {tempFieldConfig.filterType === 'dateRange' ? (
-                    <ChartDateRangePickerTrigger
-                      value={(tempFieldConfig.filterDefault && typeof tempFieldConfig.filterDefault === 'object' && 'startType' in tempFieldConfig.filterDefault)
-                        ? tempFieldConfig.filterDefault as DateRangeFilterValue
-                        : DEFAULT_DATE_RANGE_VALUE}
-                      onChange={(val) => setTempFieldConfig(p => ({ ...p, filterDefault: val }))}
-                    />
-                  ) : (
-                    <Select
-                      style={{ width: '100%' }}
-                      mode={tempFieldConfig.filterType === 'single' ? undefined : 'multiple'}
-                      value={tempFieldConfig.filterDefault}
-                      onChange={(v) => setTempFieldConfig(p => ({ ...p, filterDefault: v }))}
-                      allowClear
-                      placeholder="请选择默认值"
-                    >
-                      {(filterFieldOptions[`${selectedDataset}:${currentField.originalName}`] || []).map((val: string) => (
-                        <Option key={String(val)} value={String(val)}>{String(val)}</Option>
-                      ))}
-                    </Select>
-                  )}
-                </div>
-              </>
-            ) : (
-              <>
-                {(currentField.type !== 'dimension' ||
-                  currentField.area === 'measure' ||
-                  currentField.area === 'yAxis' ||
-                  currentField.area === 'y2Axis' ||
-                  currentField.area === 'indicator') && (
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>聚合方式</div>
-                    <Select
-                      value={tempFieldConfig.aggregation}
-                      style={{ width: '100%' }}
-                      onChange={(v) => setTempFieldConfig(p => ({ ...p, aggregation: v }))}
-                    >
-                      <Option value="求和">求和</Option>
-                      <Option value="平均值">平均值</Option>
-                      <Option value="最大值">最大值</Option>
-                      <Option value="最小值">最小值</Option>
-                      <Option value="计数">计数</Option>
-                      <Option value="去重计数">去重计数</Option>
-                    </Select>
-                  </div>
-                )}
-
-                {((chartType === 'crossTable' && currentField.area === 'measure') ||
-                  ((chartType === 'bar' || chartType === 'line') && currentField.area === 'yAxis') ||
-                  (chartType === 'dualAxis' && (currentField.area === 'yAxis' || currentField.area === 'y2Axis')) ||
-                  (chartType === 'pie' && currentField.area === 'measure') ||
-                  (chartType === 'indicator' && currentField.area === 'indicator')) && (
-                  <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>数据格式</div>
-                    <Select
-                      value={tempFieldConfig.dataFormat}
-                      style={{ width: '100%' }}
-                      onChange={(v) => setTempFieldConfig(p => ({ ...p, dataFormat: v }))}
-                    >
-                      <Option value="原始值">原始值</Option>
-                      <Option value="整数">整数</Option>
-                      <Option value="1位小数">1位小数</Option>
-                      <Option value="2位小数">2位小数</Option>
-                      <Option value="百分比">百分比</Option>
-                      <Option value="千分比">千分比</Option>
-                    </Select>
-                  </div>
-                )}
-
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>排序</div>
-                  <Select
-                    value={tempFieldConfig.sort}
-                    style={{ width: '100%' }}
-                    onChange={(v) => setTempFieldConfig(p => ({ ...p, sort: v }))}
-                  >
-                    <Option value="升序">升序</Option>
-                    <Option value="降序">降序</Option>
-                  </Select>
-                </div>
-              </>
-            )}
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
-              <Button onClick={() => { setIsFieldSettingsModalVisible(false); setCurrentField(null); }}>取消</Button>
-              <Button type="primary" onClick={saveFieldSettings}>确定</Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+        onSave={saveFieldSettings}
+      />
 
       {/* 区域字段批量设置弹窗 */}
-      <Modal
-        title="批量字段设置"
+      <AreaSettingsModal
         open={isAreaSettingsModalVisible}
+        areaKey={currentAreaKey}
+        areaFields={getAreaFields(currentAreaKey)}
+        tempAreaFieldEdits={tempAreaFieldEdits}
+        setTempAreaFieldEdits={setTempAreaFieldEdits}
+        selectedAreaRows={selectedAreaRows}
+        setSelectedAreaRows={setSelectedAreaRows}
+        updateAreaFieldConfig={updateAreaFieldConfig}
         onCancel={() => setIsAreaSettingsModalVisible(false)}
         onOk={saveAreaSettings}
-        okText="确定"
-        cancelText="取消"
-        width={620}
-        styles={{ body: { padding: '12px 0 0' } }}
-      >
-        {(() => {
-          const areaFields = getAreaFields(currentAreaKey);
-          const isFilter = currentAreaKey === 'filter';
-          const isMeasureArea = ['measure', 'yAxis', 'y2Axis', 'indicator'].includes(currentAreaKey);
-          const allChecked = areaFields.every(f => selectedAreaRows.has(f.originalName));
-          const someChecked = areaFields.some(f => selectedAreaRows.has(f.originalName));
-          const thStyle: React.CSSProperties = { padding: '8px 10px', fontSize: 12, fontWeight: 500, color: '#595959', textAlign: 'left', borderBottom: '1px solid #f0f0f0', backgroundColor: '#fafafa', whiteSpace: 'nowrap' };
-          const tdStyle: React.CSSProperties = { padding: '8px 10px', verticalAlign: 'middle', borderBottom: '1px solid #f5f5f5' };
-          const applyToSelected = (configPatch: Partial<NonNullable<FieldConfig['config']>>) => {
-            setTempAreaFieldEdits(prev => {
-              const next = { ...prev };
-              selectedAreaRows.forEach(name => {
-                next[name] = { ...next[name], config: { ...next[name]?.config, ...configPatch } };
-              });
-              return next;
-            });
-          };
-          return (
-            <>
-            {someChecked && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', backgroundColor: '#e6f4ff', borderBottom: '1px solid #bae0ff', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, color: '#1677ff', fontWeight: 500, marginRight: 4 }}>
-                  已选 {selectedAreaRows.size} 项，设置：
-                </span>
-                {isMeasureArea && (
-                  <>
-                    <Select
-                      size="small"
-                      placeholder="聚合方式"
-                      style={{ width: 110 }}
-                      onChange={v => applyToSelected({ aggregation: v })}
-                      options={[
-                        { label: '求和', value: '求和' },
-                        { label: '平均值', value: '平均值' },
-                        { label: '最大值', value: '最大值' },
-                        { label: '最小值', value: '最小值' },
-                        { label: '计数', value: '计数' },
-                        { label: '去重计数', value: '去重计数' },
-                      ]}
-                    />
-                    <Select
-                      size="small"
-                      placeholder="数据格式"
-                      style={{ width: 110 }}
-                      onChange={v => applyToSelected({ dataFormat: v })}
-                      options={[
-                        { label: '原始值', value: '原始值' },
-                        { label: '整数', value: '整数' },
-                        { label: '1位小数', value: '1位小数' },
-                        { label: '2位小数', value: '2位小数' },
-                        { label: '百分比', value: '百分比' },
-                        { label: '自定义', value: '自定义' },
-                      ]}
-                    />
-                  </>
-                )}
-                {!isFilter && (
-                  <Select
-                    size="small"
-                    placeholder="排序"
-                    style={{ width: 90 }}
-                    onChange={v => applyToSelected({ sort: v })}
-                    options={[
-                      { label: '升序', value: '升序' },
-                      { label: '降序', value: '降序' },
-                    ]}
-                  />
-                )}
-                {isFilter && (
-                  <Select
-                    size="small"
-                    placeholder="筛选器类型"
-                    style={{ width: 120 }}
-                    onChange={v => applyToSelected({ filterType: v, filterDefault: [] })}
-                    options={[
-                      { label: '多选', value: 'multiple' },
-                      { label: '单选', value: 'single' },
-                      { label: '日期区间', value: 'dateRange' },
-                    ]}
-                  />
-                )}
-              </div>
-            )}
-            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-              <colgroup>
-                <col style={{ width: 36 }} />
-                <col style={{ width: 120 }} />
-                {isMeasureArea && <col style={{ width: 120 }} />}
-                {isMeasureArea && <col style={{ width: 140 }} />}
-                {!isFilter && <col style={{ width: 110 }} />}
-                {isFilter && <col style={{ width: 140 }} />}
-              </colgroup>
-              <thead>
-                <tr>
-                  <th style={thStyle}>
-                    <input
-                      type="checkbox"
-                      checked={allChecked}
-                      ref={el => { if (el) el.indeterminate = !allChecked && someChecked; }}
-                      onChange={() => {
-                        if (allChecked) setSelectedAreaRows(new Set());
-                        else setSelectedAreaRows(new Set(areaFields.map(f => f.originalName)));
-                      }}
-                    />
-                  </th>
-                  <th style={thStyle}>字段名称</th>
-                  {isMeasureArea && <th style={thStyle}>聚合方式</th>}
-                  {isMeasureArea && <th style={thStyle}>数据格式</th>}
-                  {!isFilter && <th style={thStyle}>排序</th>}
-                  {isFilter && <th style={thStyle}>筛选器类型</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {areaFields.map(field => {
-                  const edit = tempAreaFieldEdits[field.originalName] || {};
-                  const cfg = edit.config || {};
-                  const checked = selectedAreaRows.has(field.originalName);
-                  return (
-                    <tr key={field.originalName} style={{ backgroundColor: checked ? '#fff' : '#fafafa' }}>
-                      <td style={tdStyle}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => setSelectedAreaRows(prev => {
-                            const next = new Set(prev);
-                            if (next.has(field.originalName)) next.delete(field.originalName);
-                            else next.add(field.originalName);
-                            return next;
-                          })}
-                        />
-                      </td>
-                      <td style={{ ...tdStyle, fontSize: 12, color: '#595959' }}>{field.displayName || field.originalName}</td>
-                      {isMeasureArea && (
-                        <td style={tdStyle}>
-                          <Select
-                            size="small"
-                            style={{ width: '100%' }}
-                            value={cfg.aggregation || '计数'}
-                            onChange={v => updateAreaFieldConfig(field.originalName, { aggregation: v })}
-                            options={[
-                              { label: '求和', value: '求和' },
-                              { label: '平均值', value: '平均值' },
-                              { label: '最大值', value: '最大值' },
-                              { label: '最小值', value: '最小值' },
-                              { label: '计数', value: '计数' },
-                              { label: '去重计数', value: '去重计数' },
-                            ]}
-                          />
-                        </td>
-                      )}
-                      {isMeasureArea && (
-                        <td style={tdStyle}>
-                          <Select
-                            size="small"
-                            style={{ width: '100%' }}
-                            value={cfg.dataFormat || '原始值'}
-                            onChange={v => updateAreaFieldConfig(field.originalName, { dataFormat: v })}
-                            options={[
-                              { label: '原始值', value: '原始值' },
-                              { label: '整数', value: '整数' },
-                              { label: '1位小数', value: '1位小数' },
-                              { label: '2位小数', value: '2位小数' },
-                              { label: '百分比', value: '百分比' },
-                              // { label: '自定义', value: '自定义' },
-                            ]}
-                          />
-                        </td>
-                      )}
-                      {!isFilter && (
-                        <td style={tdStyle}>
-                          <Select
-                            size="small"
-                            style={{ width: '100%' }}
-                            value={cfg.sort || '升序'}
-                            onChange={v => updateAreaFieldConfig(field.originalName, { sort: v })}
-                            options={[
-                              { label: '升序', value: '升序' },
-                              { label: '降序', value: '降序' },
-                            ]}
-                          />
-                        </td>
-                      )}
-                      {isFilter && (
-                        <td style={tdStyle}>
-                          <Select
-                            size="small"
-                            style={{ width: '100%' }}
-                            value={cfg.filterType || 'multiple'}
-                            onChange={v => updateAreaFieldConfig(field.originalName, { filterType: v, filterDefault: [] })}
-                            options={[
-                              { label: '多选', value: 'multiple' },
-                              { label: '单选', value: 'single' },
-                              { label: '日期区间', value: 'dateRange' },
-                            ]}
-                          />
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            </>
-          );
-        })()}
-      </Modal>
+      />
 
       {/* SQL 弹窗 */}
       <Modal
@@ -1513,30 +754,6 @@ const ChartConfigPage: React.FC = () => {
         </div>
       </Modal>
     </div>
-  );
-};
-
-const ChartDateRangePickerTrigger: React.FC<{ value: DateRangeFilterValue; onChange: (val: DateRangeFilterValue) => void }> = ({ value, onChange }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <Popover
-      open={open}
-      onOpenChange={setOpen}
-      trigger="click"
-      placement="bottomLeft"
-      overlayInnerStyle={{ padding: 0 }}
-      content={
-        <DateRangeFilterPicker
-          value={value}
-          onChange={(val) => { onChange(val); setOpen(false); }}
-          onCancel={() => setOpen(false)}
-        />
-      }
-    >
-      <Button icon={<CalendarIcon />} style={{ width: '100%', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {resolvedRangeLabel(value)}
-      </Button>
-    </Popover>
   );
 };
 

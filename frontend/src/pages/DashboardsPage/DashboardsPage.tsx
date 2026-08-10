@@ -175,7 +175,7 @@ const DashboardsPage: React.FC = () => {
     }
   };
 
-  type FilterParam = { field: string; type: string; dataType: string; values: string[] };
+  type FilterParam = { field: string; type: string; dataType: string; values: string[]; exclude?: boolean };
   interface ChartCacheEntry { data: unknown[]; config?: Record<string, unknown>; sql?: string; }
 
   const applyChartResponse = (chartId: string, data: unknown[], config: Record<string, unknown> | undefined, sql: string | undefined) => {
@@ -274,7 +274,7 @@ const DashboardsPage: React.FC = () => {
       } else {
         const values = Array.isArray(val) ? val : (val !== '' ? [val] : []);
         if (values.length > 0) {
-          params.push({ field: f.field, type: f.type, dataType, values: values.map(String) });
+          params.push({ field: f.field, type: f.type, dataType, values: values.map(String), exclude: f.exclude });
         }
       }
     });

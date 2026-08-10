@@ -600,6 +600,7 @@ type FilterCondition struct {
 	DataType   string   `json:"dataType"`             // "number", "text", "date" 等
 	Values     []string `json:"values"`
 	Expression string   `json:"expression,omitempty"` // 计算字段表达式，非空时替代 Field 用于 WHERE 子句
+	Exclude    bool     `json:"exclude,omitempty"`    // 排除模式：true 时使用 NOT IN 而非 IN
 }
 
 // chartFilterFieldConfig 图表配置中的筛选字段
@@ -610,6 +611,7 @@ type chartFilterFieldConfig struct {
 	Config       *struct {
 		FilterType    string          `json:"filterType"`
 		FilterDefault json.RawMessage `json:"filterDefault"`
+		FilterExclude bool            `json:"filterExclude"`
 	} `json:"config"`
 }
 
@@ -742,6 +744,7 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 			Type:     filterType,
 			DataType: "text",
 			Values:   values,
+			Exclude:  ff.Config != nil && ff.Config.FilterExclude,
 		}
 		// 计算字段：优先使用 filterField 自身存储的表达式，其次查 calcExprMap
 		if ff.IsCalculated && ff.Expression != "" && isValidExpression(ff.Expression) {
@@ -925,6 +928,10 @@ func buildFilteredSQL(base string, filters []FilterCondition) string {
 				sql += fmt.Sprintf(" AND %s BETWEEN '%s' AND '%s'", fieldExpr, start, end)
 			}
 		case "single", "multiple":
+			op := "IN"
+			if f.Exclude {
+				op = "NOT IN"
+			}
 			if f.DataType == "number" {
 				// 数字类型：校验每个值确实是数字
 				var safeValues []string
@@ -934,7 +941,7 @@ func buildFilteredSQL(base string, filters []FilterCondition) string {
 					}
 				}
 				if len(safeValues) > 0 {
-					sql += fmt.Sprintf(" AND %s IN (%s)", fieldExpr, strings.Join(safeValues, ", "))
+					sql += fmt.Sprintf(" AND %s %s (%s)", fieldExpr, op, strings.Join(safeValues, ", "))
 				}
 			} else {
 				quoted := make([]string, len(f.Values))
@@ -942,7 +949,7 @@ func buildFilteredSQL(base string, filters []FilterCondition) string {
 					val := truncateISODatetime(sanitizeSQLString(v))
 					quoted[i] = fmt.Sprintf("'%s'", val)
 				}
-				sql += fmt.Sprintf(" AND %s IN (%s)", fieldExpr, strings.Join(quoted, ", "))
+				sql += fmt.Sprintf(" AND %s %s (%s)", fieldExpr, op, strings.Join(quoted, ", "))
 			}
 		}
 	}

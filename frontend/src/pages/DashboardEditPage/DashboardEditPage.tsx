@@ -98,6 +98,50 @@ const DashboardEditPage: React.FC = () => {
   const [currentSQL, setCurrentSQL] = useState('');
   const [configChartId, setConfigChartId] = useState<string | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState<Record<string, boolean>>({});
+  const [siderWidth, setSiderWidth] = useState(300);
+
+  const handleSiderResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    // 直接操作 DOM 宽度避免拖动时整页重渲染导致卡顿，松手时再提交一次 state
+    const aside = (e.currentTarget as HTMLElement).parentElement as HTMLElement | null;
+    const startX = e.clientX;
+    const startWidth = siderWidth;
+    let latestWidth = startWidth;
+    let rafId = 0;
+
+    // antd Sider 自带 width 过渡动画，拖动时会导致跟手延迟，临时关闭
+    if (aside) aside.style.transition = 'none';
+
+    const apply = (w: number) => {
+      if (!aside) return;
+      aside.style.width = `${w}px`;
+      aside.style.minWidth = `${w}px`;
+      aside.style.maxWidth = `${w}px`;
+      aside.style.flex = `0 0 ${w}px`;
+    };
+
+    const onMove = (ev: MouseEvent) => {
+      // 面板在右侧，向左拖动变宽
+      // 面板在右侧，向左（看板容器方向）拖动变宽
+      latestWidth = Math.min(960, Math.max(260, startWidth + (startX - ev.clientX)));
+      if (!rafId) {
+        rafId = requestAnimationFrame(() => { rafId = 0; apply(latestWidth); });
+      }
+    };
+    const onUp = () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      if (aside) aside.style.transition = '';
+      setSiderWidth(latestWidth);
+    };
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
 
   const loadedChartIds = useRef<Set<string>>(new Set());
 
@@ -329,8 +373,8 @@ const DashboardEditPage: React.FC = () => {
     }
   };
 
-  const buildFilterParamsForChart = (chartId: string): Array<{ field: string; type: string; dataType: string; values: string[] }> => {
-    const params: Array<{ field: string; type: string; dataType: string; values: string[] }> = [];
+  const buildFilterParamsForChart = (chartId: string): Array<{ field: string; type: string; dataType: string; values: string[]; exclude?: boolean }> => {
+    const params: Array<{ field: string; type: string; dataType: string; values: string[]; exclude?: boolean }> = [];
     filters.forEach(f => {
       if (f.charts.length > 0 && !f.charts.includes(chartId)) return;
       const val = filterValues[f.id];
@@ -347,7 +391,7 @@ const DashboardEditPage: React.FC = () => {
       } else {
         const values = Array.isArray(val) ? val : (val !== undefined && val !== null && val !== '' ? [val] : []);
         if (values.length > 0) {
-          params.push({ field: f.field, type: f.type, dataType, values: values.map(String) });
+          params.push({ field: f.field, type: f.type, dataType, values: values.map(String), exclude: f.exclude });
         }
       }
     });
@@ -601,7 +645,12 @@ const DashboardEditPage: React.FC = () => {
         </Content>
 
         {/* 图表选择 / 配置区域 */}
-        <Sider width={300} style={{ background: '#fff', borderLeft: '1px solid #f0f0f0', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <Sider width={siderWidth} style={{ background: '#fff', borderLeft: '1px solid #f0f0f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+          {/* 拖动调整宽度 */}
+          <div
+            onMouseDown={handleSiderResizeStart}
+            style={{ position: 'absolute', left: -3, top: 0, bottom: 0, width: 6, cursor: 'col-resize', zIndex: 20 }}
+          />
           {configChartId ? (
             <ChartConfigPanel
               chartId={configChartId}

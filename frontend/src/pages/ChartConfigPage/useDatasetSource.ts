@@ -48,7 +48,7 @@ export function useDatasetSource({ selectedDataset, setFilterValues, onError }: 
       setDatasetType(dsType);
       if (dsType === 'extract') {
         const ckTable = `ds_${res.data.id.replaceAll('-', '_')}`;
-        setDatasetSQL(`SELECT * FROM insight.${ckTable}`);
+        setDatasetSQL(`SELECT * FROM ${ckTable}`);
       } else {
         setDatasetSQL(res.data.sql || '');
       }

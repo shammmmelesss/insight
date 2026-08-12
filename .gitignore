@@ -49,6 +49,8 @@ config.local.yml
 frontend/.trae/
 # Docker
 docker-compose.override.yml
+# 含生产 ClickHouse 凭据，不入库
+docker-compose.prod.yml
 
 
 

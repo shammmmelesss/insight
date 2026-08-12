@@ -230,7 +230,43 @@ tail -f /home/ubuntu/vite.log             # 前端日志
 | `CLICKHOUSE_PORT` | 9000 | ClickHouse 端口 |
 | `CLICKHOUSE_USER` | default | ClickHouse 用户 |
 | `CLICKHOUSE_PASSWORD` | （空） | ClickHouse 密码 |
-| `CLICKHOUSE_DBNAME` | insight | ClickHouse 数据库名 |
+| `CLICKHOUSE_DB` | insight | ClickHouse 数据库名 |
+
+> 环境变量优先级高于 `config.yml`。生产环境通过环境变量指向远程 ClickHouse 集群，本地开发使用 Docker 内的本地 ClickHouse（见下文「ClickHouse 环境」）。
+
+### ClickHouse 环境
+
+抽取类型数据集的目标存储。分为本地开发和生产两套：
+
+| 环境 | ClickHouse | 说明 |
+|------|-----------|------|
+| **本地开发** | Docker 内 `clickhouse` 容器 | `localhost:9000`，用户 `default`，库 `insight`，随 `docker compose up` 启动 |
+| **生产** | 远程集群 `main_cluster` | 内网 `10.0.97.6:9000`，用户 `hermes`，库 `hermes`，写本地表、查分布式表 |
+
+**本地开发**：`docker compose up` 默认启动本地 ClickHouse 容器，无需额外配置。
+
+**生产部署**：线上 backend 由 systemd 管理（见「服务器部署」）。生产 ClickHouse 凭据通过 systemd drop-in 注入，不写入 `config.yml`：
+
+```
+/etc/systemd/system/insight.service.d/clickhouse.conf
+```
+
+```ini
+[Service]
+Environment="CLICKHOUSE_HOST=10.0.97.6"
+Environment="CLICKHOUSE_PORT=9000"
+Environment="CLICKHOUSE_USER=hermes"
+Environment="CLICKHOUSE_PASSWORD=..."
+Environment="CLICKHOUSE_DB=hermes"
+```
+
+修改后执行 `sudo systemctl daemon-reload && sudo systemctl restart insight` 生效。
+
+如果用 Docker Compose 部署生产（连远程 CK，不起本地 CK 容器），使用 `docker-compose.prod.yml` 覆盖（该文件含凭据，已被 gitignore）：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+```
 
 ## API 接口
 

@@ -289,7 +289,7 @@ func TriggerMonitor(c *gin.Context) {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ClickHouse 未连接"})
 			return
 		}
-		ckTable := "insight.ds_" + replaceHyphens(dataset.ID.String())
+		ckTable := "ds_" + replaceHyphens(dataset.ID.String())
 		if dim != "" {
 			querySQL = fmt.Sprintf(
 				"SELECT `%s` AS _dim, %s AS _val FROM %s%s GROUP BY `%s` HAVING %s %s %g",
@@ -551,7 +551,7 @@ func runMonitor(monitor models.Monitor) error {
 		if database.ClickHouseDB == nil {
 			return fmt.Errorf("ClickHouse 未连接")
 		}
-		ckTable := "insight.ds_" + replaceHyphens(dataset.ID.String())
+		ckTable := "ds_" + replaceHyphens(dataset.ID.String())
 		if dim != "" {
 			querySQL = fmt.Sprintf(
 				"SELECT `%s` AS _dim, %s AS _val FROM %s%s GROUP BY `%s` HAVING %s %s %g",

@@ -461,7 +461,7 @@ func GetDatasetFieldValues(c *gin.Context) {
 			return
 		}
 		ckTable := "ds_" + strings.ReplaceAll(dataset.ID.String(), "-", "_")
-		ckSQL := fmt.Sprintf("SELECT * FROM insight.%s", ckTable)
+		ckSQL := fmt.Sprintf("SELECT * FROM %s", ckTable)
 		query = fmt.Sprintf("SELECT %s FROM (%s) AS dataset GROUP BY %s ORDER BY %s LIMIT 1000",
 			selectExpr, ckSQL, queryExpr, queryExpr)
 		db = database.ClickHouseDB

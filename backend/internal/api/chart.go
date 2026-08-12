@@ -333,7 +333,7 @@ func GetChartData(c *gin.Context) {
 			return
 		}
 		ckTable := "ds_" + strings.ReplaceAll(dataset.ID.String(), "-", "_")
-		ckSQL := fmt.Sprintf("SELECT * FROM insight.%s", ckTable)
+		ckSQL := fmt.Sprintf("SELECT * FROM %s", ckTable)
 		querySQL, err = buildChartSQL(chart.Config, string(chart.Type), ckSQL, filterConditions, dsCalcExprs)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
@@ -465,7 +465,7 @@ func PreviewChartData(c *gin.Context) {
 			return
 		}
 		ckTable := "ds_" + strings.ReplaceAll(dataset.ID.String(), "-", "_")
-		ckSQL := fmt.Sprintf("SELECT * FROM insight.%s", ckTable)
+		ckSQL := fmt.Sprintf("SELECT * FROM %s", ckTable)
 		querySQL, err = buildChartSQL(body.Config, body.Type, ckSQL, nil, dsCalcExprs)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})

@@ -4,6 +4,7 @@ import { PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined, SyncOut
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { Dataset, CreateDatasetRequest, UpdateDatasetRequest, FieldConfig, DataType, DatasetType, ExtractSchedule, ExtractFrequency, ExtractStatus } from '@shared/api.interface';
+import { canModifyRecord, displayCreator } from '../../utils/currentUser';
 
 const { Option } = Select;
 
@@ -484,13 +485,15 @@ const DatasetsPage: React.FC = () => {
     },
     {
       title: '创建人',
-      dataIndex: 'createdBy',
-      key: 'createdBy',
+      dataIndex: 'createdByName',
+      key: 'createdByName',
+      render: (_: any, record: Dataset) => displayCreator(record.createdByName, record.createdBy),
     },
     {
       title: '修改人',
-      dataIndex: 'updatedBy',
-      key: 'updatedBy',
+      dataIndex: 'updatedByName',
+      key: 'updatedByName',
+      render: (_: any, record: Dataset) => displayCreator(record.updatedByName, record.updatedBy),
     },
     {
       title: '创建时间',
@@ -510,7 +513,9 @@ const DatasetsPage: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      render: (_: any, record: Dataset) => (
+      render: (_: any, record: Dataset) => {
+        const editable = canModifyRecord(record.createdBy);
+        return (
         <div className="action-buttons">
           <Button
             size="small"
@@ -556,6 +561,8 @@ const DatasetsPage: React.FC = () => {
           <Button
             icon={<EditOutlined />}
             size="small"
+            disabled={!editable}
+            title={!editable ? '只有创建人才能编辑' : undefined}
             onClick={() => showModal(record)}
             style={{ marginRight: 8 }}
           >
@@ -565,14 +572,21 @@ const DatasetsPage: React.FC = () => {
             icon={<DeleteOutlined />}
             size="small"
             danger
-            disabled={record.chartCount > 0}
-            title={record.chartCount > 0 ? '该数据集有关联图表，不可删除' : undefined}
+            disabled={record.chartCount > 0 || !editable}
+            title={
+              !editable
+                ? '只有创建人才能删除'
+                : record.chartCount > 0
+                ? '该数据集有关联图表，不可删除'
+                : undefined
+            }
             onClick={() => handleDelete(record.id)}
           >
             删除
           </Button>
         </div>
-      ),
+        );
+      },
     },
   ];
 

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { App, Layout as AntLayout, Menu, Typography, Select, Button, Modal, Form, Input, message, Space, Dropdown } from 'antd';
+import React from 'react';
+import { Layout as AntLayout, Menu, Typography, Select, Button, Space, Tooltip } from 'antd';
 import { Link, useLocation } from 'react-router-dom';
 import {
   HomeOutlined,
@@ -7,16 +7,11 @@ import {
   BarChartOutlined,
   LayoutOutlined,
   SwapOutlined,
-  PlusOutlined,
-  EditOutlined,
-  DeleteOutlined,
   SettingOutlined,
   MonitorOutlined,
   CodeOutlined,
 } from '@ant-design/icons';
-import axios from 'axios';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
-import { Workspace } from '@shared/api.interface';
 import PortalSidebar from './PortalSidebar';
 
 const { Header, Content } = AntLayout;
@@ -69,11 +64,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isDashboardRoute = location.pathname === '/dashboards' || location.pathname.startsWith('/dashboards/');
   // 新建/编辑看板为全屏编辑态，隐藏顶部导航
   const isDashboardEditRoute = location.pathname === '/dashboards/create' || location.pathname.startsWith('/dashboards/edit');
-  const { modal } = App.useApp();
-  const { workspaces, currentWorkspace, setCurrentWorkspace, refreshWorkspaces } = useWorkspace();
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
-  const [form] = Form.useForm();
+  const { workspaces, currentWorkspace, setCurrentWorkspace } = useWorkspace();
 
   const handleWorkspaceChange = (workspaceId: string) => {
     const ws = workspaces.find(w => w.id === workspaceId);
@@ -82,82 +73,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
   };
 
-  const showCreateModal = () => {
-    setEditingWorkspace(null);
-    form.resetFields();
-    setIsModalVisible(true);
+  // 打开独立的项目空间管理页面（新浏览器标签页）
+  const openWorkspaceManager = () => {
+    window.open('/workspaces', '_blank');
   };
-
-  const showEditModal = (ws: Workspace) => {
-    setEditingWorkspace(ws);
-    form.setFieldsValue({ name: ws.name, description: ws.description });
-    setIsModalVisible(true);
-  };
-
-  const handleModalOk = async () => {
-    try {
-      const values = await form.validateFields();
-      if (editingWorkspace) {
-        await axios.put(`/api/workspaces/${editingWorkspace.id}`, values);
-        message.success('项目空间更新成功');
-      } else {
-        const res = await axios.post('/api/workspaces', values);
-        message.success('项目空间创建成功');
-        // 自动切换到新创建的空间
-        setCurrentWorkspace(res.data);
-      }
-      setIsModalVisible(false);
-      await refreshWorkspaces();
-    } catch (error) {
-      message.error('操作失败');
-    }
-  };
-
-  const handleDelete = (ws: Workspace) => {
-    if (workspaces.length <= 1) {
-      message.warning('至少保留一个项目空间');
-      return;
-    }
-    modal.confirm({
-      title: '确认删除',
-      content: `确定要删除项目空间「${ws.name}」吗？此操作不可恢复。`,
-      okText: '确认删除',
-      okButtonProps: { danger: true },
-      cancelText: '取消',
-      onOk: async () => {
-        try {
-          await axios.delete(`/api/workspaces/${ws.id}`);
-          message.success('项目空间删除成功');
-          await refreshWorkspaces();
-        } catch (error: any) {
-          const msg = error?.response?.data?.error || '删除失败';
-          message.error(msg);
-        }
-      },
-    });
-  };
-
-  const manageMenuItems = [
-    {
-      key: 'create',
-      icon: <PlusOutlined />,
-      label: '新建空间',
-      onClick: showCreateModal,
-    },
-    { type: 'divider' as const },
-    ...workspaces.map(ws => ({
-      key: ws.id,
-      label: (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', minWidth: 200 }}>
-          <span>{ws.name}</span>
-          <Space size={4}>
-            <Button type="text" size="small" icon={<EditOutlined />} onClick={(e) => { e.stopPropagation(); showEditModal(ws); }} />
-            <Button type="text" size="small" danger icon={<DeleteOutlined />} onClick={(e) => { e.stopPropagation(); handleDelete(ws); }} />
-          </Space>
-        </div>
-      ),
-    })),
-  ];
 
   return (
     <AntLayout style={{ height: '100vh' }}>
@@ -188,9 +107,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                 <Select.Option key={ws.id} value={ws.id}>{ws.name}</Select.Option>
               ))}
             </Select>
-            <Dropdown menu={{ items: manageMenuItems }} trigger={['click']}>
-              <Button type="text" size="small" icon={<SettingOutlined />} />
-            </Dropdown>
+            <Tooltip title="项目空间管理">
+              <Button type="text" size="small" icon={<SettingOutlined />} onClick={openWorkspaceManager} />
+            </Tooltip>
           </Space>
         </div>
       </Header>
@@ -216,24 +135,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
         </Content>
       )}
-
-      <Modal
-        title={editingWorkspace ? '编辑项目空间' : '新建项目空间'}
-        open={isModalVisible}
-        onOk={handleModalOk}
-        onCancel={() => setIsModalVisible(false)}
-        okText="确定"
-        cancelText="取消"
-      >
-        <Form form={form} layout="vertical">
-          <Form.Item name="name" label="空间名称" rules={[{ required: true, message: '请输入空间名称' }]}>
-            <Input placeholder="请输入项目空间名称" />
-          </Form.Item>
-          <Form.Item name="description" label="描述">
-            <Input.TextArea placeholder="请输入描述（可选）" rows={3} />
-          </Form.Item>
-        </Form>
-      </Modal>
     </AntLayout>
   );
 };

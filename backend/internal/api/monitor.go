@@ -59,12 +59,10 @@ type monitorRequest struct {
 	TriggerOperator  string `json:"triggerOperator"`
 	TriggerThreshold string `json:"triggerThreshold"`
 	TriggerSchedule  string `json:"triggerSchedule"`
-	NotifyChannels  string `json:"notifyChannels"`
-	NotifyLarkUsers string `json:"notifyLarkUsers"`
-	WebhookURL      string `json:"webhookUrl"`
-	WebhookSecret   string `json:"webhookSecret"`
-	CreatedBy       string `json:"createdBy"`
-	UpdatedBy       string `json:"updatedBy"`
+	NotifyChannels   string `json:"notifyChannels"`
+	NotifyLarkUsers  string `json:"notifyLarkUsers"`
+	WebhookURL       string `json:"webhookUrl"`
+	WebhookSecret    string `json:"webhookSecret"`
 }
 
 func CreateMonitor(c *gin.Context) {
@@ -96,13 +94,12 @@ func CreateMonitor(c *gin.Context) {
 		TriggerOperator:  req.TriggerOperator,
 		TriggerThreshold: req.TriggerThreshold,
 		TriggerSchedule:  triggerSchedule,
-		NotifyChannels:  notifyChannels,
-		NotifyLarkUsers: notifyLarkUsers,
-		WebhookURL:      req.WebhookURL,
-		WebhookSecret:   req.WebhookSecret,
-		CreatedBy:       req.CreatedBy,
-		UpdatedBy:       req.CreatedBy,
+		NotifyChannels:   notifyChannels,
+		NotifyLarkUsers:  notifyLarkUsers,
+		WebhookURL:       req.WebhookURL,
+		WebhookSecret:    req.WebhookSecret,
 	}
+	setCreator(c, &monitor.AuditFields)
 	if err := database.DB.Create(&monitor).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -135,6 +132,10 @@ func UpdateMonitor(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "monitor not found"})
 		return
 	}
+	if !canModify(monitor.CreatedBy, c) {
+		abortForbidden(c, "只有创建人才能修改此监控")
+		return
+	}
 	var req monitorRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -159,7 +160,7 @@ func UpdateMonitor(c *gin.Context) {
 	}
 	monitor.WebhookURL = req.WebhookURL
 	monitor.WebhookSecret = req.WebhookSecret
-	monitor.UpdatedBy = req.UpdatedBy
+	setUpdater(c, &monitor.AuditFields)
 	if err := database.DB.Save(&monitor).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -171,6 +172,15 @@ func DeleteMonitor(c *gin.Context) {
 	id, err := parseUUID(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var monitor models.Monitor
+	if err := database.DB.First(&monitor, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "monitor not found"})
+		return
+	}
+	if !canModify(monitor.CreatedBy, c) {
+		abortForbidden(c, "只有创建人才能删除此监控")
 		return
 	}
 	if err := database.DB.Delete(&models.Monitor{}, "id = ?", id).Error; err != nil {

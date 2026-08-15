@@ -6,9 +6,9 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/gin-gonic/gin"
 	"data-analysis-platform/internal/database"
 	"data-analysis-platform/internal/models"
+	"github.com/gin-gonic/gin"
 )
 
 // RegisterDashboardRoutes 注册看板路由
@@ -126,8 +126,8 @@ func CreateDashboard(c *gin.Context) {
 		Name:        req.Name,
 		Layout:      layout,
 		Filters:     filters,
-		CreatedBy:   GetCurrentUserID(c),
 	}
+	setCreator(c, &dashboard.AuditFields)
 
 	result := database.DB.Create(&dashboard)
 	if result.Error != nil {
@@ -161,7 +161,6 @@ func GetDashboard(c *gin.Context) {
 // UpdateDashboard 更新看板
 func UpdateDashboard(c *gin.Context) {
 	id := c.Param("id")
-	userID := GetCurrentUserID(c)
 
 	var req struct {
 		Name    string `json:"name" binding:"required"`
@@ -181,8 +180,8 @@ func UpdateDashboard(c *gin.Context) {
 		return
 	}
 
-	if !canAccessDashboard(&dashboard, userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "无权限修改此看板"})
+	if !canModify(dashboard.CreatedBy, c) {
+		abortForbidden(c, "只有创建人才能修改此看板")
 		return
 	}
 
@@ -193,6 +192,7 @@ func UpdateDashboard(c *gin.Context) {
 	if req.Filters != "" {
 		dashboard.Filters = req.Filters
 	}
+	setUpdater(c, &dashboard.AuditFields)
 
 	result = database.DB.Save(&dashboard)
 	if result.Error != nil {
@@ -206,7 +206,6 @@ func UpdateDashboard(c *gin.Context) {
 // ShareDashboard 更新看板分享用户
 func ShareDashboard(c *gin.Context) {
 	id := c.Param("id")
-	userID := GetCurrentUserID(c)
 
 	var req struct {
 		SharedWith string `json:"sharedWith"`
@@ -223,8 +222,8 @@ func ShareDashboard(c *gin.Context) {
 		return
 	}
 
-	if !canAccessDashboard(&dashboard, userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "无权限分享此看板"})
+	if !canModify(dashboard.CreatedBy, c) {
+		abortForbidden(c, "只有创建人才能分享此看板")
 		return
 	}
 
@@ -246,7 +245,6 @@ func ShareDashboard(c *gin.Context) {
 // DeleteDashboard 删除看板
 func DeleteDashboard(c *gin.Context) {
 	id := c.Param("id")
-	userID := GetCurrentUserID(c)
 
 	var dashboard models.Dashboard
 	result := database.DB.First(&dashboard, "id = ?", id)
@@ -255,8 +253,8 @@ func DeleteDashboard(c *gin.Context) {
 		return
 	}
 
-	if !canAccessDashboard(&dashboard, userID) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "无权限删除此看板"})
+	if !canModify(dashboard.CreatedBy, c) {
+		abortForbidden(c, "只有创建人才能删除此看板")
 		return
 	}
 

@@ -14,11 +14,24 @@ type BaseModel struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
+// AuditFields 审计字段：记录创建人与修改人
+// CreatedBy/UpdatedBy 存储用户ID（用于权限判定），CreatedByName/UpdatedByName 存储用户名（用于展示）
+type AuditFields struct {
+	CreatedBy     string `json:"createdBy" gorm:"column:created_by"`
+	CreatedByName string `json:"createdByName" gorm:"column:created_by_name"`
+	UpdatedBy     string `json:"updatedBy" gorm:"column:updated_by"`
+	UpdatedByName string `json:"updatedByName" gorm:"column:updated_by_name"`
+}
+
 // Workspace 项目空间模型
 type Workspace struct {
 	BaseModel
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	CreatedBy     string `json:"createdBy"`     // 创建人ID（用于权限校验）
+	CreatedByName string `json:"createdByName"` // 创建人姓名（用于展示）
+	UpdatedBy     string `json:"updatedBy"`     // 修改人ID
+	UpdatedByName string `json:"updatedByName"` // 修改人姓名（用于展示）
 }
 
 // DataSource 数据源模型
@@ -31,7 +44,7 @@ type DataSource struct {
 	Port        int    `json:"port" gorm:"default:3306"`
 	Database    string `json:"database"`
 	Username    string `json:"username"`
-	Password    string `json:"-"` // 不在JSON响应中暴露密码
+	Password    string `json:"-"`                  // 不在JSON响应中暴露密码
 	Credentials string `json:"-" gorm:"type:text"` // BigQuery Service Account JSON 凭证
 	IsActive    bool   `json:"isActive" gorm:"default:true"`
 }
@@ -73,7 +86,8 @@ type Dataset struct {
 	ExtractStatus   ExtractStatus `json:"extractStatus" gorm:"default:'idle'"`
 	LastExtractAt   *time.Time    `json:"lastExtractAt"`
 	ExtractError    string        `json:"extractError"`
-	Charts          []Chart       `json:"-" gorm:"foreignKey:DatasetID"`
+	AuditFields
+	Charts []Chart `json:"-" gorm:"foreignKey:DatasetID"`
 }
 
 // ChartType 图表类型
@@ -96,9 +110,8 @@ type Chart struct {
 	DatasetID   uuid.UUID `json:"datasetId"`
 	Type        ChartType `json:"type"`
 	Config      string    `json:"config" gorm:"type:jsonb;default:'{}'"`
-	CreatedBy   string    `json:"createdBy"`
-	UpdatedBy   string    `json:"updatedBy"`
-	Dataset     Dataset   `json:"-" gorm:"foreignKey:DatasetID"`
+	AuditFields
+	Dataset Dataset `json:"-" gorm:"foreignKey:DatasetID"`
 }
 
 // DashboardLayoutItem 看板布局项
@@ -118,7 +131,7 @@ type Dashboard struct {
 	Layout      string `json:"layout" gorm:"type:jsonb;default:'[]'"`
 	Filters     string `json:"filters" gorm:"type:jsonb;default:'[]'"`
 	SharedWith  string `json:"sharedWith" gorm:"type:jsonb;default:'[]'"`
-	CreatedBy   string `json:"createdBy"`
+	AuditFields
 }
 
 // Monitor 监控模型
@@ -134,42 +147,41 @@ type Monitor struct {
 	TriggerOperator  string `json:"triggerOperator"`
 	TriggerThreshold string `json:"triggerThreshold"`
 	// 触发时间：JSON，如 {"frequency":"daily","time":"09:00","weekday":1,"day":1}
-	TriggerSchedule  string `json:"triggerSchedule" gorm:"type:jsonb;default:'{}'"`
-	NotifyChannels      string `json:"notifyChannels" gorm:"type:jsonb;default:'[]'"`
-	NotifyLarkUsers     string `json:"notifyLarkUsers" gorm:"type:jsonb;default:'[]'"`
-	WebhookURL          string `json:"webhookUrl"`
-	WebhookSecret       string `json:"webhookSecret"`
-	CreatedBy           string `json:"createdBy"`
-	UpdatedBy           string `json:"updatedBy"`
+	TriggerSchedule string `json:"triggerSchedule" gorm:"type:jsonb;default:'{}'"`
+	NotifyChannels  string `json:"notifyChannels" gorm:"type:jsonb;default:'[]'"`
+	NotifyLarkUsers string `json:"notifyLarkUsers" gorm:"type:jsonb;default:'[]'"`
+	WebhookURL      string `json:"webhookUrl"`
+	WebhookSecret   string `json:"webhookSecret"`
+	AuditFields
 }
 
 // MonitorRecord 监控执行记录
 type MonitorRecord struct {
 	BaseModel
-	MonitorID    string  `json:"monitorId" gorm:"column:monitor_id;type:uuid;index"`
-	CurrentValue float64 `json:"currentValue"`
-	Threshold    float64 `json:"threshold"`
-	Operator     string  `json:"operator"`
-	AggFunc      string  `json:"aggFunc"`
-	Metric       string  `json:"metric"`
-	Triggered    bool    `json:"triggered"`
-	NotifySuccess bool   `json:"notifySuccess" gorm:"default:false"`
-	NotifyErrors string  `json:"notifyErrors" gorm:"type:jsonb;default:'[]'"`
-	SQL          string  `json:"sql" gorm:"type:text"`
-	ResultRows   string  `json:"resultRows" gorm:"type:text;default:'[]'"`
+	MonitorID     string  `json:"monitorId" gorm:"column:monitor_id;type:uuid;index"`
+	CurrentValue  float64 `json:"currentValue"`
+	Threshold     float64 `json:"threshold"`
+	Operator      string  `json:"operator"`
+	AggFunc       string  `json:"aggFunc"`
+	Metric        string  `json:"metric"`
+	Triggered     bool    `json:"triggered"`
+	NotifySuccess bool    `json:"notifySuccess" gorm:"default:false"`
+	NotifyErrors  string  `json:"notifyErrors" gorm:"type:jsonb;default:'[]'"`
+	SQL           string  `json:"sql" gorm:"type:text"`
+	ResultRows    string  `json:"resultRows" gorm:"type:text;default:'[]'"`
 }
 
 // QueryHistory SQL查询历史记录
 type QueryHistory struct {
 	BaseModel
-	WorkspaceID  string  `json:"workspaceId" gorm:"column:workspace_id;type:uuid;index"`
-	DataSourceID string  `json:"dataSourceId" gorm:"column:data_source_id;type:uuid"`
+	WorkspaceID    string `json:"workspaceId" gorm:"column:workspace_id;type:uuid;index"`
+	DataSourceID   string `json:"dataSourceId" gorm:"column:data_source_id;type:uuid"`
 	DataSourceName string `json:"dataSourceName" gorm:"column:data_source_name"`
-	SQL          string  `json:"sql" gorm:"type:text"`
-	Status       string  `json:"status"` // success | error
-	Elapsed      *int64  `json:"elapsed"`
-	RowCount     *int    `json:"rowCount"`
-	ErrorMsg     string  `json:"errorMsg" gorm:"type:text"`
+	SQL            string `json:"sql" gorm:"type:text"`
+	Status         string `json:"status"` // success | error
+	Elapsed        *int64 `json:"elapsed"`
+	RowCount       *int   `json:"rowCount"`
+	ErrorMsg       string `json:"errorMsg" gorm:"type:text"`
 }
 
 // BeforeCreate 创建前钩子，生成UUID

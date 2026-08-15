@@ -9,6 +9,7 @@ import {
   Monitor, MonitorOperator, MonitorScheduleFrequency,
   DatasetOption, FieldConfig, LarkUser, MonitorRecord,
 } from '@shared/api.interface';
+import { canModifyRecord, displayCreator } from '../../utils/currentUser';
 
 const formatDateTime = (val: string) => {
   if (!val) return '';
@@ -211,7 +212,6 @@ const MonitorPage: React.FC = () => {
       notifyLarkUsers: JSON.stringify(selectedUsers),
       webhookUrl: channel === 'webhook' ? (values.webhookUrl || '') : '',
       webhookSecret: channel === 'webhook' ? (values.webhookSecret || '') : '',
-      ...(editingMonitor ? { updatedBy: values.updatedBy } : { createdBy: values.createdBy }),
     };
     try {
       if (editingMonitor) {
@@ -256,20 +256,23 @@ const MonitorPage: React.FC = () => {
 
   const columns = [
     { title: '监控名称', dataIndex: 'name', key: 'name' },
-    { title: '创建人', dataIndex: 'createdBy', key: 'createdBy' },
+    { title: '创建人', dataIndex: 'createdByName', key: 'createdByName', render: (_: any, record: Monitor) => displayCreator(record.createdByName, record.createdBy) },
     { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', render: (val: string) => formatDateTime(val), sorter: (a: Monitor, b: Monitor) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(), defaultSortOrder: 'descend' as const },
-    { title: '修改人', dataIndex: 'updatedBy', key: 'updatedBy' },
+    { title: '修改人', dataIndex: 'updatedByName', key: 'updatedByName', render: (_: any, record: Monitor) => displayCreator(record.updatedByName, record.updatedBy) },
     { title: '修改时间', dataIndex: 'updatedAt', key: 'updatedAt', render: (val: string) => formatDateTime(val), sorter: (a: Monitor, b: Monitor) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime() },
     {
       title: '操作', key: 'action',
-      render: (_: any, record: Monitor) => (
+      render: (_: any, record: Monitor) => {
+        const editable = canModifyRecord(record.createdBy);
+        return (
         <Space>
-          <Button icon={<EditOutlined />} size="small" onClick={() => openEdit(record)}>编辑</Button>
+          <Button icon={<EditOutlined />} size="small" disabled={!editable} title={!editable ? '只有创建人才能编辑' : undefined} onClick={() => openEdit(record)}>编辑</Button>
           <Button icon={<CopyOutlined />} size="small" onClick={() => openCopy(record)}>复制</Button>
           <Button icon={<HistoryOutlined />} size="small" onClick={() => openHistory(record)}>告警历史</Button>
-          <Button icon={<DeleteOutlined />} size="small" danger onClick={() => handleDelete(record.id)}>删除</Button>
+          <Button icon={<DeleteOutlined />} size="small" danger disabled={!editable} title={!editable ? '只有创建人才能删除' : undefined} onClick={() => handleDelete(record.id)}>删除</Button>
         </Space>
-      ),
+        );
+      },
     },
   ];
 

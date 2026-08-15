@@ -59,7 +59,9 @@ func chartResponse(chart models.Chart) map[string]interface{} {
 		"createdAt":      chart.CreatedAt,
 		"updatedAt":      chart.UpdatedAt,
 		"createdBy":      chart.CreatedBy,
+		"createdByName":  chart.CreatedByName,
 		"updatedBy":      chart.UpdatedBy,
+		"updatedByName":  chart.UpdatedByName,
 		"dashboardCount": chartDashboardCount(chart.ID.String()),
 	}
 }
@@ -138,16 +140,14 @@ func CreateChart(c *gin.Context) {
 		req.Config = "{}"
 	}
 
-	userName := GetCurrentUserName(c)
 	chart := models.Chart{
 		WorkspaceID: GetWorkspaceID(c),
 		Name:        req.Name,
 		DatasetID:   datasetUUID,
 		Type:        chartType,
 		Config:      req.Config,
-		CreatedBy:   userName,
-		UpdatedBy:   userName,
 	}
+	setCreator(c, &chart.AuditFields)
 
 	result := database.DB.Create(&chart)
 	if result.Error != nil {
@@ -174,6 +174,7 @@ func CopyChart(c *gin.Context) {
 		Type:        original.Type,
 		Config:      original.Config,
 	}
+	setCreator(c, &copied.AuditFields)
 	if err := database.DB.Create(&copied).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -228,11 +229,16 @@ func UpdateChart(c *gin.Context) {
 		return
 	}
 
+	if !canModify(chart.CreatedBy, c) {
+		abortForbidden(c, "只有创建人才能修改此图表")
+		return
+	}
+
 	chart.Name = req.Name
 	chart.DatasetID = datasetUUID
 	chart.Type = chartType
 	chart.Config = req.Config
-	chart.UpdatedBy = GetCurrentUserName(c)
+	setUpdater(c, &chart.AuditFields)
 
 	result = database.DB.Save(&chart)
 	if result.Error != nil {
@@ -246,6 +252,17 @@ func UpdateChart(c *gin.Context) {
 // DeleteChart 删除图表
 func DeleteChart(c *gin.Context) {
 	id := c.Param("id")
+
+	var chart models.Chart
+	if err := database.DB.First(&chart, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Chart not found"})
+		return
+	}
+	if !canModify(chart.CreatedBy, c) {
+		abortForbidden(c, "只有创建人才能删除此图表")
+		return
+	}
+
 	result := database.DB.Delete(&models.Chart{}, "id = ?", id)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
@@ -596,8 +613,8 @@ func resolveDateRangeFilterVal(drv dateRangeFilterValue) (string, string, error)
 // FilterCondition 筛选条件
 type FilterCondition struct {
 	Field      string   `json:"field"`
-	Type       string   `json:"type"`                 // "multiple", "single", "dateRange"
-	DataType   string   `json:"dataType"`             // "number", "text", "date" 等
+	Type       string   `json:"type"`     // "multiple", "single", "dateRange"
+	DataType   string   `json:"dataType"` // "number", "text", "date" 等
 	Values     []string `json:"values"`
 	Expression string   `json:"expression,omitempty"` // 计算字段表达式，非空时替代 Field 用于 WHERE 子句
 	Exclude    bool     `json:"exclude,omitempty"`    // 排除模式：true 时使用 NOT IN 而非 IN

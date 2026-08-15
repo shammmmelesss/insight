@@ -45,9 +45,15 @@ func CreateWorkspace(c *gin.Context) {
 		return
 	}
 
+	userID := GetCurrentUserID(c)
+	userName := GetCurrentUserName(c)
 	workspace := models.Workspace{
-		Name:        req.Name,
-		Description: req.Description,
+		Name:          req.Name,
+		Description:   req.Description,
+		CreatedBy:     userID,
+		CreatedByName: userName,
+		UpdatedBy:     userID,
+		UpdatedByName: userName,
 	}
 	result := database.DB.Create(&workspace)
 	if result.Error != nil {
@@ -88,8 +94,15 @@ func UpdateWorkspace(c *gin.Context) {
 		return
 	}
 
+	if !canModifyWorkspace(&workspace, GetCurrentUserID(c)) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "只有创建人可以编辑该项目空间"})
+		return
+	}
+
 	workspace.Name = req.Name
 	workspace.Description = req.Description
+	workspace.UpdatedBy = GetCurrentUserID(c)
+	workspace.UpdatedByName = GetCurrentUserName(c)
 	result = database.DB.Save(&workspace)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
@@ -98,9 +111,28 @@ func UpdateWorkspace(c *gin.Context) {
 	c.JSON(http.StatusOK, workspace)
 }
 
+// canModifyWorkspace 判断用户是否有权限修改项目空间
+// 规则：createdBy 为空（历史数据）则所有人可修改；否则只有创建人可修改
+func canModifyWorkspace(workspace *models.Workspace, userID string) bool {
+	if workspace.CreatedBy == "" {
+		return true
+	}
+	return userID != "" && workspace.CreatedBy == userID
+}
+
 // DeleteWorkspace 删除项目空间
 func DeleteWorkspace(c *gin.Context) {
 	id := c.Param("id")
+
+	var workspace models.Workspace
+	if err := database.DB.First(&workspace, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Workspace not found"})
+		return
+	}
+	if !canModifyWorkspace(&workspace, GetCurrentUserID(c)) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "只有创建人可以删除该项目空间"})
+		return
+	}
 
 	var count int64
 	if err := database.DB.Model(&models.Dataset{}).Where("workspace_id = ?", id).Count(&count).Error; err != nil {

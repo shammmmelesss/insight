@@ -10,6 +10,7 @@ import ChartRenderer, { ChartRendererHandle } from '../../components/ChartRender
 import { dashboardCache } from '../../utils/dashboardCache';
 import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel} from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
 import { WorkUser } from '@/lib/workUser';
+import { canModifyRecord, displayCreator } from '../../utils/currentUser';
 
 // 解析看板的 sharedWith 字段（可能是 JSON 字符串或数组）
 const parseSharedWith = (raw: string | WorkUser[] | undefined): WorkUser[] => {
@@ -785,6 +786,14 @@ const DashboardsPage: React.FC = () => {
             <span style={{ fontSize: 16, fontWeight: 600, color: '#1f1f1f' }}>
               {selectedDashboard ? selectedDashboard.name : '看板'}
             </span>
+            {selectedDashboard && (
+              <span style={{ fontSize: 12, color: '#999' }}>
+                创建人：{displayCreator(selectedDashboard.createdByName, selectedDashboard.createdBy)}
+                {selectedDashboard.updatedByName || selectedDashboard.updatedBy
+                  ? ` ｜ 修改人：${displayCreator(selectedDashboard.updatedByName, selectedDashboard.updatedBy)}`
+                  : ''}
+              </span>
+            )}
           </div>
           {selectedDashboard && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -819,14 +828,16 @@ const DashboardsPage: React.FC = () => {
                   </Popover>
                 );
               })()}
-              <Button
-                type="primary"
-                size="small"
-                icon={<EditOutlined />}
-                onClick={() => navigate(`/dashboards/edit/${selectedDashboard.id}`)}
-              >
-                编辑
-              </Button>
+              {canModifyRecord(selectedDashboard.createdBy) && (
+                <Button
+                  type="primary"
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => navigate(`/dashboards/edit/${selectedDashboard.id}`)}
+                >
+                  编辑
+                </Button>
+              )}
             </div>
           )}
         </div>

@@ -9,6 +9,7 @@ import DashboardsPage from './pages/DashboardsPage/DashboardsPage';
 import DashboardEditPage from './pages/DashboardEditPage/DashboardEditPage';
 import MonitorPage from './pages/MonitorPage/MonitorPage';
 import SQLQueryPage from './pages/SQLQueryPage/SQLQueryPage';
+import WorkspacesPage from './pages/WorkspacesPage/WorkspacesPage';
 import NotFound from './pages/NotFound/NotFound';
 import Layout from './components/Layout/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -36,6 +37,7 @@ function AppRoutes() {
         <Route path="/dashboards/:id" element={<DashboardsPage />} />
         <Route path="/monitor" element={<MonitorPage />} />
         <Route path="/sql" element={<SQLQueryPage />} />
+        <Route path="/workspaces" element={<WorkspacesPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>

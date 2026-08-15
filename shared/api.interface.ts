@@ -23,6 +23,14 @@ export interface Workspace {
   id: string;
   name: string;
   description?: string;
+  /** 创建人ID（用于权限校验） */
+  createdBy?: string;
+  /** 创建人姓名（用于展示） */
+  createdByName?: string;
+  /** 修改人ID */
+  updatedBy?: string;
+  /** 修改人姓名（用于展示） */
+  updatedByName?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -92,7 +100,9 @@ export interface Dataset {
   extractError?: string;
   chartCount: number;
   createdBy: string;
+  createdByName?: string;
   updatedBy: string;
+  updatedByName?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -257,7 +267,9 @@ export interface Chart {
   config: ChartConfig;
   dashboardCount: number;
   createdBy: string;
+  createdByName?: string;
   updatedBy: string;
+  updatedByName?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -339,6 +351,10 @@ export interface Dashboard {
   layout: DashboardLayoutItem[];
   filters: FilterField[];
   sharedWith: string;
+  createdBy?: string;
+  createdByName?: string;
+  updatedBy?: string;
+  updatedByName?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -451,7 +467,9 @@ export interface Monitor {
   webhookUrl: string;
   webhookSecret: string;
   createdBy: string;
+  createdByName?: string;
   updatedBy: string;
+  updatedByName?: string;
   createdAt: string;
   updatedAt: string;
 }

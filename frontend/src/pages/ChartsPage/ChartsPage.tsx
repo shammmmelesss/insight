@@ -4,6 +4,7 @@ import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { Chart } from '@shared/api.interface';
+import { canModifyRecord, displayCreator } from '../../utils/currentUser';
 
 const formatDateTime = (val: string) => {
   if (!val) return '';
@@ -98,8 +99,9 @@ const ChartsPage: React.FC = () => {
     },
     {
       title: '创建人',
-      dataIndex: 'createdBy',
-      key: 'createdBy',
+      dataIndex: 'createdByName',
+      key: 'createdByName',
+      render: (_: any, record: Chart) => displayCreator(record.createdByName, record.createdBy),
     },
     {
       title: '创建时间',
@@ -111,8 +113,9 @@ const ChartsPage: React.FC = () => {
     },
     {
       title: '修改人',
-      dataIndex: 'updatedBy',
-      key: 'updatedBy',
+      dataIndex: 'updatedByName',
+      key: 'updatedByName',
+      render: (_: any, record: Chart) => displayCreator(record.updatedByName, record.updatedBy),
     },
     {
       title: '修改时间',
@@ -137,11 +140,15 @@ const ChartsPage: React.FC = () => {
     {
       title: '操作',
       key: 'action',
-      render: (_: any, record: Chart) => (
+      render: (_: any, record: Chart) => {
+        const editable = canModifyRecord(record.createdBy);
+        return (
         <Space>
           <Button
             icon={<EditOutlined />}
             size="small"
+            disabled={!editable}
+            title={!editable ? '只有创建人才能编辑' : ''}
             onClick={() => openChartConfig(record)}
           >
             编辑
@@ -151,13 +158,20 @@ const ChartsPage: React.FC = () => {
             size="small"
             danger
             onClick={() => handleDelete(record.id)}
-            disabled={record.dashboardCount > 0}
-            title={record.dashboardCount > 0 ? '该图表已关联看板，不可删除' : ''}
+            disabled={record.dashboardCount > 0 || !editable}
+            title={
+              !editable
+                ? '只有创建人才能删除'
+                : record.dashboardCount > 0
+                ? '该图表已关联看板，不可删除'
+                : ''
+            }
           >
             删除
           </Button>
         </Space>
-      ),
+        );
+      },
     },
   ];
 

@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"data-analysis-platform/internal/database"
 	"data-analysis-platform/internal/models"
+	"github.com/gin-gonic/gin"
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
@@ -90,6 +90,10 @@ func datasetResponse(dataset models.Dataset) map[string]interface{} {
 		"chartCount":      chartCount,
 		"createdAt":       dataset.CreatedAt,
 		"updatedAt":       dataset.UpdatedAt,
+		"createdBy":       dataset.CreatedBy,
+		"createdByName":   dataset.CreatedByName,
+		"updatedBy":       dataset.UpdatedBy,
+		"updatedByName":   dataset.UpdatedByName,
 	}
 }
 
@@ -169,6 +173,7 @@ func CreateDataset(c *gin.Context) {
 		Type:            req.Type,
 		ExtractSchedule: string(scheduleJSON),
 	}
+	setCreator(c, &dataset.AuditFields)
 
 	result := database.DB.Create(&dataset)
 	if result.Error != nil {
@@ -224,6 +229,11 @@ func UpdateDataset(c *gin.Context) {
 		return
 	}
 
+	if !canModify(dataset.CreatedBy, c) {
+		abortForbidden(c, "只有创建人才能修改此数据集")
+		return
+	}
+
 	fieldsConfigJSON, err := json.Marshal(req.FieldsConfig)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "字段配置序列化失败: " + err.Error()})
@@ -243,6 +253,7 @@ func UpdateDataset(c *gin.Context) {
 	dataset.DataSourceID = req.DataSourceId
 	dataset.Type = req.Type
 	dataset.ExtractSchedule = string(scheduleJSON)
+	setUpdater(c, &dataset.AuditFields)
 
 	result = database.DB.Save(&dataset)
 	if result.Error != nil {
@@ -256,6 +267,17 @@ func UpdateDataset(c *gin.Context) {
 // DeleteDataset 删除数据集
 func DeleteDataset(c *gin.Context) {
 	id := c.Param("id")
+
+	var dataset models.Dataset
+	if err := database.DB.First(&dataset, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "数据集不存在"})
+		return
+	}
+	if !canModify(dataset.CreatedBy, c) {
+		abortForbidden(c, "只有创建人才能删除此数据集")
+		return
+	}
+
 	result := database.DB.Delete(&models.Dataset{}, "id = ?", id)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})

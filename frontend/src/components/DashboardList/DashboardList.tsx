@@ -3,6 +3,7 @@ import { Button, Input, Modal, Dropdown, Tooltip } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, MoreOutlined, MenuFoldOutlined, MenuUnfoldOutlined, ShareAltOutlined } from '@ant-design/icons';
 import { Dashboard } from '@shared/api.interface';
 import ShareDashboardModal from '@/components/ShareDashboardModal/ShareDashboardModal';
+import { canModifyRecord } from '../../utils/currentUser';
 import './DashboardList.css';
 
 interface DashboardListProps {
@@ -104,6 +105,7 @@ const DashboardList: React.FC<DashboardListProps> = ({
               onClick={() => onSelectDashboard(dashboard)}
             >
               <span className="item-name">{dashboard.name}</span>
+              {canModifyRecord(dashboard.createdBy) && (
               <Dropdown
                 menu={{
                   items: [
@@ -147,6 +149,7 @@ const DashboardList: React.FC<DashboardListProps> = ({
                   onClick={(e) => e.stopPropagation()}
                 />
               </Dropdown>
+              )}
             </div>
           ))
         )}

@@ -86,6 +86,8 @@ type Dataset struct {
 	ExtractStatus   ExtractStatus `json:"extractStatus" gorm:"default:'idle'"`
 	LastExtractAt   *time.Time    `json:"lastExtractAt"`
 	ExtractError    string        `json:"extractError"`
+	// SharedWith 分享设置，JSON 数组，条目形如 {openId,name,avatar,role}，role ∈ {manage, view}
+	SharedWith string `json:"sharedWith" gorm:"type:jsonb;default:'[]'"`
 	AuditFields
 	Charts []Chart `json:"-" gorm:"foreignKey:DatasetID"`
 }

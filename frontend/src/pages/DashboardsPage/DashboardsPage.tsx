@@ -9,7 +9,7 @@ import DashboardList from '../../components/DashboardList/DashboardList';
 import ChartRenderer, { ChartRendererHandle } from '../../components/ChartRenderer';
 import { dashboardCache } from '../../utils/dashboardCache';
 import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel} from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
-import { WorkUser } from '@/lib/workUser';
+import { WorkUser, fetchAllWorkUsers } from '@/lib/workUser';
 import { canModifyRecord, displayCreator } from '../../utils/currentUser';
 
 // 解析看板的 sharedWith 字段（可能是 JSON 字符串或数组）
@@ -202,6 +202,8 @@ const DashboardsPage: React.FC = () => {
   const [chartSQLs, setChartSQLs] = useState<Record<string, string>>({});
   const [sqlModalVisible, setSqlModalVisible] = useState(false);
   const [currentSQLChartId, setCurrentSQLChartId] = useState('');
+  // openId -> 头像 URL 映射（用于展示创建人头像）
+  const [userAvatarMap, setUserAvatarMap] = useState<Record<string, string>>({});
 
   // 交叉表自定义表头：已确认的可见字段 (null = 全部可见)
   const [crossTableVisible, setCrossTableVisible] = useState<Record<string, { rowFields: string[]; colFields: string[]; measureFields: string[] } | null>>({});
@@ -255,6 +257,17 @@ const DashboardsPage: React.FC = () => {
 
   useEffect(() => {
     fetchDashboards();
+  }, []);
+
+  // 加载全量用户列表，构建 openId -> 头像 映射（用于展示创建人头像）
+  useEffect(() => {
+    fetchAllWorkUsers()
+      .then(users => {
+        const map: Record<string, string> = {};
+        users.forEach(u => { if (u.avatar) map[u.openId] = u.avatar; });
+        setUserAvatarMap(map);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -786,17 +799,28 @@ const DashboardsPage: React.FC = () => {
             <span style={{ fontSize: 16, fontWeight: 600, color: '#1f1f1f' }}>
               {selectedDashboard ? selectedDashboard.name : '看板'}
             </span>
-            {selectedDashboard && (
+            {selectedDashboard && (selectedDashboard.updatedByName || selectedDashboard.updatedBy) && (
               <span style={{ fontSize: 12, color: '#999' }}>
-                创建人：{displayCreator(selectedDashboard.createdByName, selectedDashboard.createdBy)}
-                {selectedDashboard.updatedByName || selectedDashboard.updatedBy
-                  ? ` ｜ 修改人：${displayCreator(selectedDashboard.updatedByName, selectedDashboard.updatedBy)}`
-                  : ''}
+                修改人：{displayCreator(selectedDashboard.updatedByName, selectedDashboard.updatedBy)}
               </span>
             )}
           </div>
           {selectedDashboard && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {(selectedDashboard.createdByName || selectedDashboard.createdBy) && (
+                <Tooltip title={`创建人：${displayCreator(selectedDashboard.createdByName, selectedDashboard.createdBy)}`}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 12, color: '#999' }}>创建人</span>
+                    <Avatar
+                      size="small"
+                      src={selectedDashboard.createdBy ? userAvatarMap[selectedDashboard.createdBy] : undefined}
+                      icon={<UserOutlined />}
+                    >
+                      {displayCreator(selectedDashboard.createdByName, selectedDashboard.createdBy)?.slice(0, 1)}
+                    </Avatar>
+                  </div>
+                </Tooltip>
+              )}
               {(() => {
                 const sharedUsers = parseSharedWith(selectedDashboard.sharedWith);
                 if (sharedUsers.length === 0) return null;

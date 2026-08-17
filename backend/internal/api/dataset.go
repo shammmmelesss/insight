@@ -43,11 +43,66 @@ func RegisterDatasetRoutes(rg *gin.RouterGroup) {
 		dataset.POST("/:id/extract", TriggerExtract)
 		dataset.POST("/:id/stop-extract", StopExtract)
 		dataset.POST("/:id/clear-data", ClearExtractData)
+		dataset.PUT("/:id/share", ShareDataset)
 	}
 }
 
+// 数据集分享角色
+const (
+	ShareRoleManage = "manage" // 管理：完全等同所有者（可编辑/删除/抽取/再分享）
+	ShareRoleView   = "view"   // 查看：只读
+)
+
+// shareEntry 分享条目，预留 type 字段以便后续支持用户组
+type shareEntry struct {
+	OpenID string `json:"openId"`
+	Name   string `json:"name"`
+	Avatar string `json:"avatar"`
+	Role   string `json:"role"`
+}
+
+// parseSharedWith 解析数据集的 SharedWith JSON
+func parseSharedWith(raw string) []shareEntry {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	var entries []shareEntry
+	if err := json.Unmarshal([]byte(raw), &entries); err != nil {
+		return nil
+	}
+	return entries
+}
+
+// datasetRole 返回当前用户对数据集的角色：owner / manage / view / ""（无权限）
+func datasetRole(ds *models.Dataset, c *gin.Context) string {
+	// 创建人为空视为历史数据，任何人可管理（与 canModify 保持一致）
+	if ds.CreatedBy == "" {
+		return "owner"
+	}
+	uid := GetCurrentUserID(c)
+	uname := GetCurrentUserName(c)
+	if (uid != "" && ds.CreatedBy == uid) || (uname != "" && ds.CreatedBy == uname) {
+		return "owner"
+	}
+	for _, e := range parseSharedWith(ds.SharedWith) {
+		if e.OpenID != "" && uid != "" && e.OpenID == uid {
+			if e.Role == ShareRoleManage {
+				return ShareRoleManage
+			}
+			return ShareRoleView
+		}
+	}
+	return ""
+}
+
+// canManageDataset 判断当前用户能否管理数据集（所有者或 manage 分享用户）
+func canManageDataset(ds *models.Dataset, c *gin.Context) bool {
+	role := datasetRole(ds, c)
+	return role == "owner" || role == ShareRoleManage
+}
+
 // datasetResponse 构建数据集响应
-func datasetResponse(dataset models.Dataset) map[string]interface{} {
+func datasetResponse(dataset models.Dataset, c *gin.Context) map[string]interface{} {
 	var fieldsConfig []interface{}
 	if err := json.Unmarshal([]byte(dataset.FieldsConfig), &fieldsConfig); err != nil {
 		fieldsConfig = []interface{}{}
@@ -75,6 +130,13 @@ func datasetResponse(dataset models.Dataset) map[string]interface{} {
 		extractStatus = models.ExtractStatusIdle
 	}
 
+	sharedWith := dataset.SharedWith
+	if strings.TrimSpace(sharedWith) == "" {
+		sharedWith = "[]"
+	}
+
+	role := datasetRole(&dataset, c)
+
 	return map[string]interface{}{
 		"id":              dataset.ID,
 		"name":            dataset.Name,
@@ -94,6 +156,9 @@ func datasetResponse(dataset models.Dataset) map[string]interface{} {
 		"createdByName":   dataset.CreatedByName,
 		"updatedBy":       dataset.UpdatedBy,
 		"updatedByName":   dataset.UpdatedByName,
+		"sharedWith":      sharedWith,
+		"role":            role,
+		"canManage":       role == "owner" || role == ShareRoleManage,
 	}
 }
 
@@ -113,7 +178,7 @@ func ListDatasets(c *gin.Context) {
 
 	responseItems := make([]map[string]interface{}, 0)
 	for _, ds := range datasets {
-		responseItems = append(responseItems, datasetResponse(ds))
+		responseItems = append(responseItems, datasetResponse(ds, c))
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -181,7 +246,7 @@ func CreateDataset(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, datasetResponse(dataset))
+	c.JSON(http.StatusCreated, datasetResponse(dataset, c))
 }
 
 // GetDataset 获取数据集详情
@@ -194,7 +259,7 @@ func GetDataset(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, datasetResponse(dataset))
+	c.JSON(http.StatusOK, datasetResponse(dataset, c))
 }
 
 // UpdateDataset 更新数据集
@@ -229,8 +294,8 @@ func UpdateDataset(c *gin.Context) {
 		return
 	}
 
-	if !canModify(dataset.CreatedBy, c) {
-		abortForbidden(c, "只有创建人才能修改此数据集")
+	if !canManageDataset(&dataset, c) {
+		abortForbidden(c, "只有创建人或管理成员才能修改此数据集")
 		return
 	}
 
@@ -261,7 +326,7 @@ func UpdateDataset(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, datasetResponse(dataset))
+	c.JSON(http.StatusOK, datasetResponse(dataset, c))
 }
 
 // DeleteDataset 删除数据集
@@ -273,8 +338,8 @@ func DeleteDataset(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "数据集不存在"})
 		return
 	}
-	if !canModify(dataset.CreatedBy, c) {
-		abortForbidden(c, "只有创建人才能删除此数据集")
+	if !canManageDataset(&dataset, c) {
+		abortForbidden(c, "只有创建人或管理成员才能删除此数据集")
 		return
 	}
 
@@ -285,6 +350,66 @@ func DeleteDataset(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// ShareDataset 更新数据集分享设置
+func ShareDataset(c *gin.Context) {
+	id := c.Param("id")
+
+	var req struct {
+		SharedWith string `json:"sharedWith"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var dataset models.Dataset
+	if err := database.DB.First(&dataset, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "数据集不存在"})
+		return
+	}
+
+	if !canManageDataset(&dataset, c) {
+		abortForbidden(c, "只有创建人或管理成员才能分享此数据集")
+		return
+	}
+
+	sharedWith := strings.TrimSpace(req.SharedWith)
+	if sharedWith == "" {
+		sharedWith = "[]"
+	}
+
+	// 校验分享条目：角色必须合法
+	entries := parseSharedWith(sharedWith)
+	normalized := make([]shareEntry, 0, len(entries))
+	seen := make(map[string]bool)
+	for _, e := range entries {
+		if e.OpenID == "" || seen[e.OpenID] {
+			continue
+		}
+		if e.Role != ShareRoleManage && e.Role != ShareRoleView {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "非法的分享角色: " + e.Role})
+			return
+		}
+		seen[e.OpenID] = true
+		normalized = append(normalized, e)
+	}
+	normalizedJSON, err := json.Marshal(normalized)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "分享设置序列化失败: " + err.Error()})
+		return
+	}
+
+	dataset.SharedWith = string(normalizedJSON)
+	setUpdater(c, &dataset.AuditFields)
+
+	if err := database.DB.Save(&dataset).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, datasetResponse(dataset, c))
 }
 
 // GetDatasetSelectList 获取数据集下拉列表
@@ -701,6 +826,10 @@ func TriggerExtract(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "数据集不存在"})
 		return
 	}
+	if !canManageDataset(&dataset, c) {
+		abortForbidden(c, "只有创建人或管理成员才能抽取此数据集")
+		return
+	}
 	if dataset.Type != models.DatasetTypeExtract {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "仅抽取类型数据集支持此操作"})
 		return
@@ -805,6 +934,10 @@ func StopExtract(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "数据集不存在"})
 		return
 	}
+	if !canManageDataset(&dataset, c) {
+		abortForbidden(c, "只有创建人或管理成员才能停止此抽取任务")
+		return
+	}
 	if dataset.ExtractStatus != models.ExtractStatusRunning {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "当前没有正在运行的抽取任务"})
 		return
@@ -831,6 +964,10 @@ func ClearExtractData(c *gin.Context) {
 	var dataset models.Dataset
 	if err := database.DB.First(&dataset, "id = ?", id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "数据集不存在"})
+		return
+	}
+	if !canManageDataset(&dataset, c) {
+		abortForbidden(c, "只有创建人或管理成员才能清空此数据集")
 		return
 	}
 	if dataset.Type != models.DatasetTypeExtract {

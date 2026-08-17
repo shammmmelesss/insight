@@ -105,6 +105,31 @@ export interface Dataset {
   updatedByName?: string;
   createdAt: string;
   updatedAt: string;
+  /** 分享设置，JSON 字符串，条目为 ShareEntry */
+  sharedWith?: string;
+  /** 当前用户对该数据集的角色 */
+  role?: DatasetRole;
+  /** 当前用户是否可管理（所有者或 manage 分享成员） */
+  canManage?: boolean;
+}
+
+/** 数据集分享角色 */
+export type ShareRole = "manage" | "view";
+
+/** 当前用户对数据集的角色（空字符串表示无权限） */
+export type DatasetRole = "owner" | "manage" | "view" | "";
+
+/** 数据集分享条目 */
+export interface ShareEntry {
+  openId: string;
+  name: string;
+  avatar?: string;
+  role: ShareRole;
+}
+
+/** 更新数据集分享设置请求 */
+export interface ShareDatasetRequest {
+  sharedWith: string;
 }
 
 /** 创建数据集请求 */

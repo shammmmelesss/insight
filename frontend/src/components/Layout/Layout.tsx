@@ -1,5 +1,5 @@
-import React from 'react';
-import { Layout as AntLayout, Menu, Typography, Select, Button, Space, Tooltip } from 'antd';
+import React, { useEffect, useState } from 'react';
+import { Layout as AntLayout, Menu, Typography, Select, Button, Space, Tooltip, Avatar } from 'antd';
 import { Link, useLocation } from 'react-router-dom';
 import {
   HomeOutlined,
@@ -10,9 +10,12 @@ import {
   SettingOutlined,
   MonitorOutlined,
   CodeOutlined,
+  UserOutlined,
 } from '@ant-design/icons';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import PortalSidebar from './PortalSidebar';
+import { fetchAllWorkUsers } from '../../lib/workUser';
+import { getCurrentUserId, getCurrentUserName } from '../../utils/currentUser';
 
 const { Header, Content } = AntLayout;
 const { Title } = Typography;
@@ -66,6 +69,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isDashboardEditRoute = location.pathname === '/dashboards/create' || location.pathname.startsWith('/dashboards/edit');
   const { workspaces, currentWorkspace, setCurrentWorkspace } = useWorkspace();
 
+  // 当前登录人（姓名取自 sessionStorage，头像按 openId 从全量用户列表匹配）
+  const currentUserId = getCurrentUserId();
+  const currentUserName = getCurrentUserName();
+  const [currentUserAvatar, setCurrentUserAvatar] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!currentUserId && !currentUserName) return;
+    fetchAllWorkUsers()
+      .then(users => {
+        const me = users.find(u => u.openId === currentUserId || u.name === currentUserName);
+        if (me?.avatar) setCurrentUserAvatar(me.avatar);
+      })
+      .catch(() => {});
+  }, [currentUserId, currentUserName]);
+
   const handleWorkspaceChange = (workspaceId: string) => {
     const ws = workspaces.find(w => w.id === workspaceId);
     if (ws) {
@@ -110,6 +128,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <Tooltip title="项目空间管理">
               <Button type="text" size="small" icon={<SettingOutlined />} onClick={openWorkspaceManager} />
             </Tooltip>
+            {(currentUserName || currentUserId) && (
+              <Tooltip title={currentUserName || currentUserId}>
+                <Avatar size="small" src={currentUserAvatar} icon={<UserOutlined />} style={{ cursor: 'default' }}>
+                  {(currentUserName || currentUserId)?.slice(0, 1)}
+                </Avatar>
+              </Tooltip>
+            )}
           </Space>
         </div>
       </Header>

@@ -1,10 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { App, Button, Card, Table, Modal, Drawer, Form, Input, Tabs, Row, Col, Select, Radio, TimePicker, Tooltip, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined, SyncOutlined, CheckCircleOutlined, CloseCircleOutlined, StopOutlined, ClearOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined, SyncOutlined, CheckCircleOutlined, CloseCircleOutlined, StopOutlined, ClearOutlined, ShareAltOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { Dataset, CreateDatasetRequest, UpdateDatasetRequest, FieldConfig, DataType, DatasetType, ExtractSchedule, ExtractFrequency, ExtractStatus } from '@shared/api.interface';
 import { canModifyRecord, displayCreator } from '../../utils/currentUser';
+import ShareDatasetModal from '../../components/ShareDatasetModal/ShareDatasetModal';
+
+// canManageDataset 判断当前用户是否可管理数据集：优先用后端返回的 canManage，
+// 回退到基于 createdBy 的本地判断以兼容旧接口/历史数据。
+const canManageDataset = (record: Dataset): boolean =>
+  record.canManage ?? canModifyRecord(record.createdBy);
 
 const { Option } = Select;
 
@@ -51,6 +57,10 @@ const DatasetsPage: React.FC = () => {
   const [chartModalVisible, setChartModalVisible] = useState(false);
   const [datasetCharts, setDatasetCharts] = useState<any[]>([]);
   const [loadingCharts, setLoadingCharts] = useState(false);
+
+  // 分享相关状态
+  const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [sharingDataset, setSharingDataset] = useState<Dataset | null>(null);
 
   // 获取数据集列表
   const fetchDatasets = async () => {
@@ -514,7 +524,7 @@ const DatasetsPage: React.FC = () => {
       title: '操作',
       key: 'action',
       render: (_: any, record: Dataset) => {
-        const editable = canModifyRecord(record.createdBy);
+        const editable = canManageDataset(record);
         return (
         <div className="action-buttons">
           <Button
@@ -562,11 +572,21 @@ const DatasetsPage: React.FC = () => {
             icon={<EditOutlined />}
             size="small"
             disabled={!editable}
-            title={!editable ? '只有创建人才能编辑' : undefined}
+            title={!editable ? '只有创建人或管理成员才能编辑' : undefined}
             onClick={() => showModal(record)}
             style={{ marginRight: 8 }}
           >
             编辑
+          </Button>
+          <Button
+            icon={<ShareAltOutlined />}
+            size="small"
+            disabled={!editable}
+            title={!editable ? '只有创建人或管理成员才能分享' : undefined}
+            onClick={() => { setSharingDataset(record); setShareModalVisible(true); }}
+            style={{ marginRight: 8 }}
+          >
+            分享
           </Button>
           <Button
             icon={<DeleteOutlined />}
@@ -575,7 +595,7 @@ const DatasetsPage: React.FC = () => {
             disabled={record.chartCount > 0 || !editable}
             title={
               !editable
-                ? '只有创建人才能删除'
+                ? '只有创建人或管理成员才能删除'
                 : record.chartCount > 0
                 ? '该数据集有关联图表，不可删除'
                 : undefined
@@ -960,6 +980,15 @@ const DatasetsPage: React.FC = () => {
           pagination={{ pageSize: 10 }}
         />
       </Modal>
+
+      <ShareDatasetModal
+        dataset={sharingDataset}
+        open={shareModalVisible}
+        onClose={() => setShareModalVisible(false)}
+        onShared={(updated) => {
+          setDatasets((prev) => prev.map((d) => (d.id === updated.id ? { ...d, ...updated } : d)));
+        }}
+      />
     </div>
   );
 };

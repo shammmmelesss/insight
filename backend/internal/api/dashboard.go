@@ -44,22 +44,25 @@ func GetCurrentUserName(c *gin.Context) string {
 
 // canAccessDashboard 检查用户是否有权限访问看板
 // 规则：createdBy 为空（历史数据）则所有人可访问；否则只有创建人和被分享用户可访问
-func canAccessDashboard(dashboard *models.Dashboard, userID string) bool {
+func canAccessDashboard(dashboard *models.Dashboard, userID, userName string) bool {
 	if dashboard.CreatedBy == "" {
 		return true
 	}
-	if userID == "" {
-		return false
+	// 创建人本人可访问：兼容历史上以「用户名」存储 createdBy 的数据
+	if userID != "" && dashboard.CreatedBy == userID {
+		return true
 	}
-	if dashboard.CreatedBy == userID {
+	if userName != "" && dashboard.CreatedBy == userName {
 		return true
 	}
 	// 检查 sharedWith JSON 数组中是否包含该用户
-	var shared []map[string]interface{}
-	if err := json.Unmarshal([]byte(dashboard.SharedWith), &shared); err == nil {
-		for _, u := range shared {
-			if openID, ok := u["openId"].(string); ok && openID == userID {
-				return true
+	if userID != "" {
+		var shared []map[string]interface{}
+		if err := json.Unmarshal([]byte(dashboard.SharedWith), &shared); err == nil {
+			for _, u := range shared {
+				if openID, ok := u["openId"].(string); ok && openID == userID {
+					return true
+				}
 			}
 		}
 	}
@@ -70,6 +73,7 @@ func canAccessDashboard(dashboard *models.Dashboard, userID string) bool {
 func ListDashboards(c *gin.Context) {
 	workspaceID := GetWorkspaceID(c)
 	userID := GetCurrentUserID(c)
+	userName := GetCurrentUserName(c)
 
 	dashboards := make([]models.Dashboard, 0)
 	query := database.DB
@@ -85,7 +89,7 @@ func ListDashboards(c *gin.Context) {
 	// 过滤：只返回有权限的看板
 	visible := make([]models.Dashboard, 0, len(dashboards))
 	for _, d := range dashboards {
-		if canAccessDashboard(&d, userID) {
+		if canAccessDashboard(&d, userID, userName) {
 			visible = append(visible, d)
 		}
 	}
@@ -142,6 +146,7 @@ func CreateDashboard(c *gin.Context) {
 func GetDashboard(c *gin.Context) {
 	id := c.Param("id")
 	userID := GetCurrentUserID(c)
+	userName := GetCurrentUserName(c)
 
 	var dashboard models.Dashboard
 	result := database.DB.First(&dashboard, "id = ?", id)
@@ -150,7 +155,7 @@ func GetDashboard(c *gin.Context) {
 		return
 	}
 
-	if !canAccessDashboard(&dashboard, userID) {
+	if !canAccessDashboard(&dashboard, userID, userName) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "无权限访问此看板"})
 		return
 	}

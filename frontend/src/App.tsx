@@ -12,6 +12,7 @@ import SQLQueryPage from './pages/SQLQueryPage/SQLQueryPage';
 import WorkspacesPage from './pages/WorkspacesPage/WorkspacesPage';
 import NotFound from './pages/NotFound/NotFound';
 import Layout from './components/Layout/Layout';
+import GlobalWatermark from './components/GlobalWatermark';
 import ErrorBoundary from './components/ErrorBoundary';
 import { WorkspaceProvider, useWorkspace } from './contexts/WorkspaceContext';
 import AuthProvider from './contexts/AuthContext';
@@ -59,9 +60,11 @@ function App() {
           <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <AuthProvider>
               <WorkspaceProvider>
-                <Layout>
-                  <AppRoutes />
-                </Layout>
+                <GlobalWatermark>
+                  <Layout>
+                    <AppRoutes />
+                  </Layout>
+                </GlobalWatermark>
               </WorkspaceProvider>
             </AuthProvider>
           </Router>

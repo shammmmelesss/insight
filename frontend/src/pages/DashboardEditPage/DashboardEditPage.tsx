@@ -7,6 +7,7 @@ import axios from 'axios';
 import { fetchDatasetOptions } from '@/api/datasets';
 import { fetchChartOptions } from '@/api/charts';
 import { dashboardCache } from '../../utils/dashboardCache';
+import { downloadSensitiveCsv } from '../../utils/csvDownload';
 import RGL, { WidthProvider } from 'react-grid-layout/legacy';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
@@ -690,12 +691,7 @@ const DashboardEditPage: React.FC = () => {
                                     const v = String(r[h] ?? '');
                                     return v.includes(',') || v.includes('"') || v.includes('\n') ? `"${v.replace(/"/g, '""')}"` : v;
                                   }).join(','))].join('\n');
-                                  const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' });
-                                  const link = document.createElement('a');
-                                  link.download = `${chart?.name || 'cross_table'}.csv`;
-                                  link.href = URL.createObjectURL(blob);
-                                  link.click();
-                                  URL.revokeObjectURL(link.href);
+                                  downloadSensitiveCsv(csv, chart?.name || 'cross_table');
                                 },
                               }] : []),
                               { type: 'divider' as const },

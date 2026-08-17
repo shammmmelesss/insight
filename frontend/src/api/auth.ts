@@ -4,6 +4,7 @@ export interface UserInfo {
   openId: string;
   name: string;
   username?: string;
+  email?: string;
   avatar?: string;
 }
 
@@ -11,7 +12,11 @@ const isDev =
   typeof location !== 'undefined' &&
   (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
 
-export const MOCK_USER: UserInfo = { openId: 'mock_user_1', name: '张三' };
+export const MOCK_USER: UserInfo = {
+  openId: 'mock_user_1',
+  name: '张三',
+  email: 'zhangsan@learnings.ai',
+};
 
 export async function getUserInfo(): Promise<UserInfo> {
   if (isDev) return MOCK_USER;
@@ -22,6 +27,7 @@ export async function getUserInfo(): Promise<UserInfo> {
     openId: u.feishu_userid || u.userid || u.id || '',
     name: u.name || u.username || '',
     username: u.username,
+    email: u.email || u.mail || u.username,
     avatar: u.avatar,
   };
 }

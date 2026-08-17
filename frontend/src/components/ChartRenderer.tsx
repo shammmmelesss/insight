@@ -12,6 +12,7 @@ import { renderLineChart } from './ChartRenderer/lineChart';
 import { renderDualAxisChart } from './ChartRenderer/dualAxis';
 import { renderPieChart } from './ChartRenderer/pieChart';
 import { renderIndicatorCard } from './ChartRenderer/indicatorCard';
+import { downloadSensitiveCsv } from '../utils/csvDownload';
 
 export interface ChartRendererHandle {
   downloadCrossTable: (fileName?: string) => Promise<void>;
@@ -206,12 +207,7 @@ const ChartRenderer = forwardRef<ChartRendererHandle, ChartRendererProps>(({
     const s2 = chartInstanceRef.current as PivotSheet;
     if (!s2) return;
     const data = await asyncGetAllPlainData({ sheetInstance: s2, split: ',', formatOptions: true });
-    const blob = new Blob([`﻿${data}`], { type: 'text/csv;charset=utf-8' });
-    const link = document.createElement('a');
-    link.download = `${fileName}.csv`;
-    link.href = URL.createObjectURL(blob);
-    link.click();
-    URL.revokeObjectURL(link.href);
+    await downloadSensitiveCsv(data, fileName);
   };
 
   useImperativeHandle(ref, () => ({ downloadCrossTable: handleDownloadCrossTable }));

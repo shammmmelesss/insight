@@ -3,7 +3,7 @@ import { getCurrentUserId, getCurrentUserName } from './currentUser';
 
 /** 敏感数据下载警示语，弹窗与 CSV 末尾复用 */
 export const SENSITIVE_DOWNLOAD_WARNING =
-  '本次下载为业务敏感数据，仅限工作使用，严禁转发、外泄、泄露给无关人员。违规将追究责任，包括纪律处分、解除劳动合同，情节严重将追究法律责任。';
+  '本次下载包含业务敏感数据，仅限工作使用，严禁转发、外泄、泄露给无关人员。违规将追究责任，包括纪律处分、解除劳动合同，情节严重将追究法律责任。';
 
 /** 下载前弹出确认框，用户点击「确认下载」返回 true，取消返回 false */
 export function confirmSensitiveDownload(): Promise<boolean> {

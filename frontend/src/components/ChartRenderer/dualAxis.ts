@@ -148,7 +148,7 @@ export const renderDualAxisChart = (ctx: RenderContext) => {
         .encode('x', actualXField)
         .encode('y', '_valueR')
         .encode('shape', 'smooth')
-        .style({ lineWidth: 2 })
+        .style({ lineWidth: 4 })
         .scale('y', { independent: true })
         .axis('y', {
           position: 'right',

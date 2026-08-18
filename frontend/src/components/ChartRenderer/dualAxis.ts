@@ -148,7 +148,7 @@ export const renderDualAxisChart = (ctx: RenderContext) => {
         .encode('x', actualXField)
         .encode('y', '_valueR')
         .encode('shape', 'smooth')
-        .style({ lineWidth: 4 })
+        .style({ lineWidth: 2 })
         .scale('y', { independent: true })
         .axis('y', {
           position: 'right',
@@ -176,7 +176,7 @@ export const renderDualAxisChart = (ctx: RenderContext) => {
           range: ORANGE_COLORS,
         });
       } else {
-        line.style({ stroke: '#FA8C16' });
+        line.style({ stroke: '#FA8C16', lineWidth: 2 });
       }
 
       chart

@@ -51,11 +51,11 @@ const menuItems = [
     icon: <MonitorOutlined />,
     label: <Link to="/monitor">监控</Link>,
   },
-  {
-    key: '/sql',
-    icon: <CodeOutlined />,
-    label: <Link to="/sql">SQL 查询</Link>,
-  },
+  // {
+  //   key: '/sql',
+  //   icon: <CodeOutlined />,
+  //   label: <Link to="/sql">SQL 查询</Link>,
+  // },
 ];
 
 interface LayoutProps {

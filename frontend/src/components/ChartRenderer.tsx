@@ -213,10 +213,10 @@ const ChartRenderer = forwardRef<ChartRendererHandle, ChartRendererProps>(({
   useImperativeHandle(ref, () => ({ downloadCrossTable: handleDownloadCrossTable }));
 
   return (
-    <div style={{ width: '100%', height: containerHeight ? `${containerHeight}px` : '100%', display: 'flex', flexDirection: 'column', overflow: 'visible' }}>
+    <div style={{ width: '100%', height: containerHeight ? `${containerHeight}px` : '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div
         ref={chartRef}
-        style={{ flex: 1, minHeight: 0, overflow: 'visible' }}
+        style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}
       />
       <div ref={legendContainerRef} style={{ flexShrink: 0 }} />
     </div>

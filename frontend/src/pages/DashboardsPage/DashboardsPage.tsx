@@ -1004,7 +1004,7 @@ const DashboardsPage: React.FC = () => {
               return (
                 <LazyChartCard
                   key={item.chartId}
-                  style={{ gridColumn: isLarge ? 'span 2' : 'span 1' }}
+                  style={{ gridColumn: isLarge ? 'span 2' : 'span 1', minWidth: 0, overflow: 'hidden' }}
                   onEnter={() => handleChartEnter(item.chartId)}
                   onExit={() => handleChartExit(item.chartId)}
                 >

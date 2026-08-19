@@ -134,6 +134,16 @@ func DeleteWorkspace(c *gin.Context) {
 		return
 	}
 
+	var dataSourceCount int64
+	if err := database.DB.Model(&models.DataSource{}).Where("workspace_id = ?", id).Count(&dataSourceCount).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if dataSourceCount > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "该项目空间下存在数据源，无法删除"})
+		return
+	}
+
 	var count int64
 	if err := database.DB.Model(&models.Dataset{}).Where("workspace_id = ?", id).Count(&count).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

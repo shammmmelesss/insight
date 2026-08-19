@@ -16,6 +16,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext';
 import PortalSidebar from './PortalSidebar';
 import { fetchAllWorkUsers } from '../../lib/workUser';
 import { getCurrentUserId, getCurrentUserName } from '../../utils/currentUser';
+import { isEmbedMode } from '../../utils/embed';
 
 const { Header, Content } = AntLayout;
 const { Title } = Typography;
@@ -67,6 +68,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isDashboardRoute = location.pathname === '/dashboards' || location.pathname.startsWith('/dashboards/');
   // 新建/编辑看板为全屏编辑态，隐藏顶部导航
   const isDashboardEditRoute = location.pathname === '/dashboards/create' || location.pathname.startsWith('/dashboards/edit');
+  // 嵌入模式：被其它系统 iframe 嵌入时隐藏顶部导航
+  const embed = isEmbedMode();
+  const hideHeader = isDashboardEditRoute || embed;
   const { workspaces, currentWorkspace, setCurrentWorkspace } = useWorkspace();
 
   // 当前登录人（姓名取自 sessionStorage，头像按 openId 从全量用户列表匹配）
@@ -98,7 +102,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <AntLayout style={{ height: '100vh' }}>
-      {!isDashboardEditRoute && (
+      {!hideHeader && (
       <Header style={{ display: 'flex', alignItems: 'center', padding: '0 24px', background: '#fff', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
         <div style={{ display: 'flex', alignItems: 'center', width: '100%', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -142,7 +146,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {isDashboardRoute ? (
         children
       ) : (
-        <Content style={{ padding: '10px', background: '#f0f2f5', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
+        <Content style={{ padding: '10px', background: '#f0f2f5', display: 'flex', flexDirection: 'column', height: hideHeader ? '100vh' : 'calc(100vh - 64px)', overflow: 'hidden' }}>
           <div
             style={{
               background: '#fff',

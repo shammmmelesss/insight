@@ -11,6 +11,7 @@ import { dashboardCache } from '../../utils/dashboardCache';
 import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel} from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
 import { WorkUser, fetchAllWorkUsers } from '@/lib/workUser';
 import { canModifyRecord, displayCreator } from '../../utils/currentUser';
+import { isEmbedMode } from '../../utils/embed';
 
 // 解析看板的 sharedWith 字段（可能是 JSON 字符串或数组）
 const parseSharedWith = (raw: string | WorkUser[] | undefined): WorkUser[] => {
@@ -748,8 +749,11 @@ const DashboardsPage: React.FC = () => {
     return map;
   };
 
+  const embed = isEmbedMode();
+
   return (
-    <Layout style={{ height: 'calc(100vh - 64px)', overflow: 'hidden', position: 'relative' }}>
+    <Layout style={{ height: embed ? '100vh' : 'calc(100vh - 64px)', overflow: 'hidden', position: 'relative' }}>
+      {!embed && (
       <Sider
         width={240}
         collapsedWidth={0}
@@ -772,8 +776,9 @@ const DashboardsPage: React.FC = () => {
           onCollapse={() => setSiderCollapsed(!siderCollapsed)}
         />
       </Sider>
+      )}
 
-      {siderCollapsed && (
+      {!embed && siderCollapsed && (
         <Tooltip title="展开侧边栏" placement="right">
           <Button
             type="text"
@@ -931,7 +936,9 @@ const DashboardsPage: React.FC = () => {
               const chartMenuItems = [
                 { key: 'refresh', label: '刷新数据', onClick: () => refetchSingleChart(item.chartId) },
                 { key: 'sql', label: '查看SQL', icon: <CodeOutlined />, onClick: () => { setCurrentSQLChartId(item.chartId); setSqlModalVisible(true); } },
-                { key: 'edit', label: '编辑图表', onClick: () => navigate(`/chart-config?chartId=${item.chartId}`) },
+                ...(canModifyRecord(selectedDashboard.createdBy)
+                  ? [{ key: 'edit', label: '编辑图表', onClick: () => navigate(`/chart-config?chartId=${item.chartId}`) }]
+                  : []),
                 ...(chart?.type === 'crossTable' ? [{
                   key: 'download',
                   label: '下载数据',

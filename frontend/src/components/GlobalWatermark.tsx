@@ -1,6 +1,7 @@
 import { Watermark } from 'antd';
 import type { ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { isEmbedMode } from '@/utils/embed';
 
 /** 取邮箱 @ 前的前缀，无邮箱时回退到 username / openId */
 function emailPrefix(user: { email?: string; username?: string; openId?: string }): string {
@@ -13,6 +14,11 @@ function emailPrefix(user: { email?: string; username?: string; openId?: string 
  */
 export default function GlobalWatermark({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+
+  // 嵌入模式：由宿主系统负责水印，这里不再叠加全局水印
+  if (isEmbedMode()) {
+    return <>{children}</>;
+  }
 
   const content = user
     ? [user.name, emailPrefix(user)].filter(Boolean).join(' ')

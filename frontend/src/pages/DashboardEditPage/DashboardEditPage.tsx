@@ -595,7 +595,7 @@ const DashboardEditPage: React.FC = () => {
                         />
                       }
                     >
-                      <Button size="small" icon={<CalendarOutlined />} style={{ width: '100%', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <Button size="middle" icon={<CalendarOutlined />} style={{ width: '100%', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {filterValues[filter.id]
                           ? resolvedRangeLabel(filterValues[filter.id] as DateRangeFilterValue)
                           : '选择日期范围'}
@@ -603,7 +603,7 @@ const DashboardEditPage: React.FC = () => {
                     </Popover>
                   ) : (
                     <Select
-                      size="small"
+                      size="middle"
                       style={{ width: '100%' }}
                       mode={filter.type === 'multiple' ? 'multiple' : undefined}
                       maxTagCount="responsive"

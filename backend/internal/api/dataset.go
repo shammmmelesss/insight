@@ -22,7 +22,9 @@ import (
 	_ "github.com/oracle/oci-go-sdk/v65/database"
 )
 
-const queryTimeout = 30 * time.Second
+// queryTimeout 数据集查询（预览/字段值/取数）死线。
+// BigQuery 走 job 提交+轮询，大表 DISTINCT/聚合常需数十秒，30s 过短会在 job 未完成时被 ctx 掐断。
+const queryTimeout = 120 * time.Second
 
 var extractCancels sync.Map
 
@@ -1021,7 +1023,12 @@ func createClickHouseTable(tableName string, colTypes []*sql.ColumnType) error {
 	return err
 }
 
-// insertRows 将查询结果批量插入 ClickHouse
+// insertBatchSize 每批写入 ClickHouse 的行数。
+// 单个事务缓冲全部结果再一次性 Commit 会在大数据量时超时（并撑爆内存），
+// 因此按批分次提交，每批一个独立事务，保证单次写入体量可控。
+const insertBatchSize = 100000
+
+// insertRows 将查询结果分批写入 ClickHouse
 func insertRows(ctx context.Context, tableName string, colTypes []*sql.ColumnType, rows *sql.Rows) error {
 	ckDB := database.ClickHouseDB
 	colNames := make([]string, len(colTypes))
@@ -1034,31 +1041,68 @@ func insertRows(ctx context.Context, tableName string, colTypes []*sql.ColumnTyp
 	insertSQL := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
 		tableName, strings.Join(colNames, ","), placeholders)
 
-	tx, err := ckDB.Begin()
-	if err != nil {
-		return err
-	}
-	stmt, err := tx.Prepare(insertSQL)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-	defer stmt.Close()
-
 	vals := make([]interface{}, len(colTypes))
 	ptrs := make([]interface{}, len(colTypes))
 	for i := range vals {
 		ptrs[i] = &vals[i]
 	}
 
+	var (
+		tx   *sql.Tx
+		stmt *sql.Stmt
+		n    int // 当前批次已缓冲行数
+	)
+
+	// begin 开启一个新批次事务
+	begin := func() error {
+		var err error
+		tx, err = ckDB.Begin()
+		if err != nil {
+			return err
+		}
+		stmt, err = tx.Prepare(insertSQL)
+		if err != nil {
+			tx.Rollback()
+			tx = nil
+			return err
+		}
+		return nil
+	}
+
+	// flush 提交当前批次并重置状态
+	flush := func() error {
+		if stmt != nil {
+			stmt.Close()
+		}
+		err := tx.Commit()
+		tx, stmt, n = nil, nil, 0
+		return err
+	}
+
+	// rollback 回滚当前未提交的批次（用于错误路径）
+	rollback := func() {
+		if stmt != nil {
+			stmt.Close()
+		}
+		if tx != nil {
+			tx.Rollback()
+			tx, stmt = nil, nil
+		}
+	}
+
 	for rows.Next() {
 		if ctx.Err() != nil {
-			tx.Rollback()
+			rollback()
 			return ctx.Err()
 		}
 		if err := rows.Scan(ptrs...); err != nil {
-			tx.Rollback()
+			rollback()
 			return err
+		}
+		if tx == nil {
+			if err := begin(); err != nil {
+				return err
+			}
 		}
 		args := make([]interface{}, len(vals))
 		for i, v := range vals {
@@ -1069,12 +1113,27 @@ func insertRows(ctx context.Context, tableName string, colTypes []*sql.ColumnTyp
 			}
 		}
 		if _, err := stmt.Exec(args...); err != nil {
-			tx.Rollback()
+			rollback()
 			return err
+		}
+		n++
+		if n >= insertBatchSize {
+			if err := flush(); err != nil {
+				return err
+			}
 		}
 	}
 
-	return tx.Commit()
+	if err := rows.Err(); err != nil {
+		rollback()
+		return err
+	}
+
+	// 提交最后一个不满 batch 的批次
+	if tx != nil {
+		return flush()
+	}
+	return nil
 }
 
 // convertBytesToCKValue 将源库 []byte 值按目标 CK 类型转换为合适的 Go 类型

@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	"data-analysis-platform/internal/config"
 
@@ -20,6 +21,16 @@ func InitClickHouse(cfg *config.Config) error {
 			Username: cfg.ClickHouse.User,
 			Password: cfg.ClickHouse.Password,
 		},
+		// 大数据量写入时，单批 Commit 需要较长的读超时，避免客户端提前超时
+		DialTimeout: 30 * time.Second,
+		ReadTimeout: 10 * time.Minute,
+		Settings: chdriver.Settings{
+			// 兜底的服务端单次执行时限；分批写入后每批都是秒级，此处仅防异常查询无限跑
+			"max_execution_time": 1800,
+		},
+		MaxOpenConns:    10,
+		MaxIdleConns:    5,
+		ConnMaxLifetime: time.Hour,
 	}
 
 	conn := chdriver.OpenDB(opts)

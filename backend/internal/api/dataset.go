@@ -42,6 +42,7 @@ func RegisterDatasetRoutes(rg *gin.RouterGroup) {
 		dataset.GET("/:id/field-values", GetDatasetFieldValues)
 		dataset.GET("/:id/charts", GetDatasetCharts)
 		dataset.POST("/preview", PreviewDataset)
+		dataset.POST("/parse-fields", ParseDatasetFields)
 		dataset.POST("/:id/extract", TriggerExtract)
 		dataset.POST("/:id/stop-extract", StopExtract)
 		dataset.POST("/:id/clear-data", ClearExtractData)
@@ -719,7 +720,10 @@ func PreviewDataset(c *gin.Context) {
 	}
 	defer db.Close()
 
-	if err := db.Ping(); err != nil {
+	// 连接探测加 5s 死线，避免源库不可达时无界阻塞请求
+	pingCtx, pingCancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+	defer pingCancel()
+	if err := db.PingContext(pingCtx); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据库连接测试失败: " + err.Error()})
 		return
 	}
@@ -804,6 +808,102 @@ func execPreviewQuery(c *gin.Context, db *sql.DB, querySQL string) {
 		"data":    resultData,
 		"columns": columns,
 	})
+}
+
+// ParseDatasetFields 仅解析查询字段（列名/类型），不真正执行查询、不扫描数据。
+// 通过把 SQL 包一层"零行"查询（LIMIT 0 / TOP 0 等）实现：数据库只返回结果集的列元数据。
+// 对 BigQuery 而言 LIMIT 0 处理 0 字节，等效 dry run，可绕开大表全表扫的耗时与费用。
+func ParseDatasetFields(c *gin.Context) {
+	var req struct {
+		SQL          string `json:"sql" binding:"required"`
+		DataSourceId string `json:"dataSourceId"`
+		DatasetId    string `json:"datasetId"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误: " + err.Error()})
+		return
+	}
+
+	// 抽取类型数据集直接查 ClickHouse
+	if req.DatasetId != "" {
+		var ds models.Dataset
+		if err := database.DB.First(&ds, "id = ?", req.DatasetId).Error; err == nil &&
+			ds.Type == models.DatasetTypeExtract {
+			if database.ClickHouseDB == nil {
+				c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ClickHouse 未连接"})
+				return
+			}
+			execParseFields(c, database.ClickHouseDB, wrapZeroRowQuery("clickhouse", req.SQL))
+			return
+		}
+	}
+
+	if req.DataSourceId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误: dataSourceId 不能为空"})
+		return
+	}
+
+	var dataSource models.DataSource
+	if err := database.DB.First(&dataSource, "id = ?", req.DataSourceId).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "数据源不存在"})
+		return
+	}
+
+	db, err := connectToDataSource(dataSource)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "连接数据源失败: " + err.Error()})
+		return
+	}
+	defer db.Close()
+
+	execParseFields(c, db, wrapZeroRowQuery(dataSource.Type, req.SQL))
+}
+
+// wrapZeroRowQuery 将查询包成"零行"查询，只取列结构不扫描数据（各库方言语法不同）
+func wrapZeroRowQuery(dsType, querySQL string) string {
+	switch dsType {
+	case "SQL Server", "sqlserver":
+		return fmt.Sprintf("SELECT TOP 0 * FROM (%s) AS __parse_fields", querySQL)
+	case "Oracle", "oracle":
+		return fmt.Sprintf("SELECT * FROM (%s) __parse_fields WHERE ROWNUM < 1", querySQL)
+	default:
+		// MySQL / PostgreSQL / BigQuery / ClickHouse 等均支持 LIMIT
+		return fmt.Sprintf("SELECT * FROM (%s) AS __parse_fields LIMIT 0", querySQL)
+	}
+}
+
+// execParseFields 执行零行查询，仅返回列元数据（不读取任何数据行）
+func execParseFields(c *gin.Context, db *sql.DB, querySQL string) {
+	ctx, cancel := context.WithTimeout(c.Request.Context(), queryTimeout)
+	defer cancel()
+
+	rows, err := db.QueryContext(ctx, querySQL)
+	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			c.JSON(http.StatusRequestTimeout, gin.H{"error": "解析字段超时，请检查SQL"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "解析字段失败: " + err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取列信息失败: " + err.Error()})
+		return
+	}
+
+	columns := make([]map[string]interface{}, 0, len(columnTypes))
+	for _, colType := range columnTypes {
+		columns = append(columns, map[string]interface{}{
+			"name": colType.Name(),
+			"type": colType.DatabaseTypeName(),
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"columns": columns})
 }
 
 // GetDatasetCharts 获取使用特定数据集的图表列表

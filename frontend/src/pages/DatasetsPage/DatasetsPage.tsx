@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { App, Button, Card, Table, Modal, Drawer, Form, Input, Tabs, Row, Col, Select, Radio, TimePicker, Tooltip, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined, SyncOutlined, CheckCircleOutlined, CloseCircleOutlined, StopOutlined, ClearOutlined, ShareAltOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined, SyncOutlined, CheckCircleOutlined, CloseCircleOutlined, StopOutlined, ClearOutlined, ShareAltOutlined, FileSearchOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { Dataset, CreateDatasetRequest, UpdateDatasetRequest, FieldConfig, DataType, DatasetType, ExtractSchedule, ExtractFrequency, ExtractStatus } from '@shared/api.interface';
@@ -37,6 +37,7 @@ const DatasetsPage: React.FC = () => {
   const [sqlResult, setSqlResult] = useState<any[]>([]);
   const [sqlColumns, setSqlColumns] = useState<any[]>([]);
   const [runningSql, setRunningSql] = useState(false);
+  const [parsingFields, setParsingFields] = useState(false);
   const [activeTab, setActiveTab] = useState('query');
   const [fieldsConfig, setFieldsConfig] = useState<FieldConfig[]>([]);
   const [dataSources, setDataSources] = useState<any[]>([]);
@@ -105,6 +106,54 @@ const DatasetsPage: React.FC = () => {
     }
   };
 
+  // 根据返回的列生成字段配置：复用已有普通字段的用户配置，追加保留计算字段
+  const buildFieldsConfig = (columns: any[]): FieldConfig[] => {
+    const existingMap = new Map(
+      fieldsConfig.filter(f => !f.isCalculated).map(f => [f.originalName, f])
+    );
+    const calculatedFields = fieldsConfig.filter(f => f.isCalculated);
+    const sqlFields: FieldConfig[] = (columns || []).map((col: any) => {
+      const existing = existingMap.get(col.name);
+      if (existing) return existing;
+      const dataType = mapDbTypeToDataType(col.type);
+      const fieldType: FieldConfig['type'] = dataType === 'number' ? 'measure' : 'dimension';
+      return {
+        originalName: col.name,
+        displayName: col.name,
+        type: fieldType,
+        dataType: dataType,
+      };
+    });
+    return [...sqlFields, ...calculatedFields];
+  };
+
+  // 解析字段：仅拉取列结构，不发起实际查询（后端走零行查询/LIMIT 0），适合大表/BigQuery
+  const parseFields = async () => {
+    if (!formValues.sql.trim()) {
+      message.error('请输入SQL查询语句');
+      return;
+    }
+    if (!selectedDataSource) {
+      message.error('请选择数据源');
+      return;
+    }
+    try {
+      setParsingFields(true);
+      const response = await axios.post('/api/datasets/parse-fields', {
+        sql: formValues.sql,
+        dataSourceId: selectedDataSource,
+      });
+      setFieldsConfig(buildFieldsConfig(response.data.columns || []));
+      message.success('字段解析成功');
+      setActiveTab('fields');
+    } catch (error) {
+      message.error('字段解析失败');
+      console.error('字段解析失败:', error);
+    } finally {
+      setParsingFields(false);
+    }
+  };
+
   // 运行SQL
   const runSql = async () => {
     try {
@@ -131,26 +180,9 @@ const DatasetsPage: React.FC = () => {
       
       setSqlResult(response.data.data || []);
       setSqlColumns(response.data.columns || []);
-      
-      // 生成字段配置：复用已有普通字段的用户配置，追加保留计算字段
-      const existingMap = new Map(
-        fieldsConfig.filter(f => !f.isCalculated).map(f => [f.originalName, f])
-      );
-      const calculatedFields = fieldsConfig.filter(f => f.isCalculated);
-      const sqlFields: FieldConfig[] = (response.data.columns || []).map((col: any) => {
-        const existing = existingMap.get(col.name);
-        if (existing) return existing;
-        const dataType = mapDbTypeToDataType(col.type);
-        const fieldType: FieldConfig['type'] = dataType === 'number' ? 'measure' : 'dimension';
-        return {
-          originalName: col.name,
-          displayName: col.name,
-          type: fieldType,
-          dataType: dataType,
-        };
-      });
-      setFieldsConfig([...sqlFields, ...calculatedFields]);
-      
+
+      setFieldsConfig(buildFieldsConfig(response.data.columns || []));
+
       message.success('SQL运行成功');
       setActiveTab('fields');
     } catch (error) {
@@ -772,15 +804,27 @@ const DatasetsPage: React.FC = () => {
                     onChange={(e) => setFormValues({...formValues, sql: e.target.value})}
                     style={{ fontFamily: 'monospace', flex: 1 }}
                   />
-                  <Button
-                    type="primary"
-                    icon={<PlayCircleOutlined />}
-                    onClick={runSql}
-                    loading={runningSql}
-                    style={{ height: 'fit-content', whiteSpace: 'nowrap' }}
-                  >
-                    试运行
-                  </Button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <Button
+                      type="primary"
+                      icon={<PlayCircleOutlined />}
+                      onClick={runSql}
+                      loading={runningSql}
+                      style={{ whiteSpace: 'nowrap' }}
+                    >
+                      试运行
+                    </Button>
+                    <Tooltip title="仅解析字段结构，不执行实际查询（适合大表/BigQuery）">
+                      <Button
+                        icon={<FileSearchOutlined />}
+                        onClick={parseFields}
+                        loading={parsingFields}
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        解析字段
+                      </Button>
+                    </Tooltip>
+                  </div>
                 </div>
               </Form.Item>
 

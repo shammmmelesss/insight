@@ -15,7 +15,8 @@ import { renderIndicatorCard } from './ChartRenderer/indicatorCard';
 import { downloadSensitiveCsv } from '../utils/csvDownload';
 
 export interface ChartRendererHandle {
-  downloadCrossTable: (fileName?: string) => Promise<void>;
+  /** 下载当前图表的数据为 CSV（支持所有图表类型） */
+  downloadData: (fileName?: string) => Promise<void>;
 }
 
 interface ChartRendererProps {
@@ -82,7 +83,8 @@ const ChartRenderer = forwardRef<ChartRendererHandle, ChartRendererProps>(({
       insetBottom: 10,
     });
 
-    chart.interaction('tooltip', { enterable: true });
+    // 将 tooltip 挂载到 body，避免被容器的 overflow:hidden 裁剪（G2 会按画布偏移正确定位）
+    chart.interaction('tooltip', { enterable: true, mount: document.body });
     chartConfig(chart);
     chart.render();
     chartInstanceRef.current = chart;
@@ -203,14 +205,42 @@ const ChartRenderer = forwardRef<ChartRendererHandle, ChartRendererProps>(({
     };
   }, [chartType, chartData, rowFields, colFields, measureFields, xAxisFields, yAxisFields, y2AxisFields, groupFields, indicatorFields, containerHeight, fieldFormats]);
 
-  const handleDownloadCrossTable = async (fileName = 'cross_table') => {
-    const s2 = chartInstanceRef.current as PivotSheet;
-    if (!s2) return;
-    const data = await asyncGetAllPlainData({ sheetInstance: s2, split: ',', formatOptions: true });
-    await downloadSensitiveCsv(data, fileName);
+  // CSV 字段转义：含逗号/引号/换行时用双引号包裹并转义内部引号
+  const escapeCsvCell = (value: unknown): string => {
+    const s = value == null ? '' : String(value);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
 
-  useImperativeHandle(ref, () => ({ downloadCrossTable: handleDownloadCrossTable }));
+  // 由 chartData 构建 CSV（用于 G2 类图表：柱/线/饼/双轴/指标卡）
+  const buildDataCsv = (): string => {
+    if (!chartData.length) return '';
+    const keys = Array.from(
+      chartData.reduce<Set<string>>((set, row) => {
+        Object.keys(row).forEach((k) => set.add(k));
+        return set;
+      }, new Set<string>())
+    );
+    const header = keys.map((k) => escapeCsvCell(getFieldLabel(k))).join(',');
+    const rows = chartData.map((row) =>
+      keys.map((k) => escapeCsvCell(fmt.formatValue(row[k], fieldFormats[k]))).join(',')
+    );
+    return [header, ...rows].join('\n');
+  };
+
+  const handleDownloadData = async (fileName = 'chart') => {
+    if (chartType === 'crossTable') {
+      const s2 = chartInstanceRef.current as PivotSheet;
+      if (!s2) return;
+      const data = await asyncGetAllPlainData({ sheetInstance: s2, split: ',', formatOptions: true });
+      await downloadSensitiveCsv(data, fileName);
+      return;
+    }
+    const csv = buildDataCsv();
+    if (!csv) return;
+    await downloadSensitiveCsv(csv, fileName);
+  };
+
+  useImperativeHandle(ref, () => ({ downloadData: handleDownloadData }));
 
   return (
     <div style={{ width: '100%', height: containerHeight ? `${containerHeight}px` : '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

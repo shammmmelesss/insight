@@ -939,10 +939,10 @@ const DashboardsPage: React.FC = () => {
                 ...(canModifyRecord(selectedDashboard.createdBy)
                   ? [{ key: 'edit', label: '编辑图表', onClick: () => navigate(`/chart-config?chartId=${item.chartId}`) }]
                   : []),
-                ...(chart?.type === 'crossTable' ? [{
+                ...(hasData && !isEmpty ? [{
                   key: 'download',
                   label: '下载数据',
-                  onClick: () => getChartRef(item.chartId).current?.downloadCrossTable(chart?.name || 'cross_table'),
+                  onClick: () => getChartRef(item.chartId).current?.downloadData(chart?.name || 'chart'),
                 }] : []),
               ];
               const appliedFilters = filters.filter(f => f.charts.length === 0 || f.charts.includes(item.chartId));

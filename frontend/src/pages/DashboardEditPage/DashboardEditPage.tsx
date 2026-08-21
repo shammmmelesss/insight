@@ -680,7 +680,7 @@ const DashboardEditPage: React.FC = () => {
                                 label: '复制图表',
                                 onClick: () => handleCopyChart(item),
                               },
-                              ...(chart?.type === 'crossTable' ? [{
+                              {
                                 key: 'download',
                                 label: '下载数据',
                                 onClick: () => {
@@ -691,9 +691,9 @@ const DashboardEditPage: React.FC = () => {
                                     const v = String(r[h] ?? '');
                                     return v.includes(',') || v.includes('"') || v.includes('\n') ? `"${v.replace(/"/g, '""')}"` : v;
                                   }).join(','))].join('\n');
-                                  downloadSensitiveCsv(csv, chart?.name || 'cross_table');
+                                  downloadSensitiveCsv(csv, chart?.name || 'chart');
                                 },
-                              }] : []),
+                              },
                               { type: 'divider' as const },
                               {
                                 key: 'remove',

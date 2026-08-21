@@ -19,6 +19,10 @@ import (
 	"data-analysis-platform/internal/models"
 )
 
+// storageAccelExpectRows 是判定"本应走 Storage 却没走"的行数阈值。
+// 低于此值走 REST 属官方 client 正常优化（小结果不建 ReadSession），不算降级。
+const storageAccelExpectRows = 500000
+
 // extractBigQueryToStaging 使用 BigQuery Storage Read API 抽取数据并写入 staging 表。
 //
 // 相比 database/sql 走的 REST + 逐行 JSON 解码（纯 CPU 密集、大结果集会吃满多核），
@@ -130,11 +134,13 @@ func extractBigQueryToStaging(ctx context.Context, dataSource models.DataSource,
 
 	// 显式记录本次抽取的读取通道，便于确认 Storage 加速是否真正生效：
 	//   accelerated=true  → 走了 Storage Read API（Arrow 流，低 CPU）
-	//   accelerated=false → 退回官方 REST 逐行读取（小结果集属正常；大结果集则说明
-	//                       Storage 未生效，需排查 readsessions 权限 / Storage API 开关）
+	//   accelerated=false → 退回官方 REST 逐行读取。小结果集走 REST 属正常——官方 client
+	//                       对小结果故意不建 ReadSession（固定开销不划算）；仅当结果集足够
+	//                       大（超过 storageAccelExpectRows）却仍未加速，才可能是 Storage
+	//                       未生效（readsessions 权限 / Storage API 开关），标 DEGRADED 需排查。
 	accelerated := it.IsAccelerated()
 	level := "OK"
-	if storageEnabled && !accelerated && rowCount > 0 {
+	if storageEnabled && !accelerated && rowCount >= storageAccelExpectRows {
 		level = "DEGRADED"
 	}
 	log.Printf("[extract] BigQuery 抽取完成 table=%s rows=%d storage_enabled=%v accelerated=%v [%s]",

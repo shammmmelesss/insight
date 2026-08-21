@@ -17,7 +17,9 @@ export const isDev =
   typeof location !== 'undefined' &&
   (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
 
-const WORK_USER_API = 'https://work.learnings.ai/work/v1/user';
+// 走后端同源代理，避免浏览器直连第三方域名触发 CORS / 私有网络访问(PNA)拦截；
+// 后端会把当前请求的 Cookie 转发给 work.learnings.ai 完成鉴权。
+const WORK_USER_API = '/api/lark/work-users';
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 分钟
 
@@ -35,7 +37,7 @@ export async function fetchAllWorkUsers(): Promise<WorkUser[]> {
   }
   if (!fetchPromise) {
     fetchPromise = axios
-      .get(WORK_USER_API, { withCredentials: true })
+      .get(WORK_USER_API)
       .then((res) => {
         const list: any[] = res.data?.data?.userList || [];
         const users = list

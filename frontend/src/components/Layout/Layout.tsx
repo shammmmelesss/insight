@@ -9,7 +9,6 @@ import {
   SwapOutlined,
   SettingOutlined,
   MonitorOutlined,
-  CodeOutlined,
   UserOutlined,
 } from '@ant-design/icons';
 import { useWorkspace } from '../../contexts/WorkspaceContext';

@@ -17,7 +17,9 @@ interface NavItem {
   application?: { id: string; name: string; homepage: string };
 }
 
-const PORTAL_API = 'https://work.learnings.ai/portal/api/workplace/v1';
+// 走后端同源代理，避免浏览器直连第三方域名触发 CORS / 私有网络访问(PNA)拦截；
+// 后端会把当前请求的 Cookie 转发给 work.learnings.ai 完成鉴权。
+const PORTAL_API = '/api/portal';
 
 function extractAppList(data: any): PortalApp[] {
   if (!data) return [];

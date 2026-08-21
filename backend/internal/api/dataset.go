@@ -26,6 +26,11 @@ import (
 // BigQuery 走 job 提交+轮询，大表 DISTINCT/聚合常需数十秒，30s 过短会在 job 未完成时被 ctx 掐断。
 const queryTimeout = 120 * time.Second
 
+// extractTimeout 单次抽取的死线。抽取会全量拉取源表并写入 ClickHouse，
+// 正常大表也可能耗时数分钟，但必须有上界：否则源库查询挂死时抽取会无限期
+// 空转吃满 CPU、永远停不下来（UI 上一直显示"抽取中"），拖垮整个平台。
+const extractTimeout = 60 * time.Minute
+
 var extractCancels sync.Map
 
 // RegisterDatasetRoutes 注册数据集路由
@@ -951,7 +956,7 @@ func TriggerExtract(c *gin.Context) {
 		"extract_error":  "",
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), extractTimeout)
 	extractCancels.Store(dataset.ID.String(), cancel)
 
 	// 异步执行抽取
@@ -963,10 +968,7 @@ func TriggerExtract(c *gin.Context) {
 		err := doExtract(ctx, dataset)
 		now := time.Now()
 		if err != nil {
-			errMsg := err.Error()
-			if ctx.Err() != nil {
-				errMsg = "已手动停止"
-			}
+			errMsg := extractErrMsg(ctx, err)
 			database.DB.Model(&dataset).Updates(map[string]interface{}{
 				"extract_status":  models.ExtractStatusFailed,
 				"extract_error":   errMsg,
@@ -984,20 +986,59 @@ func TriggerExtract(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "抽取任务已启动"})
 }
 
-// doExtract 执行数据抽取：从源数据库读取并写入 ClickHouse
+// doExtract 执行数据抽取：从源数据库读取并写入 ClickHouse。
+// BigQuery 走 Storage Read API（Arrow 流式，CPU/吞吐远优于 REST+JSON），
+// 其余数据源走通用 database/sql 路径。两者都写入 staging 表后原子切换为正式表，
+// 避免"先删后写"在抽取期间产生数据真空期，且中途失败不会破坏已有数据。
 func doExtract(ctx context.Context, dataset models.Dataset) error {
 	var dataSource models.DataSource
 	if err := database.DB.First(&dataSource, "id = ?", dataset.DataSourceID).Error; err != nil {
 		return fmt.Errorf("数据源不存在: %w", err)
 	}
 
+	tableName := "ds_" + strings.ReplaceAll(dataset.ID.String(), "-", "_")
+	stagingName := tableName + "_staging"
+
+	// 抽取失败或被中止时，清理 staging 表，保证正式表数据不受影响
+	committed := false
+	defer func() {
+		if !committed && database.ClickHouseDB != nil {
+			database.ClickHouseDB.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", stagingName))
+		}
+	}()
+
+	if isBigQuery(dataSource.Type) {
+		if err := extractBigQueryToStaging(ctx, dataSource, dataset.SQL, stagingName); err != nil {
+			return err
+		}
+	} else {
+		if err := extractSQLToStaging(ctx, dataSource, dataset.SQL, stagingName); err != nil {
+			return err
+		}
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	// 原子切换：将 staging 表替换为正式表
+	if err := swapStagingTable(tableName, stagingName); err != nil {
+		return fmt.Errorf("切换数据表失败: %w", err)
+	}
+	committed = true
+
+	return nil
+}
+
+// extractSQLToStaging 通用 database/sql 抽取路径：执行 SQL 并把结果写入 staging 表。
+func extractSQLToStaging(ctx context.Context, dataSource models.DataSource, query, stagingName string) error {
 	srcDB, err := connectToDataSource(dataSource)
 	if err != nil {
 		return fmt.Errorf("连接数据源失败: %w", err)
 	}
 	defer srcDB.Close()
 
-	rows, err := srcDB.QueryContext(ctx, dataset.SQL)
+	rows, err := srcDB.QueryContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("执行 SQL 失败: %w", err)
 	}
@@ -1008,23 +1049,49 @@ func doExtract(ctx context.Context, dataset models.Dataset) error {
 		return fmt.Errorf("获取列信息失败: %w", err)
 	}
 
-	tableName := "ds_" + strings.ReplaceAll(dataset.ID.String(), "-", "_")
-
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	// 建表 DDL
-	if err := createClickHouseTable(tableName, colTypes); err != nil {
+	// 在 staging 表上建表 DDL（会先清理可能残留的旧 staging 表）
+	if err := createClickHouseTable(stagingName, colTypes); err != nil {
 		return fmt.Errorf("建表失败: %w", err)
 	}
 
-	// 批量写入
-	if err := insertRows(ctx, tableName, colTypes, rows); err != nil {
+	// 批量写入 staging 表
+	if err := insertRows(ctx, stagingName, colTypes, rows); err != nil {
 		return fmt.Errorf("写入数据失败: %w", err)
 	}
-
 	return nil
+}
+
+// swapStagingTable 将写好数据的 staging 表原子切换为正式表。
+// 正式表已存在时使用 EXCHANGE TABLES（原子交换，无数据真空期），
+// 交换后旧正式表数据留在 staging 名下，随后删除；正式表不存在时直接重命名。
+func swapStagingTable(tableName, stagingName string) error {
+	ckDB := database.ClickHouseDB
+
+	var exists uint8
+	if err := ckDB.QueryRow(fmt.Sprintf("EXISTS TABLE %s", tableName)).Scan(&exists); err != nil {
+		return err
+	}
+
+	if exists == 1 {
+		if _, err := ckDB.Exec(fmt.Sprintf("EXCHANGE TABLES %s AND %s", tableName, stagingName)); err == nil {
+			// 交换后 staging 名下是旧数据，删除即可（失败不影响正式表）
+			ckDB.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", stagingName))
+			return nil
+		}
+		// EXCHANGE 失败（例如库引擎为 Ordinary 而非 Atomic，不支持原子交换），
+		// 退回"删除正式表 + 重命名 staging"。此路径存在极短的数据空窗，但仍避免了
+		// 长时间写入过程中的真空期，且旧表被删前 staging 数据已写好。
+		if _, err := ckDB.Exec(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)); err != nil {
+			return err
+		}
+	}
+
+	_, err := ckDB.Exec(fmt.Sprintf("RENAME TABLE %s TO %s", stagingName, tableName))
+	return err
 }
 
 // StopExtract 停止正在运行的抽取任务
@@ -1288,8 +1355,39 @@ func mapToCKType(dbType string) string {
 	}
 }
 
+// extractErrMsg 根据 ctx 结束原因给出更准确的失败说明：
+// 手动停止 → "已手动停止"；到达抽取死线 → 超时提示；否则用原始错误。
+func extractErrMsg(ctx context.Context, err error) string {
+	switch ctx.Err() {
+	case context.Canceled:
+		return "已手动停止"
+	case context.DeadlineExceeded:
+		return fmt.Sprintf("抽取超时（超过 %s），请优化 SQL 或缩小数据范围", extractTimeout)
+	default:
+		return err.Error()
+	}
+}
+
+// resetOrphanedExtracts 在服务启动时把残留的 running 状态重置为 failed。
+// 抽取 goroutine 只存在于进程内存中，进程崩溃/重启后这些任务实际已消失，
+// 但数据库状态仍停在 running，导致 UI 永久显示"抽取中"且无法再次触发。
+func resetOrphanedExtracts() {
+	result := database.DB.Model(&models.Dataset{}).
+		Where("type = ? AND extract_status = ?", models.DatasetTypeExtract, models.ExtractStatusRunning).
+		Updates(map[string]interface{}{
+			"extract_status": models.ExtractStatusFailed,
+			"extract_error":  "服务重启，上次抽取已中断，请重新抽取",
+		})
+	if result.Error != nil {
+		log.Printf("[scheduler] failed to reset orphaned extracts: %v", result.Error)
+	} else if result.RowsAffected > 0 {
+		log.Printf("[scheduler] reset %d orphaned running extract(s) to failed", result.RowsAffected)
+	}
+}
+
 // StartExtractScheduler 每分钟检查一次，触发到点的抽取任务
 func StartExtractScheduler() {
+	resetOrphanedExtracts()
 	go func() {
 		for {
 			now := time.Now()
@@ -1372,7 +1470,7 @@ func runScheduledExtracts() {
 			"extract_status": models.ExtractStatusRunning,
 			"extract_error":  "",
 		})
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), extractTimeout)
 		extractCancels.Store(dataset.ID.String(), cancel)
 		go func() {
 			defer func() {
@@ -1382,10 +1480,7 @@ func runScheduledExtracts() {
 			err := doExtract(ctx, dataset)
 			t := time.Now()
 			if err != nil {
-				errMsg := err.Error()
-				if ctx.Err() != nil {
-					errMsg = "已手动停止"
-				}
+				errMsg := extractErrMsg(ctx, err)
 				database.DB.Model(&dataset).Updates(map[string]interface{}{
 					"extract_status":  models.ExtractStatusFailed,
 					"extract_error":   errMsg,

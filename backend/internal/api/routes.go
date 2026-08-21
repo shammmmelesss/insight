@@ -22,6 +22,8 @@ func RegisterRoutes(r *gin.Engine) {
 		RegisterMonitorRoutes(api)
 		// 飞书路由
 		RegisterLarkRoutes(api)
+		// 门户（产品与服务）代理路由
+		RegisterPortalRoutes(api)
 		// 当前用户
 		api.GET("/me", GetMe)
 		// 首页最近更新路由

@@ -5,10 +5,11 @@ import { G2_COLORS, LINE_LEGEND_HEIGHT, SLIDER_CONFIG } from './constants';
 // 渲染折线图
 export const renderLineChart = (ctx: RenderContext) => {
   const {
-    container, chartData, xAxisFields, yAxisFields, groupFields,
+    container, chartData: rawChartData, xAxisFields, yAxisFields, groupFields,
     getFieldLabel, formatValue, formatAxisValue, getActualField, buildFormatLookup,
     createAndRenderG2Chart, renderCustomLegend, hiddenSeriesRef,
   } = ctx;
+  let chartData = rawChartData;
 
   if (chartData.length === 0) {
     showMessage(container, '暂无数据');
@@ -33,10 +34,20 @@ export const renderLineChart = (ctx: RenderContext) => {
     return;
   }
 
-  // 处理分组字段
+  // 处理分组字段：支持多个分组字段，合并为一个复合分组列（值1-值2）
+  const actualGroupFields = (Array.isArray(groupFields) ? groupFields : [])
+    .filter(f => f)
+    .map(f => getActualField(f, dataFields));
   let actualGroupField = '';
-  if (Array.isArray(groupFields) && groupFields.length > 0 && groupFields[0]) {
-    actualGroupField = getActualField(groupFields[0], dataFields);
+  if (actualGroupFields.length === 1) {
+    actualGroupField = actualGroupFields[0];
+  } else if (actualGroupFields.length > 1) {
+    // 多个分组字段：在每行注入合成的复合分组列
+    actualGroupField = '_group';
+    chartData = chartData.map(item => ({
+      ...item,
+      _group: actualGroupFields.map(f => String(item[f] ?? '')).join('-'),
+    }));
   }
 
   // 根据数据量决定X轴标签展示策略：少量数据水平展示，大量数据旋转+稀疏
@@ -143,17 +154,42 @@ export const renderLineChart = (ctx: RenderContext) => {
     if (hasLegend) renderCustomLegend(seriesItems);
   } else {
     // 多Y轴：将宽格式数据转换为长格式
-    const multiSeriesItems = actualYFields.map((f, i) => ({ name: getFieldLabel(f), color: G2_COLORS[i % G2_COLORS.length] }));
-    const visibleMetrics = new Set(multiSeriesItems.filter(s => !hiddenSeriesRef.current.has(s.name)).map(s => s.name));
+    // 有分组时，系列名为「分组值-指标」的笛卡尔积；无分组时仅为指标名
+    const uniqueGroups = actualGroupField
+      ? [...new Set(chartData.map(item => String(item[actualGroupField] ?? '')))].filter(g => g !== '')
+      : [];
+    const makeSeriesName = (yField: string, groupValue?: string) =>
+      actualGroupField && groupValue !== undefined
+        ? `${groupValue}-${getFieldLabel(yField)}`
+        : getFieldLabel(yField);
+
+    const multiSeriesItems: SeriesItem[] = [];
+    if (actualGroupField) {
+      let colorIdx = 0;
+      uniqueGroups.forEach(groupValue => {
+        actualYFields.forEach(f => {
+          multiSeriesItems.push({ name: makeSeriesName(f, groupValue), color: G2_COLORS[colorIdx % G2_COLORS.length] });
+          colorIdx++;
+        });
+      });
+    } else {
+      actualYFields.forEach((f, i) => {
+        multiSeriesItems.push({ name: makeSeriesName(f), color: G2_COLORS[i % G2_COLORS.length] });
+      });
+    }
+    const visibleSeries = new Set(multiSeriesItems.filter(s => !hiddenSeriesRef.current.has(s.name)).map(s => s.name));
 
     const longData: ChartDatum[] = [];
     chartData.forEach(item => {
+      const groupValue = actualGroupField ? String(item[actualGroupField] ?? '') : undefined;
       actualYFields.forEach(yField => {
         const value = Number(item[yField]) || 0;
-        if (!isNaN(value) && visibleMetrics.has(getFieldLabel(yField))) {
+        const seriesName = makeSeriesName(yField, groupValue);
+        if (!isNaN(value) && visibleSeries.has(seriesName)) {
           longData.push({
             ...item,
-            _metric: getFieldLabel(yField),
+            _metric: seriesName,
+            _yField: yField,
             _value: value,
           });
         }
@@ -200,11 +236,10 @@ export const renderLineChart = (ctx: RenderContext) => {
           title: (d: any) => String(d[actualXField] ?? ''),
           items: [
             (d: any) => {
-              const metric = String(d._metric ?? '');
-              const yField = actualYFields.find(f => getFieldLabel(f) === metric) ?? '';
+              const yField = String(d._yField ?? '');
               return {
-                name: metric,
-                value: formatValue(lineXMetricsMap[String(d[actualXField] ?? '')]?.[yField], yFormatLookup[yField]),
+                name: String(d._metric ?? ''),
+                value: formatValue(d._value ?? lineXMetricsMap[String(d[actualXField] ?? '')]?.[yField], yFormatLookup[yField]),
               };
             },
           ],

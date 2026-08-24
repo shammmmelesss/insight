@@ -5,10 +5,11 @@ import { G2_COLORS, LINE_LEGEND_HEIGHT, SLIDER_CONFIG } from './constants';
 // 渲染柱状图
 export const renderBarChart = (ctx: RenderContext) => {
   const {
-    container, chartData, xAxisFields, yAxisFields, groupFields,
+    container, chartData: rawChartData, xAxisFields, yAxisFields, groupFields,
     getFieldLabel, formatValue, formatAxisValue, getActualField, buildFormatLookup,
     createAndRenderG2Chart, renderCustomLegend, hiddenSeriesRef,
   } = ctx;
+  let chartData = rawChartData;
 
   if (chartData.length === 0) {
     showMessage(container, '暂无数据');
@@ -33,10 +34,20 @@ export const renderBarChart = (ctx: RenderContext) => {
     return;
   }
 
-  // 处理分组字段
+  // 处理分组字段：支持多个分组字段，合并为一个复合分组列（值1-值2）
+  const actualGroupFields = (Array.isArray(groupFields) ? groupFields : [])
+    .filter(f => f)
+    .map(f => getActualField(f, dataFields));
   let actualGroupField = '';
-  if (Array.isArray(groupFields) && groupFields.length > 0 && groupFields[0]) {
-    actualGroupField = getActualField(groupFields[0], dataFields);
+  if (actualGroupFields.length === 1) {
+    actualGroupField = actualGroupFields[0];
+  } else if (actualGroupFields.length > 1) {
+    // 多个分组字段：在每行注入合成的复合分组列
+    actualGroupField = '_group';
+    chartData = chartData.map(item => ({
+      ...item,
+      _group: actualGroupFields.map(f => String(item[f] ?? '')).join('-'),
+    }));
   }
 
   // 根据数据量决定X轴标签展示策略：少量数据水平展示，大量数据旋转+稀疏
@@ -128,14 +139,47 @@ export const renderBarChart = (ctx: RenderContext) => {
     }
   } else {
     // 多Y轴：将宽格式数据转换为长格式（跳过被图例隐藏的系列）
+    // 有分组时，系列名为「分组值-指标」的笛卡尔积；无分组时仅为指标名
+    const uniqueGroups = actualGroupField
+      ? [...new Set(chartData.map(item => String(item[actualGroupField] ?? '')))].filter(g => g !== '')
+      : [];
+    const makeSeriesName = (yField: string, groupValue?: string) =>
+      actualGroupField && groupValue !== undefined
+        ? `${groupValue}-${getFieldLabel(yField)}`
+        : getFieldLabel(yField);
+
+    // 系列名 → 颜色映射（与图例/柱子保持一致）
+    const barColorMap: Record<string, string> = {};
+    const seriesNames: string[] = [];
+    if (actualGroupField) {
+      let colorIdx = 0;
+      uniqueGroups.forEach(groupValue => {
+        actualYFields.forEach(f => {
+          const name = makeSeriesName(f, groupValue);
+          seriesNames.push(name);
+          barColorMap[name] = G2_COLORS[colorIdx % G2_COLORS.length];
+          colorIdx++;
+        });
+      });
+    } else {
+      actualYFields.forEach((f, i) => {
+        const name = makeSeriesName(f);
+        seriesNames.push(name);
+        barColorMap[name] = G2_COLORS[i % G2_COLORS.length];
+      });
+    }
+
     const longData: ChartDatum[] = [];
     chartData.forEach(item => {
+      const groupValue = actualGroupField ? String(item[actualGroupField] ?? '') : undefined;
       actualYFields.forEach(yField => {
         const value = Number(item[yField]) || 0;
-        if (!isNaN(value) && !hiddenSeriesRef.current.has(getFieldLabel(yField))) {
+        const seriesName = makeSeriesName(yField, groupValue);
+        if (!isNaN(value) && !hiddenSeriesRef.current.has(seriesName)) {
           longData.push({
             ...item,
-            _metric: getFieldLabel(yField),
+            _metric: seriesName,
+            _yField: yField,
             _value: value,
           });
         }
@@ -146,20 +190,6 @@ export const renderBarChart = (ctx: RenderContext) => {
       showMessage(container, 'Y轴字段无有效数值');
       return;
     }
-
-    // 构建 X 值 → 各指标值的查找表（以原始字段名为键）
-    const xMetricsMap: Record<string, Record<string, number>> = {};
-    chartData.forEach(item => {
-      const xKey = String(item[actualXField] ?? '');
-      if (!xMetricsMap[xKey]) xMetricsMap[xKey] = {};
-      actualYFields.forEach(yField => {
-        xMetricsMap[xKey][yField] = Number(item[yField]) || 0;
-      });
-    });
-
-    // tooltip 标记点颜色映射（与图例/柱子保持一致）
-    const barColorMap: Record<string, string> = {};
-    actualYFields.forEach((f, i) => { barColorMap[f] = G2_COLORS[i % G2_COLORS.length]; });
 
     createAndRenderG2Chart((chart) => {
       chart.axis('x', xAxisConfig);
@@ -180,26 +210,28 @@ export const renderBarChart = (ctx: RenderContext) => {
         .encode('color', '_metric')
         // 固定颜色映射域，避免隐藏部分系列后颜色错位（与图例保持一致）
         .scale('color', {
-          domain: actualYFields.map(f => getFieldLabel(f)),
-          range: G2_COLORS,
+          domain: seriesNames,
+          range: seriesNames.map(name => barColorMap[name]),
         })
         .style({ fillOpacity: 1, lineWidth: 0 })
         .interaction('elementHighlight')
         .tooltip({
           title: (d: any) => String(d[actualXField] ?? ''),
-          // 展示当前 x 下的全部指标
-          items: actualYFields
-            .filter(yField => !hiddenSeriesRef.current.has(getFieldLabel(yField)))
-            .map(yField => (d: any) => ({
-              name: getFieldLabel(yField),
-              value: formatValue(xMetricsMap[String(d[actualXField] ?? '')]?.[yField], yFormatLookup[yField]),
-              color: barColorMap[yField],
-            })),
+          items: [
+            (d: any) => {
+              const yField = String(d._yField ?? '');
+              return {
+                name: String(d._metric ?? ''),
+                value: formatValue(d._value, yFormatLookup[yField]),
+                color: barColorMap[String(d._metric ?? '')],
+              };
+            },
+          ],
         });
 
       chart.legend(false);
     }, LINE_LEGEND_HEIGHT);
 
-    renderCustomLegend(actualYFields.map(f => ({ name: getFieldLabel(f), color: barColorMap[f] })));
+    renderCustomLegend(seriesNames.map(name => ({ name, color: barColorMap[name] })));
   }
 };

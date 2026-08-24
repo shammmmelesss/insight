@@ -291,7 +291,8 @@ const DashboardEditPage: React.FC = () => {
         }
       } catch (error: any) {
         if (error?.response?.status === 403) {
-          message.error('无权限访问此看板');
+          const dashName = error.response.data?.name;
+          message.error(dashName ? `没有「${dashName}」看板权限` : '无权限访问此看板');
         } else {
           message.error('获取看板详情失败');
         }

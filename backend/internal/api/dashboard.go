@@ -156,7 +156,7 @@ func GetDashboard(c *gin.Context) {
 	}
 
 	if !canAccessDashboard(&dashboard, userID, userName) {
-		c.JSON(http.StatusForbidden, gin.H{"error": "无权限访问此看板"})
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权限访问此看板", "name": dashboard.Name})
 		return
 	}
 

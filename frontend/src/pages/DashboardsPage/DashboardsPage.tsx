@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Button, Card, Modal, Layout, Skeleton, Select, Tooltip, Dropdown, Popover, Avatar } from 'antd';
-import { EditOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined, InboxOutlined, PlusOutlined, CalendarOutlined, FilterOutlined, UserOutlined } from '@ant-design/icons';
+import { EditOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined, InboxOutlined, PlusOutlined, CalendarOutlined, FilterOutlined, UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { fetchChartOptions } from '@/api/charts';
@@ -180,6 +180,8 @@ const DashboardsPage: React.FC = () => {
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedDashboard, setSelectedDashboard] = useState<Dashboard | null>(null);
+  // 非 null 时表示无权限访问 URL 指定的看板（值为看板名称，空串表示名称未知）
+  const [noPermission, setNoPermission] = useState<string | null>(null);
   const [charts, setCharts] = useState<ChartOption[]>([]);
   const [chartData, setChartData] = useState<Record<string, unknown[]>>({});
   const [chartConfigs, setChartConfigs] = useState<Record<string, Record<string, unknown>>>({});
@@ -279,6 +281,27 @@ const DashboardsPage: React.FC = () => {
       return dashboards.find(d => d.id === urlId) ?? prev;
     });
   }, [urlId, dashboards]);
+
+  // URL 指定的看板不在有权限的列表中时，拉取详情以判断是否无权限，并在看板上覆盖蒙层提示
+  useEffect(() => {
+    if (loading || !urlId) { setNoPermission(null); return; }
+    if (dashboards.some(d => d.id === urlId)) { setNoPermission(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        await axios.get(`/api/dashboards/${urlId}`);
+        if (!cancelled) setNoPermission(null);
+      } catch (error: any) {
+        if (cancelled) return;
+        if (error?.response?.status === 403) {
+          setNoPermission(error.response.data?.name || '');
+        } else {
+          setNoPermission(null);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [urlId, dashboards, loading]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -794,6 +817,23 @@ const DashboardsPage: React.FC = () => {
             }}
           />
         </Tooltip>
+      )}
+
+      {/* 无权限蒙层：覆盖看板内容区，看不到具体数据，中间提示无权限 */}
+      {noPermission !== null && (
+        <div style={{
+          position: 'absolute', top: 0, bottom: 0, right: 0,
+          left: embed ? 0 : (siderCollapsed ? 0 : 240),
+          background: 'rgba(240, 242, 245, 0.75)', backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)', zIndex: 100,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <LockOutlined style={{ fontSize: 44, color: '#bfbfbf', marginBottom: 16 }} />
+          <div style={{ fontSize: 18, fontWeight: 600, color: '#595959', marginBottom: 6 }}>暂无访问权限</div>
+          <div style={{ fontSize: 13, color: '#8c8c8c' }}>
+            {noPermission ? `你没有「${noPermission}」看板的访问权限` : '你没有该看板的访问权限'}
+          </div>
+        </div>
       )}
 
       <Content style={{ background: '#f0f2f5', overflow: 'auto', padding: '12px 12px 12px' }}>

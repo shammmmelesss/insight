@@ -1,16 +1,18 @@
-import { App as AntdApp, ConfigProvider } from 'antd';
+import { App as AntdApp, ConfigProvider, Spin } from 'antd';
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+// 首页保持同步加载，保证首屏最快渲染；其余页面按路由懒加载
 import HomePage from './pages/HomePage/HomePage';
-import DataSourcesPage from './pages/DataSourcesPage/DataSourcesPage';
-import DatasetsPage from './pages/DatasetsPage/DatasetsPage';
-import ChartsPage from './pages/ChartsPage/ChartsPage';
-import ChartConfigPage from './pages/ChartConfigPage/ChartConfigPage';
-import DashboardsPage from './pages/DashboardsPage/DashboardsPage';
-import DashboardEditPage from './pages/DashboardEditPage/DashboardEditPage';
-import MonitorPage from './pages/MonitorPage/MonitorPage';
-import SQLQueryPage from './pages/SQLQueryPage/SQLQueryPage';
-import WorkspacesPage from './pages/WorkspacesPage/WorkspacesPage';
-import NotFound from './pages/NotFound/NotFound';
+const DataSourcesPage = lazy(() => import('./pages/DataSourcesPage/DataSourcesPage'));
+const DatasetsPage = lazy(() => import('./pages/DatasetsPage/DatasetsPage'));
+const ChartsPage = lazy(() => import('./pages/ChartsPage/ChartsPage'));
+const ChartConfigPage = lazy(() => import('./pages/ChartConfigPage/ChartConfigPage'));
+const DashboardsPage = lazy(() => import('./pages/DashboardsPage/DashboardsPage'));
+const DashboardEditPage = lazy(() => import('./pages/DashboardEditPage/DashboardEditPage'));
+const MonitorPage = lazy(() => import('./pages/MonitorPage/MonitorPage'));
+const SQLQueryPage = lazy(() => import('./pages/SQLQueryPage/SQLQueryPage'));
+const WorkspacesPage = lazy(() => import('./pages/WorkspacesPage/WorkspacesPage'));
+const NotFound = lazy(() => import('./pages/NotFound/NotFound'));
 import Layout from './components/Layout/Layout';
 import GlobalWatermark from './components/GlobalWatermark';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -26,6 +28,7 @@ function AppRoutes() {
 
   return (
     <div key={currentWorkspace?.id || 'none'} style={{ display: 'contents' }}>
+      <Suspense fallback={<div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}><Spin size="large" /></div>}>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/data-sources" element={<DataSourcesPage />} />
@@ -41,6 +44,7 @@ function AppRoutes() {
         <Route path="/workspaces" element={<WorkspacesPage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+      </Suspense>
     </div>
   );
 }

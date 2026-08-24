@@ -1,6 +1,7 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef, memo } from 'react';
 import type { ChartType } from '@shared/api.interface';
 import { PivotSheet, asyncGetAllPlainData } from '@antv/s2';
+import '@antv/s2/dist/s2.min.css';
 import { Chart } from '@antv/g2';
 
 import type { ChartDatum, RenderContext, SeriesItem } from './ChartRenderer/context';

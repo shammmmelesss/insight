@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { App, Button, Card, Table, Modal, Drawer, Form, Input, Tabs, Row, Col, Select, Radio, TimePicker, Tooltip, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined, SyncOutlined, CheckCircleOutlined, CloseCircleOutlined, StopOutlined, ClearOutlined, ShareAltOutlined, FileSearchOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined, SyncOutlined, CheckCircleOutlined, CloseCircleOutlined, StopOutlined, ClearOutlined, ShareAltOutlined, FileSearchOutlined, CopyOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { Dataset, CreateDatasetRequest, UpdateDatasetRequest, FieldConfig, DataType, DatasetType, ExtractSchedule, ExtractFrequency, ExtractStatus } from '@shared/api.interface';
@@ -371,6 +371,26 @@ const DatasetsPage: React.FC = () => {
     });
   };
   
+  // 复制数据集
+  const [copyingIds, setCopyingIds] = useState<Set<string>>(new Set());
+  const handleCopy = async (id: string) => {
+    setCopyingIds((prev) => new Set(prev).add(id));
+    try {
+      await axios.post(`/api/datasets/${id}/copy`);
+      message.success('数据集复制成功');
+      fetchDatasets();
+    } catch (error) {
+      message.error('数据集复制失败');
+      console.error('数据集复制失败:', error);
+    } finally {
+      setCopyingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
+
   // 获取使用特定数据集的图表列表
   const fetchDatasetCharts = async (datasetId: string) => {
     setLoadingCharts(true);
@@ -609,6 +629,15 @@ const DatasetsPage: React.FC = () => {
             style={{ marginRight: 8 }}
           >
             编辑
+          </Button>
+          <Button
+            icon={<CopyOutlined />}
+            size="small"
+            loading={copyingIds.has(record.id)}
+            onClick={() => handleCopy(record.id)}
+            style={{ marginRight: 8 }}
+          >
+            复制
           </Button>
           <Button
             icon={<ShareAltOutlined />}

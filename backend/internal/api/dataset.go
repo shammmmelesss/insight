@@ -52,6 +52,7 @@ func RegisterDatasetRoutes(rg *gin.RouterGroup) {
 		dataset.POST("/:id/stop-extract", StopExtract)
 		dataset.POST("/:id/clear-data", ClearExtractData)
 		dataset.PUT("/:id/share", ShareDataset)
+		dataset.POST("/:id/copy", CopyDataset)
 	}
 }
 
@@ -358,6 +359,53 @@ func DeleteDataset(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// CopyDataset 复制数据集
+func CopyDataset(c *gin.Context) {
+	id := c.Param("id")
+
+	var original models.Dataset
+	if err := database.DB.First(&original, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "数据集不存在"})
+		return
+	}
+	// 有查看及以上权限（所有者/管理/被分享查看）即可复制到自己名下
+	if datasetRole(&original, c) == "" {
+		abortForbidden(c, "无权访问此数据集")
+		return
+	}
+
+	fieldsConfig := original.FieldsConfig
+	if strings.TrimSpace(fieldsConfig) == "" {
+		fieldsConfig = "[]"
+	}
+	extractSchedule := original.ExtractSchedule
+	if strings.TrimSpace(extractSchedule) == "" {
+		extractSchedule = "{}"
+	}
+
+	copied := models.Dataset{
+		WorkspaceID:     original.WorkspaceID,
+		Name:            original.Name + "_copy",
+		SQL:             original.SQL,
+		Description:     original.Description,
+		FieldsConfig:    fieldsConfig,
+		DataSourceID:    original.DataSourceID,
+		Type:            original.Type,
+		ExtractSchedule: extractSchedule,
+		// 抽取状态与分享设置不复制，归属新创建人
+		ExtractStatus: models.ExtractStatusIdle,
+		SharedWith:    "[]",
+	}
+	setCreator(c, &copied.AuditFields)
+
+	if err := database.DB.Create(&copied).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "复制数据集失败: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, datasetResponse(copied, c))
 }
 
 // ShareDataset 更新数据集分享设置

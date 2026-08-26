@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { Button, Card, Modal, Layout, Skeleton, Select, Tooltip, Dropdown, Popover, Avatar } from 'antd';
+import { Button, Card, Modal, Layout, Skeleton, Select, Tooltip, Dropdown, Popover, Avatar, Checkbox } from 'antd';
 import { EditOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined, InboxOutlined, PlusOutlined, CalendarOutlined, FilterOutlined, UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
@@ -141,16 +141,20 @@ interface ViewChartBodyProps {
   cfg: Record<string, unknown>;
   chartH: number;
   visibleFields?: { rowFields: string[]; colFields: string[]; measureFields: string[] } | null;
+  groupFieldsOverride?: string[] | null;
   chartRef: React.RefObject<ChartRendererHandle>;
 }
-const ViewChartBody: React.FC<ViewChartBodyProps> = React.memo(({ chartType, data, cfg, chartH, visibleFields, chartRef }) => {
+const ViewChartBody: React.FC<ViewChartBodyProps> = React.memo(({ chartType, data, cfg, chartH, visibleFields, groupFieldsOverride, chartRef }) => {
   const rowFields = useMemo(() => visibleFields ? visibleFields.rowFields : extractNamesStatic(cfg.rowFields), [cfg.rowFields, visibleFields]);
   const colFields = useMemo(() => visibleFields ? visibleFields.colFields : extractNamesStatic(cfg.colFields), [cfg.colFields, visibleFields]);
   const measureFields = useMemo(() => visibleFields ? visibleFields.measureFields : extractNamesStatic(cfg.measureFields), [cfg.measureFields, visibleFields]);
   const xAxisFields = useMemo(() => extractNamesStatic(cfg.xAxisFields), [cfg.xAxisFields]);
   const yAxisFields = useMemo(() => extractNamesStatic(cfg.yAxisFields), [cfg.yAxisFields]);
   const y2AxisFields = useMemo(() => extractNamesStatic(cfg.y2AxisFields), [cfg.y2AxisFields]);
-  const groupFields = useMemo(() => extractNamesStatic(cfg.groupFields), [cfg.groupFields]);
+  const groupFields = useMemo(
+    () => (groupFieldsOverride ? groupFieldsOverride : extractNamesStatic(cfg.groupFields)),
+    [cfg.groupFields, groupFieldsOverride]
+  );
   const indicatorFields = useMemo(() => extractNamesStatic(cfg.indicatorFields), [cfg.indicatorFields]);
   const fieldFormats = useMemo(() => buildFieldFormatsStatic(cfg), [cfg]);
   const fieldLabelMap = useMemo(() => buildFieldLabelMapStatic(cfg), [cfg]);
@@ -207,6 +211,16 @@ const DashboardsPage: React.FC = () => {
   const [currentSQLChartId, setCurrentSQLChartId] = useState('');
   // openId -> 头像 URL 映射（用于展示创建人头像）
   const [userAvatarMap, setUserAvatarMap] = useState<Record<string, string>>({});
+
+  // 柱状图/折线图分组维度选择：已选用于聚合的分组字段名 (undefined = 全部分组字段)
+  const [groupSelection, setGroupSelection] = useState<Record<string, string[]>>({});
+  const groupSelectionRef = useRef<Record<string, string[]>>({});
+  // 分组选择 Popover 开关
+  const [groupPickerOpen, setGroupPickerOpen] = useState<Record<string, boolean>>({});
+  // 每个图表左上角「筛选」按钮 Popover 的展开状态
+  const [chartFilterOpen, setChartFilterOpen] = useState<Record<string, boolean>>({});
+  // 图表自身配置筛选（config.filterFields）的运行时取值：[chartId][字段名] = value
+  const [chartFilterValues, setChartFilterValues] = useState<Record<string, Record<string, any>>>({});
 
   // 交叉表自定义表头：已确认的可见字段 (null = 全部可见)
   const [crossTableVisible, setCrossTableVisible] = useState<Record<string, { rowFields: string[]; colFields: string[]; measureFields: string[] } | null>>({});
@@ -330,17 +344,21 @@ const DashboardsPage: React.FC = () => {
     if (config) setChartConfigs(prev => ({ ...prev, [chartId]: config }));
   };
 
-  const fetchChartData = async (chartId: string, filterParams?: FilterParam[]) => {
-    const cacheKey = `chart:${chartId}:${JSON.stringify(filterParams ?? [])}`;
+  const fetchChartData = async (chartId: string, filterParams?: FilterParam[], groupOverride?: string[]) => {
+    const buildParams = () => {
+      const params: Record<string, string> = {};
+      if (filterParams && filterParams.length > 0) params.filters = JSON.stringify(filterParams);
+      if (groupOverride) params.groupFields = JSON.stringify(groupOverride);
+      return params;
+    };
+    const cacheKey = `chart:${chartId}:${JSON.stringify(filterParams ?? [])}:${groupOverride ? JSON.stringify(groupOverride) : 'all'}`;
     const cached = dashboardCache.get<ChartCacheEntry>(cacheKey);
 
     if (cached) {
       applyChartResponse(chartId, cached.data, cached.config, cached.sql);
       void (async () => {
         try {
-          const params: Record<string, string> = {};
-          if (filterParams && filterParams.length > 0) params.filters = JSON.stringify(filterParams);
-          const response = await axios.get(`/api/charts/${chartId}/data`, { params });
+          const response = await axios.get(`/api/charts/${chartId}/data`, { params: buildParams() });
           let config = response.data.chart?.config;
           if (typeof config === 'string') { try { config = JSON.parse(config); } catch { config = undefined; } }
           dashboardCache.set(cacheKey, { data: response.data.data, config, sql: response.data.sql });
@@ -351,8 +369,7 @@ const DashboardsPage: React.FC = () => {
     }
 
     try {
-      const params: Record<string, string> = {};
-      if (filterParams && filterParams.length > 0) params.filters = JSON.stringify(filterParams);
+      const params = buildParams();
       const response = await axios.get(`/api/charts/${chartId}/data`, { params });
       let config = response.data.chart?.config;
       if (typeof config === 'string') { try { config = JSON.parse(config); } catch { config = undefined; } }
@@ -427,9 +444,68 @@ const DashboardsPage: React.FC = () => {
     return params;
   };
 
+  // 从图表自身配置的筛选字段（config.filterFields）构建筛选参数
+  const buildChartConfigFilterParams = (
+    chartId: string,
+    cfg: Record<string, unknown>,
+    datasetId?: string,
+    activeValues: Record<string, any> = chartFilterValues[chartId] || {},
+  ): FilterParam[] => {
+    const params: FilterParam[] = [];
+    const fields = (Array.isArray(cfg.filterFields) ? cfg.filterFields : []) as Array<{ originalName: string; config?: { filterType?: string } }>;
+    fields.forEach(f => {
+      const val = activeValues[f.originalName];
+      if (val === undefined || val === null) return;
+      const type = f.config?.filterType || 'multiple';
+      const dataType = (datasetId && datasetFieldTypes[`${datasetId}:${f.originalName}`]) || 'text';
+      if (type === 'dateRange') {
+        if (val && typeof val === 'object' && 'startType' in (val as object)) {
+          const [s, e] = resolveDateRangeValue(val as DateRangeFilterValue);
+          params.push({ field: f.originalName, type: 'dateRange', dataType, values: [s.format('YYYY-MM-DD'), e.format('YYYY-MM-DD')] });
+        }
+      } else {
+        const values = Array.isArray(val) ? val : (val !== '' ? [val] : []);
+        if (values.length > 0) params.push({ field: f.originalName, type, dataType, values: values.map(String) });
+      }
+    });
+    return params;
+  };
+
+  // 图表自身筛选值变化时，合并看板筛选与图表筛选后重新拉取该图表
+  const applyChartConfigFilterChange = (chartId: string, cfg: Record<string, unknown>, datasetId: string | undefined, fieldName: string, value: any) => {
+    setChartFilterValues(prev => {
+      const nextForChart = { ...(prev[chartId] || {}), [fieldName]: value };
+      const next = { ...prev, [chartId]: nextForChart };
+      const combined = [...buildFilterParamsForChart(chartId), ...buildChartConfigFilterParams(chartId, cfg, datasetId, nextForChart)];
+      loadSingleChart(chartId, combined.length > 0 ? combined : undefined);
+      return next;
+    });
+  };
+
+  // 打开图表筛选 Popover 时，加载各筛选字段的可选值与字段类型
+  const prepareChartConfigFilters = (chartId: string, cfg: Record<string, unknown>, datasetId?: string) => {
+    const fields = (Array.isArray(cfg.filterFields) ? cfg.filterFields : []) as Array<{ originalName: string; config?: { filterType?: string; filterDefault?: any } }>;
+    if (datasetId) {
+      fields.forEach(f => {
+        fetchDatasetFieldType(datasetId, f.originalName);
+        if ((f.config?.filterType || 'multiple') !== 'dateRange') fetchFilterFieldOptions(datasetId, f.originalName);
+      });
+    }
+    // 首次打开时，用图表配置的默认筛选值初始化尚未设置的字段
+    setChartFilterValues(prev => {
+      if (prev[chartId]) return prev;
+      const seeded: Record<string, any> = {};
+      fields.forEach(f => {
+        const def = f.config?.filterDefault;
+        if (def !== undefined && def !== null && !(Array.isArray(def) && def.length === 0)) seeded[f.originalName] = def;
+      });
+      return Object.keys(seeded).length > 0 ? { ...prev, [chartId]: seeded } : prev;
+    });
+  };
+
   const loadSingleChart = async (chartId: string, filterParams?: FilterParam[]) => {
     setChartLoadingMap(prev => ({ ...prev, [chartId]: true }));
-    await fetchChartData(chartId, filterParams);
+    await fetchChartData(chartId, filterParams, groupSelectionRef.current[chartId]);
     setChartLoadingMap(prev => ({ ...prev, [chartId]: false }));
   };
 
@@ -491,6 +567,14 @@ const DashboardsPage: React.FC = () => {
   const refetchSingleChart = (chartId: string) => {
     const params = buildFilterParamsForChart(chartId);
     loadSingleChart(chartId, params.length > 0 ? params : undefined);
+  };
+
+  // 应用分组维度选择：更新选中状态并按新分组重新请求数据
+  const applyGroupSelection = (chartId: string, selected: string[]) => {
+    setGroupSelection(prev => ({ ...prev, [chartId]: selected }));
+    groupSelectionRef.current = { ...groupSelectionRef.current, [chartId]: selected };
+    setGroupPickerOpen(prev => ({ ...prev, [chartId]: false }));
+    refetchSingleChart(chartId);
   };
 
   useEffect(() => {
@@ -965,6 +1049,23 @@ const DashboardsPage: React.FC = () => {
         {selectedDashboard ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
             {parsedLayout.length > 0 ? parsedLayout.map((item, index) => {
+              if (item.type === 'text') {
+                return (
+                  <div
+                    key={item.chartId}
+                    style={{ gridColumn: isWide(item) ? 'span 2' : 'span 1', minWidth: 0 }}
+                  >
+                    <Card
+                      style={{ minWidth: 0, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+                      styles={{ body: { padding: '12px 16px' } }}
+                    >
+                      <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 14, lineHeight: 1.6, color: '#262626' }}>
+                        {item.text || ''}
+                      </div>
+                    </Card>
+                  </div>
+                );
+              }
               const chart = chartsById[item.chartId];
               const cfg = chartConfigs[item.chartId] || {};
               const isLarge = isWide(item);
@@ -986,6 +1087,8 @@ const DashboardsPage: React.FC = () => {
                 }] : []),
               ];
               const appliedFilters = filters.filter(f => f.charts.length === 0 || f.charts.includes(item.chartId));
+              // 图表自身配置的筛选字段（图表配置里「筛选」区域拖入的字段）
+              const chartConfigFilterFields = (Array.isArray(cfg.filterFields) ? cfg.filterFields : []) as Array<{ originalName: string; displayName?: string; config?: { filterType?: string } }>;
               const isCrossTable = chart?.type === 'crossTable';
               const labelMap = buildFieldLabelMap(cfg);
               const visibleFields = crossTableVisible[item.chartId];
@@ -993,6 +1096,11 @@ const DashboardsPage: React.FC = () => {
               const selectedFieldCount = visibleFields
                 ? visibleFields.rowFields.length + visibleFields.colFields.length + visibleFields.measureFields.length
                 : allFieldCount;
+              // 柱状图/折线图：当存在多个分组维度时，允许用户在图表上选择用于聚合的分组维度
+              const supportsGroupPicker = chart?.type === 'bar' || chart?.type === 'line';
+              const groupFieldNames = extractNames(cfg.groupFields);
+              const showGroupPicker = supportsGroupPicker && groupFieldNames.length > 1;
+              const selectedGroups = groupSelection[item.chartId] ?? groupFieldNames;
               const cardTitle = (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
@@ -1015,6 +1123,120 @@ const DashboardsPage: React.FC = () => {
                     )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                    {chartConfigFilterFields.length > 0 && (
+                      <Popover
+                        open={!!chartFilterOpen[item.chartId]}
+                        onOpenChange={open => {
+                          if (open) prepareChartConfigFilters(item.chartId, cfg, chart?.datasetId);
+                          setChartFilterOpen(prev => ({ ...prev, [item.chartId]: open }));
+                        }}
+                        trigger="click"
+                        placement="bottomRight"
+                        arrow={false}
+                        content={
+                          <div style={{ minWidth: 240, maxWidth: 320, padding: '4px 0' }} onClick={e => e.stopPropagation()}>
+                            <div style={{ marginBottom: 8, fontWeight: 500, fontSize: 13 }}>筛选项</div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                              {chartConfigFilterFields.map(ff => {
+                                const fType = ff.config?.filterType || 'multiple';
+                                const curVal = chartFilterValues[item.chartId]?.[ff.originalName];
+                                const dpKey = `cf:${item.chartId}:${ff.originalName}`;
+                                return (
+                                  <div key={ff.originalName} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                                    <span style={{ fontSize: 12, color: '#666' }}>{ff.displayName || ff.originalName}</span>
+                                    {fType === 'dateRange' ? (
+                                      <Popover
+                                        trigger="click"
+                                        placement="bottomLeft"
+                                        open={!!datePickerOpen[dpKey]}
+                                        onOpenChange={open => setDatePickerOpen(prev => ({ ...prev, [dpKey]: open }))}
+                                        content={
+                                          <DateRangeFilterPicker
+                                            value={curVal as DateRangeFilterValue | undefined}
+                                            onChange={(val) => {
+                                              applyChartConfigFilterChange(item.chartId, cfg, chart?.datasetId, ff.originalName, val);
+                                              setDatePickerOpen(prev => ({ ...prev, [dpKey]: false }));
+                                            }}
+                                            onCancel={() => setDatePickerOpen(prev => ({ ...prev, [dpKey]: false }))}
+                                          />
+                                        }
+                                      >
+                                        <Button size="small" icon={<CalendarOutlined />} style={{ width: '100%', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {curVal ? resolvedRangeLabel(curVal as DateRangeFilterValue) : '选择日期范围'}
+                                        </Button>
+                                      </Popover>
+                                    ) : (
+                                      <Select
+                                        size="small"
+                                        style={{ width: '100%' }}
+                                        mode={fType === 'multiple' ? 'multiple' : undefined}
+                                        maxTagCount="responsive"
+                                        value={curVal}
+                                        onChange={(value) => applyChartConfigFilterChange(item.chartId, cfg, chart?.datasetId, ff.originalName, value)}
+                                        allowClear
+                                        placeholder="请选择"
+                                        getPopupContainer={triggerNode => triggerNode.parentElement || document.body}
+                                      >
+                                        {(filterFieldOptions[`${chart?.datasetId}:${ff.originalName}`] || []).map(val => (
+                                          <Select.Option key={String(val)} value={String(val)}>{String(val)}</Select.Option>
+                                        ))}
+                                      </Select>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        }
+                        getPopupContainer={() => document.body}
+                      >
+                        <Button
+                          size="small"
+                          type="text"
+                          icon={<FilterOutlined style={{ fontSize: 12 }} />}
+                          style={{ fontSize: 12, color: '#595959', padding: '0 6px', display: 'flex', alignItems: 'center' }}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          筛选
+                        </Button>
+                      </Popover>
+                    )}
+                    {showGroupPicker && (
+                      <Popover
+                        open={!!groupPickerOpen[item.chartId]}
+                        onOpenChange={open => setGroupPickerOpen(prev => ({ ...prev, [item.chartId]: open }))}
+                        content={
+                          <div style={{ minWidth: 160, padding: '4px 0' }} onClick={e => e.stopPropagation()}>
+                            <Checkbox.Group
+                              value={selectedGroups}
+                              onChange={vals => applyGroupSelection(item.chartId, vals as string[])}
+                              style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 12px' }}
+                            >
+                              {groupFieldNames.map(name => (
+                                <Checkbox key={name} value={name}>{labelMap[name] || name}</Checkbox>
+                              ))}
+                            </Checkbox.Group>
+                          </div>
+                        }
+                        trigger="click"
+                        placement="bottomRight"
+                        arrow={false}
+                        overlayInnerStyle={{ padding: 0 }}
+                        getPopupContainer={() => document.body}
+                      >
+                        <Button
+                          size="small"
+                          type="text"
+                          style={{ fontSize: 12, color: '#595959', padding: '0 6px', display: 'flex', alignItems: 'center', gap: 4 }}
+                          onClick={e => e.stopPropagation()}
+                        >
+                          分组({selectedGroups.length})
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ marginTop: 1 }}>
+                            <path d="M2 3.5L5 6.5L8 3.5" stroke="#595959" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </Button>
+                      </Popover>
+                    )}
                     {isCrossTable && allFieldCount > 0 && (
                       <Popover
                         open={!!fieldPickerOpen[item.chartId]}
@@ -1076,6 +1298,7 @@ const DashboardsPage: React.FC = () => {
                         cfg={cfg}
                         chartH={chartH}
                         visibleFields={visibleFields}
+                        groupFieldsOverride={showGroupPicker ? selectedGroups : undefined}
                       />
                     ) : (
                       <div style={{ height: chartH }} />

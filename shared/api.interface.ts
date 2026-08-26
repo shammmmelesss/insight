@@ -367,6 +367,10 @@ export interface DashboardLayoutItem {
   y: number;
   width: number;
   height: number;
+  /** 组件类型，缺省表示普通图表；'text' 为文本组件（内容存于 text 字段，不请求后端数据） */
+  type?: 'text';
+  /** 文本组件的内容 */
+  text?: string;
 }
 
 /** 看板 */

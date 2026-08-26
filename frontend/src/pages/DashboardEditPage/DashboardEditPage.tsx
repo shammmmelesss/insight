@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Button, Input, Layout, Space, Card, Modal, message, Spin, Dropdown, Tooltip, Select, Popover } from 'antd';
-import { ArrowLeftOutlined, SearchOutlined, EllipsisOutlined, CodeOutlined, SettingOutlined, CalendarOutlined, PlusOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, SearchOutlined, EllipsisOutlined, CodeOutlined, SettingOutlined, CalendarOutlined, PlusOutlined, FontSizeOutlined, FilterOutlined } from '@ant-design/icons';
 import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel} from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
@@ -125,7 +125,8 @@ const chartAreaHeight = (h: number) => Math.max(120, gridItemPixelHeight(h) - 60
 // Detect old layout format (width <= 8 and height <= 8 means pre-RGL format)
 const toRGLLayout = (items: DashboardLayoutItem[]): RGLLayout[] =>
   items.map((item, index) => {
-    const isOld = item.width <= 8 && item.height <= 8;
+    // 文本组件始终是新格式，跳过旧布局兼容推断
+    const isOld = item.type !== 'text' && item.width <= 8 && item.height <= 8;
     return {
       i: item.chartId,
       x: isOld ? 0 : item.x,
@@ -168,6 +169,10 @@ const DashboardEditPage: React.FC = () => {
   const [currentSQL, setCurrentSQL] = useState('');
   const [configChartId, setConfigChartId] = useState<string | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState<Record<string, boolean>>({});
+  // 每个图表左上角「筛选」按钮 Popover 的展开状态
+  const [chartFilterOpen, setChartFilterOpen] = useState<Record<string, boolean>>({});
+  // 图表自身配置筛选（config.filterFields）的运行时取值：[chartId][字段名] = value
+  const [chartFilterValues, setChartFilterValues] = useState<Record<string, Record<string, any>>>({});
   const [siderWidth, setSiderWidth] = useState(300);
 
   const handleSiderResizeStart = (e: React.MouseEvent) => {
@@ -215,6 +220,20 @@ const DashboardEditPage: React.FC = () => {
 
   const loadedChartIds = useRef<Set<string>>(new Set());
   const draftCounter = useRef(0);
+  const textCounter = useRef(0);
+
+  // 在看板上新增一个文本组件（内容存于布局项，不依赖后端数据）
+  const handleAddText = () => {
+    const textId = `text-${Date.now()}-${++textCounter.current}`;
+    setSelectedCharts(prev => [...prev, { chartId: textId, x: 0, y: 0, width: COLS, height: 3, type: 'text', text: '' }]);
+    setRglLayout(prev => [...prev, { i: textId, x: 0, y: Infinity, w: COLS, h: 3, minW: 2, minH: 2 }]);
+    // 文本组件无后端数据，标记为已加载避免触发 /data 请求
+    loadedChartIds.current.add(textId);
+  };
+
+  const handleTextChange = (chartId: string, value: string) => {
+    setSelectedCharts(prev => prev.map(item => item.chartId === chartId ? { ...item, text: value } : item));
+  };
 
   // 在看板上直接新建一张空图表（草稿），并打开右侧配置面板
   const handleCreateChart = () => {
@@ -356,6 +375,7 @@ const DashboardEditPage: React.FC = () => {
 
   useEffect(() => {
     selectedCharts.forEach(item => {
+      if (item.type === 'text') return;
       if (!loadedChartIds.current.has(item.chartId)) {
         loadedChartIds.current.add(item.chartId);
         fetchChartData(item.chartId);
@@ -519,6 +539,63 @@ const DashboardEditPage: React.FC = () => {
     return params;
   };
 
+  // 从图表自身配置的筛选字段（config.filterFields）构建筛选参数
+  const buildChartConfigFilterParams = (
+    cfg: Record<string, any>,
+    datasetId: string | undefined,
+    activeValues: Record<string, any>,
+  ): Array<{ field: string; type: string; dataType: string; values: string[] }> => {
+    const params: Array<{ field: string; type: string; dataType: string; values: string[] }> = [];
+    const fields = (Array.isArray(cfg.filterFields) ? cfg.filterFields : []) as Array<{ originalName: string; config?: { filterType?: string } }>;
+    fields.forEach(f => {
+      const val = activeValues[f.originalName];
+      if (val === undefined || val === null) return;
+      const type = f.config?.filterType || 'multiple';
+      const dataType = (datasetId && datasetFieldTypes[`${datasetId}:${f.originalName}`]) || 'text';
+      if (type === 'dateRange') {
+        if (val && typeof val === 'object' && 'startType' in (val as object)) {
+          const [s, e] = resolveDateRangeValue(val as DateRangeFilterValue);
+          params.push({ field: f.originalName, type: 'dateRange', dataType, values: [s.format('YYYY-MM-DD'), e.format('YYYY-MM-DD')] });
+        }
+      } else {
+        const values = Array.isArray(val) ? val : (val !== '' ? [val] : []);
+        if (values.length > 0) params.push({ field: f.originalName, type, dataType, values: values.map(String) });
+      }
+    });
+    return params;
+  };
+
+  // 图表自身筛选值变化时，合并看板筛选与图表筛选后重新拉取该图表
+  const applyChartConfigFilterChange = (chartId: string, cfg: Record<string, any>, datasetId: string | undefined, fieldName: string, value: any) => {
+    setChartFilterValues(prev => {
+      const nextForChart = { ...(prev[chartId] || {}), [fieldName]: value };
+      const combined = [...buildFilterParamsForChart(chartId), ...buildChartConfigFilterParams(cfg, datasetId, nextForChart)];
+      fetchChartData(chartId, combined);
+      return { ...prev, [chartId]: nextForChart };
+    });
+  };
+
+  // 打开图表筛选 Popover 时，加载各筛选字段的可选值与字段类型
+  const prepareChartConfigFilters = (chartId: string, cfg: Record<string, any>, datasetId?: string) => {
+    const fields = (Array.isArray(cfg.filterFields) ? cfg.filterFields : []) as Array<{ originalName: string; config?: { filterType?: string; filterDefault?: any } }>;
+    if (datasetId) {
+      fields.forEach(f => {
+        fetchDatasetFieldType(datasetId, f.originalName);
+        if ((f.config?.filterType || 'multiple') !== 'dateRange') fetchFilterFieldOptions(datasetId, f.originalName);
+      });
+    }
+    // 首次打开时，用图表配置的默认筛选值初始化尚未设置的字段
+    setChartFilterValues(prev => {
+      if (prev[chartId]) return prev;
+      const seeded: Record<string, any> = {};
+      fields.forEach(f => {
+        const def = f.config?.filterDefault;
+        if (def !== undefined && def !== null && !(Array.isArray(def) && def.length === 0)) seeded[f.originalName] = def;
+      });
+      return Object.keys(seeded).length > 0 ? { ...prev, [chartId]: seeded } : prev;
+    });
+  };
+
   useEffect(() => {
     if (filters.length === 0) return;
     const affectedChartIds = new Set<string>();
@@ -566,6 +643,7 @@ const DashboardEditPage: React.FC = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Button type="default" onClick={handleOpenFilterModal}>筛选器</Button>
           <Button type="default" icon={<PlusOutlined />} onClick={handleCreateChart}>新增图表</Button>
+          <Button type="default" icon={<FontSizeOutlined />} onClick={handleAddText}>文本</Button>
         </div>
         <Space>
           <Button onClick={handleCancel}>取消</Button>
@@ -640,6 +718,8 @@ const DashboardEditPage: React.FC = () => {
               {selectedCharts.map((item, index) => {
                 const chart = charts.find(c => c.id === item.chartId);
                 const cfg = chartConfigs[item.chartId] || EMPTY_CFG;
+                // 图表自身配置的筛选字段（图表配置里「筛选」区域拖入的字段）
+                const chartConfigFilterFields = (Array.isArray(cfg.filterFields) ? cfg.filterFields : []) as Array<{ originalName: string; displayName?: string; config?: { filterType?: string } }>;
                 const key = item.chartId;
                 const layoutItem = rglLayout.find(l => l.i === key);
                 const h = layoutItem?.h ?? DEFAULT_H;
@@ -647,20 +727,146 @@ const DashboardEditPage: React.FC = () => {
 
                 const isConfigSelected = configChartId === item.chartId;
 
+                if (item.type === 'text') {
+                  return (
+                    <div key={key}>
+                      <Card
+                        style={{ height: '100%', overflow: 'hidden' }}
+                        styles={{ body: { padding: 0, height: '100%' } }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                          <div className="chart-drag-handle" style={{ height: 24, cursor: 'move', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 6px', flexShrink: 0 }}>
+                            <Tooltip title="移除">
+                              <Button type="text" danger size="small" icon={<EllipsisOutlined />} onMouseDown={e => e.stopPropagation()} onClick={() => handleRemoveChart(key)} />
+                            </Tooltip>
+                          </div>
+                          <Input.TextArea
+                            value={item.text || ''}
+                            onChange={e => handleTextChange(key, e.target.value)}
+                            placeholder="请输入文本内容"
+                            variant="borderless"
+                            onMouseDown={e => e.stopPropagation()}
+                            style={{ flex: 1, resize: 'none', fontSize: 14, lineHeight: 1.6 }}
+                          />
+                        </div>
+                      </Card>
+                    </div>
+                  );
+                }
+
                 return (
                   <div key={key} onClick={() => setConfigChartId(item.chartId)}>
                     <Card
-                      title={
-                        <span className="chart-drag-handle" style={{ cursor: 'move', display: 'block' }}>
-                          {chart?.name || `图表${index + 1}`}
-                        </span>
-                      }
+                      title={(() => {
+                        const appliedFilters = filters.filter(f => f.charts.length === 0 || f.charts.includes(item.chartId));
+                        return (
+                          <span className="chart-drag-handle" style={{ cursor: 'move', display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {chart?.name || `图表${index + 1}`}
+                            </span>
+                            {appliedFilters.length > 0 && (
+                              <Tooltip
+                                title={
+                                  <div>
+                                    <div style={{ marginBottom: 4, fontWeight: 500 }}>命中筛选器：</div>
+                                    {appliedFilters.map(f => (
+                                      <div key={f.id} style={{ fontSize: 12 }}>{f.name}（{f.field}）</div>
+                                    ))}
+                                  </div>
+                                }
+                              >
+                                <FilterOutlined style={{ fontSize: 12, color: '#1677ff', flexShrink: 0, cursor: 'default' }} />
+                              </Tooltip>
+                            )}
+                          </span>
+                        );
+                      })()}
                       style={{ height: '100%', boxShadow: isConfigSelected ? '0 0 0 2px #1677ff' : 'none', overflow: 'visible' }}
                       styles={{
                         header: { height: '40px', padding: '0 12px', display: 'flex', alignItems: 'center', borderBottom: 'none', cursor: 'move' },
                         body: { padding: '10px', overflow: 'visible', height: 'calc(100% - 40px)' },
                       }}
                       extra={
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {chartConfigFilterFields.length > 0 && (
+                          <Popover
+                            open={!!chartFilterOpen[item.chartId]}
+                            onOpenChange={open => {
+                              if (open) prepareChartConfigFilters(item.chartId, cfg, chart?.datasetId);
+                              setChartFilterOpen(prev => ({ ...prev, [item.chartId]: open }));
+                            }}
+                            trigger="click"
+                            placement="bottomRight"
+                            arrow={false}
+                            content={
+                              <div style={{ minWidth: 240, maxWidth: 320, padding: '4px 0' }} onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()}>
+                                <div style={{ marginBottom: 8, fontWeight: 500, fontSize: 13 }}>筛选项</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                                  {chartConfigFilterFields.map(ff => {
+                                    const fType = ff.config?.filterType || 'multiple';
+                                    const curVal = chartFilterValues[item.chartId]?.[ff.originalName];
+                                    const dpKey = `cf:${item.chartId}:${ff.originalName}`;
+                                    return (
+                                      <div key={ff.originalName} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                                        <span style={{ fontSize: 12, color: '#666' }}>{ff.displayName || ff.originalName}</span>
+                                        {fType === 'dateRange' ? (
+                                          <Popover
+                                            trigger="click"
+                                            placement="bottomLeft"
+                                            open={!!datePickerOpen[dpKey]}
+                                            onOpenChange={open => setDatePickerOpen(prev => ({ ...prev, [dpKey]: open }))}
+                                            content={
+                                              <DateRangeFilterPicker
+                                                value={curVal as DateRangeFilterValue | undefined}
+                                                onChange={(val) => {
+                                                  applyChartConfigFilterChange(item.chartId, cfg, chart?.datasetId, ff.originalName, val);
+                                                  setDatePickerOpen(prev => ({ ...prev, [dpKey]: false }));
+                                                }}
+                                                onCancel={() => setDatePickerOpen(prev => ({ ...prev, [dpKey]: false }))}
+                                              />
+                                            }
+                                          >
+                                            <Button size="small" icon={<CalendarOutlined />} style={{ width: '100%', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                              {curVal ? resolvedRangeLabel(curVal as DateRangeFilterValue) : '选择日期范围'}
+                                            </Button>
+                                          </Popover>
+                                        ) : (
+                                          <Select
+                                            size="small"
+                                            style={{ width: '100%' }}
+                                            mode={fType === 'multiple' ? 'multiple' : undefined}
+                                            maxTagCount="responsive"
+                                            value={curVal}
+                                            onChange={(value) => applyChartConfigFilterChange(item.chartId, cfg, chart?.datasetId, ff.originalName, value)}
+                                            allowClear
+                                            placeholder="请选择"
+                                            getPopupContainer={triggerNode => triggerNode.parentElement || document.body}
+                                          >
+                                            {(filterFieldOptions[`${chart?.datasetId}:${ff.originalName}`] || []).map((val: any) => (
+                                              <Select.Option key={String(val)} value={String(val)}>{String(val)}</Select.Option>
+                                            ))}
+                                          </Select>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            }
+                            getPopupContainer={() => document.body}
+                          >
+                            <Button
+                              size="small"
+                              type="text"
+                              icon={<FilterOutlined style={{ fontSize: 12 }} />}
+                              style={{ fontSize: 12, color: '#595959', padding: '0 6px', display: 'flex', alignItems: 'center' }}
+                              onClick={e => e.stopPropagation()}
+                              onMouseDown={e => e.stopPropagation()}
+                            >
+                              筛选
+                            </Button>
+                          </Popover>
+                        )}
                         <Dropdown
                           menu={{
                             items: [
@@ -709,6 +915,7 @@ const DashboardEditPage: React.FC = () => {
                             <Button type="text" icon={<EllipsisOutlined />} size="small" style={{ cursor: 'pointer' }} onMouseDown={e => e.stopPropagation()} />
                           </Tooltip>
                         </Dropdown>
+                        </span>
                       }
                     >
                       <DashboardChartBody

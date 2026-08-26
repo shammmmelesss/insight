@@ -335,6 +335,19 @@ func GetChartData(c *gin.Context) {
 		}
 	}
 
+	// 解析分组维度覆盖参数：柱状图/折线图场景下，用户可在图表上自由选择用于聚合的分组维度
+	// nil 表示未覆盖（使用配置中的全部分组字段）；非 nil（含空数组）表示按所选子集聚合
+	var groupOverride []string
+	if groupParam := c.Query("groupFields"); groupParam != "" {
+		if err := json.Unmarshal([]byte(groupParam), &groupOverride); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "解析分组维度参数失败: " + err.Error()})
+			return
+		}
+		if groupOverride == nil {
+			groupOverride = []string{}
+		}
+	}
+
 	// 抽取类型数据集使用 ClickHouse 表，直连类型使用原始数据源
 	dsCalcExprs := extractCalcFieldExprs(dataset.FieldsConfig)
 	var querySQL string
@@ -351,14 +364,14 @@ func GetChartData(c *gin.Context) {
 		}
 		ckTable := "ds_" + strings.ReplaceAll(dataset.ID.String(), "-", "_")
 		ckSQL := fmt.Sprintf("SELECT * FROM %s", ckTable)
-		querySQL, err = buildChartSQL(chart.Config, string(chart.Type), ckSQL, filterConditions, dsCalcExprs)
+		querySQL, err = buildChartSQL(chart.Config, string(chart.Type), ckSQL, filterConditions, dsCalcExprs, groupOverride)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
 			return
 		}
 		db = database.ClickHouseDB
 	} else {
-		querySQL, err = buildChartSQL(chart.Config, string(chart.Type), dataset.SQL, filterConditions, dsCalcExprs)
+		querySQL, err = buildChartSQL(chart.Config, string(chart.Type), dataset.SQL, filterConditions, dsCalcExprs, groupOverride)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
 			return
@@ -483,14 +496,14 @@ func PreviewChartData(c *gin.Context) {
 		}
 		ckTable := "ds_" + strings.ReplaceAll(dataset.ID.String(), "-", "_")
 		ckSQL := fmt.Sprintf("SELECT * FROM %s", ckTable)
-		querySQL, err = buildChartSQL(body.Config, body.Type, ckSQL, nil, dsCalcExprs)
+		querySQL, err = buildChartSQL(body.Config, body.Type, ckSQL, nil, dsCalcExprs, nil)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
 			return
 		}
 		db = database.ClickHouseDB
 	} else {
-		querySQL, err = buildChartSQL(body.Config, body.Type, dataset.SQL, nil, dsCalcExprs)
+		querySQL, err = buildChartSQL(body.Config, body.Type, dataset.SQL, nil, dsCalcExprs, nil)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
 			return
@@ -655,7 +668,8 @@ func extractCalcFieldExprs(fieldsConfigJSON string) map[string]string {
 // maxChartRows 单个图表查询返回的最大行数，防止数据量过大拖垮前端渲染
 const maxChartRows = 200000
 
-func buildChartSQL(configJSON string, chartType string, datasetSQL string, filters []FilterCondition, dsCalcExprs map[string]string) (string, error) {
+// groupOverride 为 nil 时使用配置中的全部分组字段；非 nil（含空切片）时仅按其中列出的分组字段聚合
+func buildChartSQL(configJSON string, chartType string, datasetSQL string, filters []FilterCondition, dsCalcExprs map[string]string, groupOverride []string) (string, error) {
 	var config struct {
 		RowFields       []fieldConfig              `json:"rowFields"`
 		ColFields       []fieldConfig              `json:"colFields"`
@@ -671,6 +685,22 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 
 	if err := json.Unmarshal([]byte(configJSON), &config); err != nil {
 		return datasetSQL, nil
+	}
+
+	// 应用分组维度覆盖：仅保留用户所选的分组字段（保持配置中的原始顺序）
+	// 该逻辑在字段被用于 SELECT / GROUP BY 之前执行，因此同时作用于两者
+	if groupOverride != nil {
+		allowed := make(map[string]bool, len(groupOverride))
+		for _, name := range groupOverride {
+			allowed[name] = true
+		}
+		filtered := make([]fieldConfig, 0, len(config.GroupFields))
+		for _, f := range config.GroupFields {
+			if allowed[f.OriginalName] {
+				filtered = append(filtered, f)
+			}
+		}
+		config.GroupFields = filtered
 	}
 
 	// 收集所有维度字段的计算表达式，用于筛选条件中替换字段名

@@ -315,11 +315,18 @@ const ChartConfigPage: React.FC = () => {
         prev.map(f => f.originalName === currentField.originalName ? { ...f, config: tempFieldConfig } : f)
       );
     }
-    // 日期筛选：将 filterDefault 同步到 filterValues，确保预览立即生效
+    // 将 filterDefault 同步到 filterValues，确保预览立即生效
     // （useEffect 只在 filterValues 中无该 key 时初始化，无法覆盖已有值）
-    if (area === 'filter' && tempFieldConfig.filterType === 'dateRange') {
+    if (area === 'filter') {
       const dv = tempFieldConfig.filterDefault;
-      const newVal = (dv && typeof dv === 'object' && 'startType' in dv) ? dv : DEFAULT_DATE_RANGE_VALUE;
+      let newVal: any;
+      if (tempFieldConfig.filterType === 'dateRange') {
+        newVal = (dv && typeof dv === 'object' && 'startType' in dv) ? dv : DEFAULT_DATE_RANGE_VALUE;
+      } else if (tempFieldConfig.filterType === 'single') {
+        newVal = Array.isArray(dv) ? dv[0] : dv;
+      } else {
+        newVal = dv == null ? [] : (Array.isArray(dv) ? dv : [dv]);
+      }
       setFilterValues(prev => ({ ...prev, [currentField.originalName]: newVal }));
     }
     setIsFieldSettingsModalVisible(false);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Button, Layout, Form, Select, Radio, message, Popover, Switch } from 'antd';
-import { PlusOutlined, DeleteOutlined, CalendarOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, CalendarOutlined, HolderOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { FilterField } from '@shared/api.interface';
 import DateRangeFilterPicker, { DateRangeFilterValue, resolvedRangeLabel, DEFAULT_DATE_RANGE_VALUE } from '../DateRangeFilterPicker/DateRangeFilterPicker';
@@ -36,6 +36,8 @@ const FilterConfigModal: React.FC<FilterConfigModalProps> = ({ visible, onCancel
   const [fieldValues, setFieldValues] = useState<Record<string, any[]>>({});
   const [loadingValues, setLoadingValues] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   // 弹窗打开时加载已有筛选器配置
   useEffect(() => {
@@ -174,6 +176,42 @@ const FilterConfigModal: React.FC<FilterConfigModalProps> = ({ visible, onCancel
     }
   };
   
+  // 拖拽排序
+  const handleDragStart = (index: number, e: React.DragEvent) => {
+    setDragIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (index: number, e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (index !== dragOverIndex) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDrop = (index: number, e: React.DragEvent) => {
+    e.preventDefault();
+    if (dragIndex === null || dragIndex === index) {
+      setDragIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+    setFields(prev => {
+      const next = [...prev];
+      const [moved] = next.splice(dragIndex, 1);
+      next.splice(index, 0, moved);
+      return next;
+    });
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
   // 更新字段配置
   const updateField = (fieldId: string, updates: Partial<FilterField>) => {
     setFields(prev => prev.map(field => 
@@ -228,23 +266,34 @@ const FilterConfigModal: React.FC<FilterConfigModalProps> = ({ visible, onCancel
             </Button>
             
             <div>
-              {fields.map(field => (
+              {fields.map((field, index) => (
                 <div
                   key={field.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(index, e)}
+                  onDragOver={(e) => handleDragOver(index, e)}
+                  onDrop={(e) => handleDrop(index, e)}
+                  onDragEnd={handleDragEnd}
                   onClick={() => handleSelectField(field.id)}
                   style={{
                     padding: '8px 12px',
                     marginBottom: 8,
                     borderRadius: 4,
-                    cursor: 'pointer',
+                    cursor: 'grab',
+                    opacity: dragIndex === index ? 0.4 : 1,
                     backgroundColor: selectedFieldId === field.id ? '#e6f7ff' : '#fff',
-                    border: selectedFieldId === field.id ? '1px solid #91d5ff' : '1px solid #e8e8e8',
+                    border: dragOverIndex === index && dragIndex !== index
+                      ? '1px dashed #1890ff'
+                      : selectedFieldId === field.id ? '1px solid #91d5ff' : '1px solid #e8e8e8',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
                   }}
                 >
-                  {field.name}
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
+                    <HolderOutlined style={{ color: '#bfbfbf', flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{field.name}</span>
+                  </span>
                   <Button
                     type="text"
                     icon={<DeleteOutlined />}

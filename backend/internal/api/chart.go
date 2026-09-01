@@ -325,12 +325,22 @@ func GetChartData(c *gin.Context) {
 		return
 	}
 
-	// 解析筛选器参数
+	// 解析看板级筛选器参数（作用于外层聚合结果）
 	filtersParam := c.Query("filters")
 	var filterConditions []FilterCondition
 	if filtersParam != "" {
 		if err := json.Unmarshal([]byte(filtersParam), &filterConditions); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "解析筛选器参数失败: " + err.Error()})
+			return
+		}
+	}
+
+	// 解析图表级筛选器参数（用户在图表上交互修改的筛选值，始终作用于内层原始数据）
+	chartFiltersParam := c.Query("chartFilters")
+	var chartFilterOverrides []FilterCondition
+	if chartFiltersParam != "" {
+		if err := json.Unmarshal([]byte(chartFiltersParam), &chartFilterOverrides); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "解析图表筛选器参数失败: " + err.Error()})
 			return
 		}
 	}
@@ -364,14 +374,14 @@ func GetChartData(c *gin.Context) {
 		}
 		ckTable := "ds_" + strings.ReplaceAll(dataset.ID.String(), "-", "_")
 		ckSQL := fmt.Sprintf("SELECT * FROM %s", ckTable)
-		querySQL, err = buildChartSQL(chart.Config, string(chart.Type), ckSQL, filterConditions, dsCalcExprs, groupOverride)
+		querySQL, err = buildChartSQL(chart.Config, string(chart.Type), ckSQL, filterConditions, dsCalcExprs, groupOverride, chartFilterOverrides)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
 			return
 		}
 		db = database.ClickHouseDB
 	} else {
-		querySQL, err = buildChartSQL(chart.Config, string(chart.Type), dataset.SQL, filterConditions, dsCalcExprs, groupOverride)
+		querySQL, err = buildChartSQL(chart.Config, string(chart.Type), dataset.SQL, filterConditions, dsCalcExprs, groupOverride, chartFilterOverrides)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
 			return
@@ -496,14 +506,14 @@ func PreviewChartData(c *gin.Context) {
 		}
 		ckTable := "ds_" + strings.ReplaceAll(dataset.ID.String(), "-", "_")
 		ckSQL := fmt.Sprintf("SELECT * FROM %s", ckTable)
-		querySQL, err = buildChartSQL(body.Config, body.Type, ckSQL, nil, dsCalcExprs, nil)
+		querySQL, err = buildChartSQL(body.Config, body.Type, ckSQL, nil, dsCalcExprs, nil, nil)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
 			return
 		}
 		db = database.ClickHouseDB
 	} else {
-		querySQL, err = buildChartSQL(body.Config, body.Type, dataset.SQL, nil, dsCalcExprs, nil)
+		querySQL, err = buildChartSQL(body.Config, body.Type, dataset.SQL, nil, dsCalcExprs, nil, nil)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "构建SQL失败: " + err.Error()})
 			return
@@ -669,7 +679,9 @@ func extractCalcFieldExprs(fieldsConfigJSON string) map[string]string {
 const maxChartRows = 200000
 
 // groupOverride 为 nil 时使用配置中的全部分组字段；非 nil（含空切片）时仅按其中列出的分组字段聚合
-func buildChartSQL(configJSON string, chartType string, datasetSQL string, filters []FilterCondition, dsCalcExprs map[string]string, groupOverride []string) (string, error) {
+// chartFilterOverrides 为用户在图表上交互修改的图表级筛选值：当某字段被覆盖时，
+// 用覆盖值替换该字段在图表配置中的默认筛选值；两者都始终作用于内层（_inner）
+func buildChartSQL(configJSON string, chartType string, datasetSQL string, filters []FilterCondition, dsCalcExprs map[string]string, groupOverride []string, chartFilterOverrides []FilterCondition) (string, error) {
 	var config struct {
 		RowFields       []fieldConfig              `json:"rowFields"`
 		ColFields       []fieldConfig              `json:"colFields"`
@@ -803,6 +815,28 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 			fc = resolveFilterExpr(fc)
 		}
 		chartFilters = append(chartFilters, fc)
+	}
+
+	// 合并图表级筛选覆盖值：用户在图表上交互修改的筛选值优先于配置中的默认值。
+	// 同一字段被覆盖时，剔除配置产生的该字段筛选，再追加覆盖值（均作用于内层）。
+	if len(chartFilterOverrides) > 0 {
+		overridden := make(map[string]bool, len(chartFilterOverrides))
+		for _, o := range chartFilterOverrides {
+			overridden[o.Field] = true
+		}
+		kept := chartFilters[:0]
+		for _, fc := range chartFilters {
+			if !overridden[fc.Field] {
+				kept = append(kept, fc)
+			}
+		}
+		chartFilters = kept
+		for _, o := range chartFilterOverrides {
+			if !isValidIdentifier(o.Field) || len(o.Values) == 0 {
+				continue
+			}
+			chartFilters = append(chartFilters, resolveFilterExpr(o))
+		}
 	}
 
 	// 构建内层 SQL：数据集 + 图表级筛选

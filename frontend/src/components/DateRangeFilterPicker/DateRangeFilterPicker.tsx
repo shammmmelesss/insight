@@ -38,7 +38,9 @@ export function resolveDateRangeValue(value: DateRangeFilterValue): [Dayjs, Dayj
 
 export function resolvedRangeLabel(value: DateRangeFilterValue): string {
   const [s, e] = resolveDateRangeValue(value);
-  return `${s.format('YYYY/MM/DD')} ~ ${e.format('YYYY/MM/DD')}`;
+  // 起止同年时省略结束日期的年份，精简展示
+  const end = s.year() === e.year() ? e.format('MM/DD') : e.format('YYYY/MM/DD');
+  return `${s.format('YYYY/MM/DD')} ~ ${end}`;
 }
 
 interface Props {

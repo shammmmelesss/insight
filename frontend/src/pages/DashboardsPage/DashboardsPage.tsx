@@ -344,14 +344,15 @@ const DashboardsPage: React.FC = () => {
     if (config) setChartConfigs(prev => ({ ...prev, [chartId]: config }));
   };
 
-  const fetchChartData = async (chartId: string, filterParams?: FilterParam[], groupOverride?: string[]) => {
+  const fetchChartData = async (chartId: string, filterParams?: FilterParam[], groupOverride?: string[], chartFilterParams?: FilterParam[]) => {
     const buildParams = () => {
       const params: Record<string, string> = {};
       if (filterParams && filterParams.length > 0) params.filters = JSON.stringify(filterParams);
+      if (chartFilterParams && chartFilterParams.length > 0) params.chartFilters = JSON.stringify(chartFilterParams);
       if (groupOverride) params.groupFields = JSON.stringify(groupOverride);
       return params;
     };
-    const cacheKey = `chart:${chartId}:${JSON.stringify(filterParams ?? [])}:${groupOverride ? JSON.stringify(groupOverride) : 'all'}`;
+    const cacheKey = `chart:${chartId}:${JSON.stringify(filterParams ?? [])}:${JSON.stringify(chartFilterParams ?? [])}:${groupOverride ? JSON.stringify(groupOverride) : 'all'}`;
     const cached = dashboardCache.get<ChartCacheEntry>(cacheKey);
 
     if (cached) {
@@ -476,8 +477,14 @@ const DashboardsPage: React.FC = () => {
     setChartFilterValues(prev => {
       const nextForChart = { ...(prev[chartId] || {}), [fieldName]: value };
       const next = { ...prev, [chartId]: nextForChart };
-      const combined = [...buildFilterParamsForChart(chartId), ...buildChartConfigFilterParams(chartId, cfg, datasetId, nextForChart)];
-      loadSingleChart(chartId, combined.length > 0 ? combined : undefined);
+      // 看板级筛选走外层，图表级筛选走内层，分别通过不同参数传递
+      const dashboardParams = buildFilterParamsForChart(chartId);
+      const chartParams = buildChartConfigFilterParams(chartId, cfg, datasetId, nextForChart);
+      loadSingleChart(
+        chartId,
+        dashboardParams.length > 0 ? dashboardParams : undefined,
+        chartParams.length > 0 ? chartParams : undefined,
+      );
       return next;
     });
   };
@@ -503,9 +510,9 @@ const DashboardsPage: React.FC = () => {
     });
   };
 
-  const loadSingleChart = async (chartId: string, filterParams?: FilterParam[]) => {
+  const loadSingleChart = async (chartId: string, filterParams?: FilterParam[], chartFilterParams?: FilterParam[]) => {
     setChartLoadingMap(prev => ({ ...prev, [chartId]: true }));
-    await fetchChartData(chartId, filterParams, groupSelectionRef.current[chartId]);
+    await fetchChartData(chartId, filterParams, groupSelectionRef.current[chartId], chartFilterParams);
     setChartLoadingMap(prev => ({ ...prev, [chartId]: false }));
   };
 
@@ -1314,7 +1321,7 @@ const DashboardsPage: React.FC = () => {
               </div>
             )}
           </div>
-        ) : (
+        ) : noPermission !== null ? null : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 320 }}>
             <InboxOutlined style={{ fontSize: 48, color: '#d9d9d9', marginBottom: 16 }} />
             <div style={{ fontSize: 15, color: '#595959', marginBottom: 6 }}>请从左侧选择一个看板</div>

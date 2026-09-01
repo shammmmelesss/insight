@@ -78,7 +78,9 @@ export const generateSQL = (params: GenerateSQLParams): string => {
   const filterClauses = filterFields
     .map(f => {
       const filterType = f.config?.filterType || 'multiple';
-      const vals = filterValues[f.originalName];
+      // 未在 filterValues 中显式设置时，回退到配置的筛选默认值，
+      // 与后端 buildChartSQL 的 FilterDefault 回退行为保持一致，确保编辑预览中默认值生效
+      const vals = filterValues[f.originalName] ?? f.config?.filterDefault;
       if (!vals) return null;
       const expr = fieldExpr(f);
       if (filterType === 'dateRange') {

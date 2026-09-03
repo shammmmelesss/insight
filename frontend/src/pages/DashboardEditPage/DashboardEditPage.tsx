@@ -25,6 +25,7 @@ interface RGLLayout {
 
 import { DashboardLayoutItem, ChartOption, FilterField } from '@shared/api.interface';
 import ChartRenderer from '../../components/ChartRenderer';
+import RichTextEditor from '../../components/RichTextEditor';
 import FilterConfigModal from '../../components/FilterConfigModal/FilterConfigModal';
 import ChartConfigPanel from '../../components/ChartConfigPanel/ChartConfigPanel';
 
@@ -680,14 +681,13 @@ const DashboardEditPage: React.FC = () => {
             <div key={item.chartId} style={{ marginBottom: 10 }}>
               <Card styles={{ body: { padding: 0 } }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-                  <Input.TextArea
-                    value={item.text || ''}
-                    onChange={e => handleTextChange(item.chartId, e.target.value)}
-                    placeholder="请输入文本内容"
-                    variant="borderless"
-                    autoSize={{ minRows: 1 }}
-                    style={{ flex: 1, resize: 'none', fontSize: 14, lineHeight: 1.6, padding: '8px 12px' }}
-                  />
+                  <div style={{ flex: 1, minWidth: 0, padding: 8 }}>
+                    <RichTextEditor
+                      value={item.text || ''}
+                      onChange={value => handleTextChange(item.chartId, value)}
+                      placeholder="请输入文本内容"
+                    />
+                  </div>
                   <div style={{ display: 'flex', flexShrink: 0, padding: '4px 6px 0 0' }}>
                     <Tooltip title="移回看板内">
                       <Button type="text" size="small" icon={<VerticalAlignBottomOutlined />} onClick={() => handleMoveTextToGrid(item.chartId)} />
@@ -790,14 +790,13 @@ const DashboardEditPage: React.FC = () => {
                               <Button type="text" danger size="small" icon={<EllipsisOutlined />} onMouseDown={e => e.stopPropagation()} onClick={() => handleRemoveChart(key)} />
                             </Tooltip>
                           </div>
-                          <Input.TextArea
-                            value={item.text || ''}
-                            onChange={e => handleTextChange(key, e.target.value)}
-                            placeholder="请输入文本内容"
-                            variant="borderless"
-                            onMouseDown={e => e.stopPropagation()}
-                            style={{ flex: 1, resize: 'none', fontSize: 14, lineHeight: 1.6 }}
-                          />
+                          <div style={{ flex: 1, minHeight: 0, padding: '0 8px 8px' }}>
+                            <RichTextEditor
+                              value={item.text || ''}
+                              onChange={value => handleTextChange(key, value)}
+                              placeholder="请输入文本内容"
+                            />
+                          </div>
                         </div>
                       </Card>
                     </div>

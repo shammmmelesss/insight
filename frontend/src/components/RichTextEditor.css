@@ -1,0 +1,31 @@
+/* 富文本编辑器：让编辑区域填充组件高度，工具栏置顶 */
+.insight-rich-text-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.insight-rich-text-editor .quill {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.insight-rich-text-editor .ql-toolbar {
+  border-color: #f0f0f0;
+  flex-shrink: 0;
+}
+
+.insight-rich-text-editor .ql-container {
+  border-color: #f0f0f0;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  font-size: 14px;
+}
+
+.insight-rich-text-editor .ql-editor {
+  line-height: 1.6;
+}

@@ -1,0 +1,9 @@
+/* 富文本展示态：复用 quill 的基本排版，去除内边距 */
+.insight-rich-text-view {
+  height: auto;
+  word-break: break-word;
+}
+
+.insight-rich-text-view.ql-editor {
+  overflow: visible;
+}

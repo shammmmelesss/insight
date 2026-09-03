@@ -7,6 +7,7 @@ import { fetchChartOptions } from '@/api/charts';
 import { Dashboard, ChartOption, FilterField, DashboardLayoutItem } from '@shared/api.interface';
 import DashboardList from '../../components/DashboardList/DashboardList';
 import ChartRenderer, { ChartRendererHandle } from '../../components/ChartRenderer';
+import RichTextView from '../../components/RichTextView';
 import { dashboardCache } from '../../utils/dashboardCache';
 import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel} from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
 import { WorkUser, fetchAllWorkUsers } from '@/lib/workUser';
@@ -1021,9 +1022,7 @@ const DashboardsPage: React.FC = () => {
               style={{ minWidth: 0, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
               styles={{ body: { padding: '12px 16px' } }}
             >
-              <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 14, lineHeight: 1.6, color: '#262626' }}>
-                {item.text || ''}
-              </div>
+              <RichTextView html={item.text} style={{ color: '#262626' }} />
             </Card>
           </div>
         ))}
@@ -1092,9 +1091,7 @@ const DashboardsPage: React.FC = () => {
                       style={{ minWidth: 0, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
                       styles={{ body: { padding: '12px 16px' } }}
                     >
-                      <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 14, lineHeight: 1.6, color: '#262626' }}>
-                        {item.text || ''}
-                      </div>
+                      <RichTextView html={item.text} style={{ color: '#262626' }} />
                     </Card>
                   </div>
                 );

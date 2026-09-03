@@ -371,6 +371,8 @@ export interface DashboardLayoutItem {
   type?: 'text';
   /** 文本组件的内容 */
   text?: string;
+  /** 文本组件的位置，'top' 表示置于筛选器上方（不参与网格布局），缺省表示在网格内 */
+  position?: 'top';
 }
 
 /** 看板 */

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { Button, Input, Layout, Space, Card, Modal, message, Spin, Dropdown, Tooltip, Select, Popover } from 'antd';
-import { ArrowLeftOutlined, SearchOutlined, EllipsisOutlined, CodeOutlined, SettingOutlined, CalendarOutlined, PlusOutlined, FontSizeOutlined, FilterOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, SearchOutlined, EllipsisOutlined, CodeOutlined, SettingOutlined, CalendarOutlined, PlusOutlined, FontSizeOutlined, FilterOutlined, VerticalAlignTopOutlined, VerticalAlignBottomOutlined } from '@ant-design/icons';
 import DateRangeFilterPicker, { DateRangeFilterValue, DEFAULT_DATE_RANGE_VALUE, resolveDateRangeValue, resolvedRangeLabel} from '../../components/DateRangeFilterPicker/DateRangeFilterPicker';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
@@ -80,8 +80,9 @@ interface DashboardChartBodyProps {
   data: any[];
   cfg: any;
   chartH: number;
+  statusMessage?: string;
 }
-const DashboardChartBody: React.FC<DashboardChartBodyProps> = React.memo(({ chartType, data, cfg, chartH }) => {
+const DashboardChartBody: React.FC<DashboardChartBodyProps> = React.memo(({ chartType, data, cfg, chartH, statusMessage }) => {
   const rowFields = useMemo(() => extractNames(cfg.rowFields), [cfg.rowFields]);
   const colFields = useMemo(() => extractNames(cfg.colFields), [cfg.colFields]);
   const measureFields = useMemo(() => extractNames(cfg.measureFields), [cfg.measureFields]);
@@ -107,6 +108,7 @@ const DashboardChartBody: React.FC<DashboardChartBodyProps> = React.memo(({ char
       containerHeight={chartH}
       fieldLabelMap={fieldLabelMap}
       fieldFormats={fieldFormats}
+      statusMessage={statusMessage}
     />
   );
 });
@@ -124,7 +126,8 @@ const chartAreaHeight = (h: number) => Math.max(120, gridItemPixelHeight(h) - 60
 
 // Detect old layout format (width <= 8 and height <= 8 means pre-RGL format)
 const toRGLLayout = (items: DashboardLayoutItem[]): RGLLayout[] =>
-  items.map((item, index) => {
+  // 置顶文本组件不参与网格布局
+  items.filter(item => !(item.type === 'text' && item.position === 'top')).map((item, index) => {
     // 文本组件始终是新格式，跳过旧布局兼容推断
     const isOld = item.type !== 'text' && item.width <= 8 && item.height <= 8;
     return {
@@ -157,6 +160,7 @@ const DashboardEditPage: React.FC = () => {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [isCancelModalVisible, setIsCancelModalVisible] = useState(false);
   const [chartData, setChartData] = useState<Record<string, any[]>>({});
+  const [chartStatus, setChartStatus] = useState<Record<string, string>>({});
   const [chartConfigs, setChartConfigs] = useState<Record<string, any>>({});
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [datasets, setDatasets] = useState<Array<{ id: string; name: string }>>([]);
@@ -233,6 +237,18 @@ const DashboardEditPage: React.FC = () => {
 
   const handleTextChange = (chartId: string, value: string) => {
     setSelectedCharts(prev => prev.map(item => item.chartId === chartId ? { ...item, text: value } : item));
+  };
+
+  // 将文本组件置于筛选器上方：从网格布局中移除，改为顶部堆叠展示
+  const handleMoveTextToTop = (chartId: string) => {
+    setSelectedCharts(prev => prev.map(item => item.chartId === chartId ? { ...item, position: 'top' } : item));
+    setRglLayout(prev => prev.filter(l => l.i !== chartId));
+  };
+
+  // 将文本组件移回网格内（取消置顶）
+  const handleMoveTextToGrid = (chartId: string) => {
+    setSelectedCharts(prev => prev.map(item => item.chartId === chartId ? { ...item, position: undefined } : item));
+    setRglLayout(prev => prev.some(l => l.i === chartId) ? prev : [...prev, { i: chartId, x: 0, y: Infinity, w: COLS, h: 3, minW: 2, minH: 2 }]);
   };
 
   // 在看板上直接新建一张空图表（草稿），并打开右侧配置面板
@@ -345,6 +361,11 @@ const DashboardEditPage: React.FC = () => {
         params.filters = JSON.stringify(filterParams);
       }
       const response = await axios.get(`/api/charts/${chartId}/data`, { params });
+      setChartStatus(prev => {
+        if (response.data.extracting) return { ...prev, [chartId]: response.data.message || '数据正在写入，请稍候' };
+        if (!prev[chartId]) return prev;
+        const next = { ...prev }; delete next[chartId]; return next;
+      });
       setChartData(prev => ({ ...prev, [chartId]: response.data.data }));
       if (response.data.sql) {
         setChartSQLs(prev => ({ ...prev, [chartId]: response.data.sql }));
@@ -654,6 +675,32 @@ const DashboardEditPage: React.FC = () => {
       {/* 主内容区域 */}
       <Layout style={{ flex: 1, minHeight: 0, height: 'auto', overflow: 'hidden' }}>
         <Content style={{ padding: '10px', background: '#f0f2f5', overflow: 'auto' }}>
+          {/* 置于筛选器上方的文本组件 */}
+          {selectedCharts.filter(item => item.type === 'text' && item.position === 'top').map(item => (
+            <div key={item.chartId} style={{ marginBottom: 10 }}>
+              <Card styles={{ body: { padding: 0 } }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+                  <Input.TextArea
+                    value={item.text || ''}
+                    onChange={e => handleTextChange(item.chartId, e.target.value)}
+                    placeholder="请输入文本内容"
+                    variant="borderless"
+                    autoSize={{ minRows: 1 }}
+                    style={{ flex: 1, resize: 'none', fontSize: 14, lineHeight: 1.6, padding: '8px 12px' }}
+                  />
+                  <div style={{ display: 'flex', flexShrink: 0, padding: '4px 6px 0 0' }}>
+                    <Tooltip title="移回看板内">
+                      <Button type="text" size="small" icon={<VerticalAlignBottomOutlined />} onClick={() => handleMoveTextToGrid(item.chartId)} />
+                    </Tooltip>
+                    <Tooltip title="移除">
+                      <Button type="text" danger size="small" icon={<EllipsisOutlined />} onClick={() => handleRemoveChart(item.chartId)} />
+                    </Tooltip>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          ))}
+
           {/* 筛选器展示区域 */}
           {filters.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, padding: '10px 12px', marginBottom: 10, background: '#fff', borderRadius: 6, border: '1px solid #ebebeb' }}>
@@ -701,7 +748,7 @@ const DashboardEditPage: React.FC = () => {
             </div>
           )}
 
-          {selectedCharts.length > 0 ? (
+          {selectedCharts.some(item => !(item.type === 'text' && item.position === 'top')) ? (
             <ReactGridLayout
               layout={rglLayout}
               cols={COLS}
@@ -715,7 +762,7 @@ const DashboardEditPage: React.FC = () => {
               draggableHandle=".chart-drag-handle"
               resizeHandles={['se', 'sw', 'ne', 'nw', 's', 'e']}
             >
-              {selectedCharts.map((item, index) => {
+              {selectedCharts.filter(item => !(item.type === 'text' && item.position === 'top')).map((item, index) => {
                 const chart = charts.find(c => c.id === item.chartId);
                 const cfg = chartConfigs[item.chartId] || EMPTY_CFG;
                 // 图表自身配置的筛选字段（图表配置里「筛选」区域拖入的字段）
@@ -736,6 +783,9 @@ const DashboardEditPage: React.FC = () => {
                       >
                         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                           <div className="chart-drag-handle" style={{ height: 24, cursor: 'move', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '0 6px', flexShrink: 0 }}>
+                            <Tooltip title="置于筛选器上方">
+                              <Button type="text" size="small" icon={<VerticalAlignTopOutlined />} onMouseDown={e => e.stopPropagation()} onClick={() => handleMoveTextToTop(key)} />
+                            </Tooltip>
                             <Tooltip title="移除">
                               <Button type="text" danger size="small" icon={<EllipsisOutlined />} onMouseDown={e => e.stopPropagation()} onClick={() => handleRemoveChart(key)} />
                             </Tooltip>
@@ -923,6 +973,7 @@ const DashboardEditPage: React.FC = () => {
                         data={chartData[item.chartId] || EMPTY_DATA}
                         cfg={cfg}
                         chartH={chartH}
+                        statusMessage={chartStatus[item.chartId]}
                       />
                     </Card>
                   </div>

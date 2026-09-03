@@ -368,6 +368,10 @@ func GetChartData(c *gin.Context) {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ClickHouse 未连接，请检查配置"})
 			return
 		}
+		if dataset.ExtractStatus == models.ExtractStatusRunning {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "extracting": true, "message": "数据正在写入，请稍候"})
+			return
+		}
 		if dataset.ExtractStatus != models.ExtractStatusSuccess {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "数据尚未抽取成功，请先执行抽取"})
 			return
@@ -498,6 +502,10 @@ func PreviewChartData(c *gin.Context) {
 	if dataset.Type == models.DatasetTypeExtract {
 		if database.ClickHouseDB == nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ClickHouse 未连接"})
+			return
+		}
+		if dataset.ExtractStatus == models.ExtractStatusRunning {
+			c.JSON(http.StatusOK, gin.H{"data": []interface{}{}, "extracting": true, "message": "数据正在写入，请稍候"})
 			return
 		}
 		if dataset.ExtractStatus != models.ExtractStatusSuccess {

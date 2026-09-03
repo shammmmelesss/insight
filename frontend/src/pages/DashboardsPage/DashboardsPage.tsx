@@ -143,8 +143,9 @@ interface ViewChartBodyProps {
   visibleFields?: { rowFields: string[]; colFields: string[]; measureFields: string[] } | null;
   groupFieldsOverride?: string[] | null;
   chartRef: React.RefObject<ChartRendererHandle>;
+  statusMessage?: string;
 }
-const ViewChartBody: React.FC<ViewChartBodyProps> = React.memo(({ chartType, data, cfg, chartH, visibleFields, groupFieldsOverride, chartRef }) => {
+const ViewChartBody: React.FC<ViewChartBodyProps> = React.memo(({ chartType, data, cfg, chartH, visibleFields, groupFieldsOverride, chartRef, statusMessage }) => {
   const rowFields = useMemo(() => visibleFields ? visibleFields.rowFields : extractNamesStatic(cfg.rowFields), [cfg.rowFields, visibleFields]);
   const colFields = useMemo(() => visibleFields ? visibleFields.colFields : extractNamesStatic(cfg.colFields), [cfg.colFields, visibleFields]);
   const measureFields = useMemo(() => visibleFields ? visibleFields.measureFields : extractNamesStatic(cfg.measureFields), [cfg.measureFields, visibleFields]);
@@ -174,6 +175,7 @@ const ViewChartBody: React.FC<ViewChartBodyProps> = React.memo(({ chartType, dat
       containerHeight={chartH}
       fieldFormats={fieldFormats}
       fieldLabelMap={fieldLabelMap}
+      statusMessage={statusMessage}
     />
   );
 });
@@ -188,6 +190,7 @@ const DashboardsPage: React.FC = () => {
   const [noPermission, setNoPermission] = useState<string | null>(null);
   const [charts, setCharts] = useState<ChartOption[]>([]);
   const [chartData, setChartData] = useState<Record<string, unknown[]>>({});
+  const [chartStatus, setChartStatus] = useState<Record<string, string>>({});
   const [chartConfigs, setChartConfigs] = useState<Record<string, Record<string, unknown>>>({});
   const [chartLoadingMap, setChartLoadingMap] = useState<Record<string, boolean>>({});
   const chartRendererRefs = useRef<Record<string, React.RefObject<ChartRendererHandle>>>({});
@@ -336,12 +339,17 @@ const DashboardsPage: React.FC = () => {
   };
 
   type FilterParam = { field: string; type: string; dataType: string; values: string[]; exclude?: boolean };
-  interface ChartCacheEntry { data: unknown[]; config?: Record<string, unknown>; sql?: string; }
+  interface ChartCacheEntry { data: unknown[]; config?: Record<string, unknown>; sql?: string; status?: string; }
 
-  const applyChartResponse = (chartId: string, data: unknown[], config: Record<string, unknown> | undefined, sql: string | undefined) => {
+  const applyChartResponse = (chartId: string, data: unknown[], config: Record<string, unknown> | undefined, sql: string | undefined, statusMessage?: string) => {
     setChartData(prev => ({ ...prev, [chartId]: data }));
     if (sql) setChartSQLs(prev => ({ ...prev, [chartId]: sql }));
     if (config) setChartConfigs(prev => ({ ...prev, [chartId]: config }));
+    setChartStatus(prev => {
+      if (statusMessage) return { ...prev, [chartId]: statusMessage };
+      if (!prev[chartId]) return prev;
+      const next = { ...prev }; delete next[chartId]; return next;
+    });
   };
 
   const fetchChartData = async (chartId: string, filterParams?: FilterParam[], groupOverride?: string[], chartFilterParams?: FilterParam[]) => {
@@ -356,14 +364,15 @@ const DashboardsPage: React.FC = () => {
     const cached = dashboardCache.get<ChartCacheEntry>(cacheKey);
 
     if (cached) {
-      applyChartResponse(chartId, cached.data, cached.config, cached.sql);
+      applyChartResponse(chartId, cached.data, cached.config, cached.sql, cached.status);
       void (async () => {
         try {
           const response = await axios.get(`/api/charts/${chartId}/data`, { params: buildParams() });
           let config = response.data.chart?.config;
           if (typeof config === 'string') { try { config = JSON.parse(config); } catch { config = undefined; } }
-          dashboardCache.set(cacheKey, { data: response.data.data, config, sql: response.data.sql });
-          applyChartResponse(chartId, response.data.data, config, response.data.sql);
+          const status = response.data.extracting ? (response.data.message || '数据正在写入，请稍候') : undefined;
+          dashboardCache.set(cacheKey, { data: response.data.data, config, sql: response.data.sql, status });
+          applyChartResponse(chartId, response.data.data, config, response.data.sql, status);
         } catch { /* silent */ }
       })();
       return;
@@ -374,8 +383,9 @@ const DashboardsPage: React.FC = () => {
       const response = await axios.get(`/api/charts/${chartId}/data`, { params });
       let config = response.data.chart?.config;
       if (typeof config === 'string') { try { config = JSON.parse(config); } catch { config = undefined; } }
-      dashboardCache.set(cacheKey, { data: response.data.data, config, sql: response.data.sql });
-      applyChartResponse(chartId, response.data.data, config, response.data.sql);
+      const status = response.data.extracting ? (response.data.message || '数据正在写入，请稍候') : undefined;
+      dashboardCache.set(cacheKey, { data: response.data.data, config, sql: response.data.sql, status });
+      applyChartResponse(chartId, response.data.data, config, response.data.sql, status);
     } catch (error) {
       console.error('获取图表数据失败:', error);
     }
@@ -928,7 +938,8 @@ const DashboardsPage: React.FC = () => {
       )}
 
       <Content style={{ background: '#f0f2f5', overflow: 'auto', padding: '12px 12px 12px' }}>
-        {/* 标题栏 - sticky，负margin抵消Content两侧padding */}
+        {/* 标题栏 - sticky，负margin抵消Content两侧padding；嵌入模式下隐藏 */}
+        {!embed && (
         <div style={{ background: '#fff', border: '1px solid #ebebeb', padding: '0 12px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderRadius: 6 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {selectedDashboard && <div style={{ width: 3, height: 16, background: '#4096ff', borderRadius: 2 }} />}
@@ -1001,6 +1012,21 @@ const DashboardsPage: React.FC = () => {
             </div>
           )}
         </div>
+        )}
+
+        {/* 置于筛选器上方的文本组件 */}
+        {selectedDashboard && parsedLayout.filter(item => item.type === 'text' && item.position === 'top').map(item => (
+          <div key={item.chartId} style={{ marginBottom: 12 }}>
+            <Card
+              style={{ minWidth: 0, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+              styles={{ body: { padding: '12px 16px' } }}
+            >
+              <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 14, lineHeight: 1.6, color: '#262626' }}>
+                {item.text || ''}
+              </div>
+            </Card>
+          </div>
+        ))}
 
         {/* 筛选器栏 */}
         {selectedDashboard && filters.length > 0 && (
@@ -1055,7 +1081,7 @@ const DashboardsPage: React.FC = () => {
         {/* 图表网格 / 空态 */}
         {selectedDashboard ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-            {parsedLayout.length > 0 ? parsedLayout.map((item, index) => {
+            {parsedLayout.length > 0 ? parsedLayout.filter(item => !(item.type === 'text' && item.position === 'top')).map((item, index) => {
               if (item.type === 'text') {
                 return (
                   <div
@@ -1080,7 +1106,8 @@ const DashboardsPage: React.FC = () => {
               const isLoading = chartLoadingMap[item.chartId] ?? false;
               const dataRows = chartData[item.chartId] as Record<string, unknown>[] | undefined;
               const hasData = dataRows !== undefined;
-              const isEmpty = hasData && dataRows!.length === 0;
+              const statusMsg = chartStatus[item.chartId];
+              const isEmpty = hasData && dataRows!.length === 0 && !statusMsg;
               const chartMenuItems = [
                 { key: 'refresh', label: '刷新数据', onClick: () => refetchSingleChart(item.chartId) },
                 { key: 'sql', label: '查看SQL', icon: <CodeOutlined />, onClick: () => { setCurrentSQLChartId(item.chartId); setSqlModalVisible(true); } },
@@ -1306,6 +1333,7 @@ const DashboardsPage: React.FC = () => {
                         chartH={chartH}
                         visibleFields={visibleFields}
                         groupFieldsOverride={showGroupPicker ? selectedGroups : undefined}
+                        statusMessage={statusMsg}
                       />
                     ) : (
                       <div style={{ height: chartH }} />

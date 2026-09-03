@@ -34,6 +34,8 @@ interface ChartRendererProps {
   containerHeight?: number;
   fieldFormats?: Record<string, string>;
   fieldLabelMap?: Record<string, string>;
+  /** 非空时以占位提示替代图表内容（如数据集抽取中「数据正在写入」） */
+  statusMessage?: string;
 }
 
 const ChartRenderer = forwardRef<ChartRendererHandle, ChartRendererProps>(({
@@ -50,6 +52,7 @@ const ChartRenderer = forwardRef<ChartRendererHandle, ChartRendererProps>(({
   containerHeight,
   fieldFormats = {},
   fieldLabelMap = {},
+  statusMessage,
 }, ref) => {
   const getFieldLabel = (key: string): string => fieldLabelMap[key] || key;
   const chartRef = useRef<HTMLDivElement>(null);
@@ -127,6 +130,13 @@ const ChartRenderer = forwardRef<ChartRendererHandle, ChartRendererProps>(({
     chartRef.current.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #999;">请先选择数据集</div>';
   };
 
+  // 渲染状态占位提示（如数据集抽取中「数据正在写入」）
+  const renderStatus = (msg: string) => {
+    if (!chartRef.current) return;
+    if (legendContainerRef.current) legendContainerRef.current.innerHTML = '';
+    chartRef.current.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #999;">${msg}</div>`;
+  };
+
   // 渲染图表的公共函数：清理旧实例并按类型分发
   const renderChart = () => {
     if (!chartRef.current) return;
@@ -141,6 +151,12 @@ const ChartRenderer = forwardRef<ChartRendererHandle, ChartRendererProps>(({
         console.error('Failed to destroy chart instance:', error);
       }
       chartInstanceRef.current = null;
+    }
+
+    // 抽取中等状态：仅显示占位提示，跳过图表渲染
+    if (statusMessage) {
+      renderStatus(statusMessage);
+      return;
     }
 
     try {
@@ -204,7 +220,7 @@ const ChartRenderer = forwardRef<ChartRendererHandle, ChartRendererProps>(({
         chartInstanceRef.current = null;
       }
     };
-  }, [chartType, chartData, rowFields, colFields, measureFields, xAxisFields, yAxisFields, y2AxisFields, groupFields, indicatorFields, containerHeight, fieldFormats]);
+  }, [chartType, chartData, rowFields, colFields, measureFields, xAxisFields, yAxisFields, y2AxisFields, groupFields, indicatorFields, containerHeight, fieldFormats, statusMessage]);
 
   // CSV 字段转义：含逗号/引号/换行时用双引号包裹并转义内部引号
   const escapeCsvCell = (value: unknown): string => {

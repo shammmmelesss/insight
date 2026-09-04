@@ -253,7 +253,7 @@ const FilterConfigModal: React.FC<FilterConfigModalProps> = ({ visible, onCancel
     >
       <Layout style={{ height: 500 }}>
         {/* 左侧字段列表 */}
-        <Sider width={200} style={{ background: '#f0f2f5', borderRight: '1px solid #e8e8e8' }}>
+        <Sider width={200} style={{ background: 'var(--bg-layout)', borderRight: '1px solid var(--border)' }}>
           <div style={{ padding: 16 }}>
             <Button 
               type="dashed" 
@@ -283,15 +283,15 @@ const FilterConfigModal: React.FC<FilterConfigModalProps> = ({ visible, onCancel
                     opacity: dragIndex === index ? 0.4 : 1,
                     backgroundColor: selectedFieldId === field.id ? '#e6f7ff' : '#fff',
                     border: dragOverIndex === index && dragIndex !== index
-                      ? '1px dashed #1890ff'
-                      : selectedFieldId === field.id ? '1px solid #91d5ff' : '1px solid #e8e8e8',
+                      ? '1px dashed var(--primary)'
+                      : selectedFieldId === field.id ? '1px solid #BFDBFE' : '1px solid var(--border)',
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
                   }}
                 >
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6, overflow: 'hidden' }}>
-                    <HolderOutlined style={{ color: '#bfbfbf', flexShrink: 0 }} />
+                    <HolderOutlined style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{field.name}</span>
                   </span>
                   <Button
@@ -299,7 +299,7 @@ const FilterConfigModal: React.FC<FilterConfigModalProps> = ({ visible, onCancel
                     icon={<DeleteOutlined />}
                     size="small"
                     onClick={(e) => handleDeleteField(field.id, e)}
-                    style={{ color: '#ff4d4f' }}
+                    style={{ color: 'var(--error)' }}
                   />
                 </div>
               ))}
@@ -419,7 +419,7 @@ const FilterConfigModal: React.FC<FilterConfigModalProps> = ({ visible, onCancel
       </Layout>
       
       {/* 底部操作按钮 */}
-      <div style={{ padding: '16px 24px', borderTop: '1px solid #e8e8e8', textAlign: 'right' }}>
+      <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)', textAlign: 'right' }}>
         <Button style={{ marginRight: 8 }} onClick={handleCancel}>
           取消
         </Button>
@@ -461,17 +461,17 @@ const DateRangePickerTrigger: React.FC<DateRangePickerTriggerProps> = ({ value, 
           alignItems: 'center',
           gap: 6,
           padding: '4px 10px',
-          border: '1px solid #d9d9d9',
+          border: '1px solid var(--border)',
           borderRadius: 6,
           cursor: 'pointer',
           background: '#fff',
           fontSize: 13,
-          color: value?.startType ? '#262626' : '#bfbfbf',
+          color: value?.startType ? 'var(--text)' : 'var(--text-tertiary)',
           minWidth: 200,
           userSelect: 'none',
         }}
       >
-        <CalendarOutlined style={{ color: '#8c8c8c', fontSize: 13 }} />
+        <CalendarOutlined style={{ color: 'var(--text-secondary)', fontSize: 13 }} />
         {label}
       </div>
     </Popover>

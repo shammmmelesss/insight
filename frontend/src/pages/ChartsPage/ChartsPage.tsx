@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { App, Button, Card, Table, Space, message, Modal } from 'antd';
+import { App, Button, Card, Table, Tag, Modal } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -13,13 +13,21 @@ const formatDateTime = (val: string) => {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 };
 
+const chartTypeMap: Record<string, { label: string; color: string }> = {
+  crossTable: { label: '交叉表', color: 'purple' },
+  bar: { label: '柱状图', color: 'blue' },
+  line: { label: '折线图', color: 'green' },
+  pie: { label: '饼图', color: 'orange' },
+  indicator: { label: '指标卡', color: 'cyan' },
+};
+
 const ChartsPage: React.FC = () => {
   const [charts, setCharts] = useState<Chart[]>([]);
   const [loading, setLoading] = useState(false);
   const [dashboardModalVisible, setDashboardModalVisible] = useState(false);
   const [chartDashboards, setChartDashboards] = useState<any[]>([]);
   const [loadingDashboards, setLoadingDashboards] = useState(false);
-  const { modal } = App.useApp();
+  const { modal, message } = App.useApp();
   const navigate = useNavigate();
 
   // 获取图表列表
@@ -94,8 +102,22 @@ const ChartsPage: React.FC = () => {
       dataIndex: 'name',
       key: 'name',
       render: (text: string, record: Chart) => (
-        <a onClick={() => openChartConfig(record)}>{text}</a>
+        <a
+          onClick={() => openChartConfig(record)}
+          style={{ color: 'var(--primary)', fontWeight: 500 }}
+        >
+          {text}
+        </a>
       ),
+    },
+    {
+      title: '类型',
+      dataIndex: 'type',
+      key: 'type',
+      render: (type: string) => {
+        const m = chartTypeMap[type];
+        return m ? <Tag color={m.color}>{m.label}</Tag> : (type || '-');
+      },
     },
     {
       title: '创建人',
@@ -130,7 +152,7 @@ const ChartsPage: React.FC = () => {
       key: 'dashboardCount',
       render: (count: number, record: Chart) => (
         <span
-          style={{ color: '#1890ff', cursor: 'pointer' }}
+          style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: 500 }}
           onClick={() => showDashboardModal(record.id)}
         >
           {count}个
@@ -143,7 +165,7 @@ const ChartsPage: React.FC = () => {
       render: (_: any, record: Chart) => {
         const editable = canModifyRecord(record.createdBy);
         return (
-        <Space>
+        <div className="action-buttons">
           <Button
             icon={<EditOutlined />}
             size="small"
@@ -169,7 +191,7 @@ const ChartsPage: React.FC = () => {
           >
             删除
           </Button>
-        </Space>
+        </div>
         );
       },
     },
@@ -177,8 +199,11 @@ const ChartsPage: React.FC = () => {
 
   return (
     <div className="charts-page" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexShrink: 0 }}>
-        <h2>图表配置</h2>
+      <div className="page-header">
+        <div className="page-title">
+          <h2>图表配置</h2>
+          <span className="page-sub-title">共 {charts.length} 个图表</span>
+        </div>
         <Button
           type="primary"
           icon={<PlusOutlined />}
@@ -188,7 +213,7 @@ const ChartsPage: React.FC = () => {
         </Button>
       </div>
 
-      <Card style={{ flex: 1, minHeight: 0, overflow: 'hidden' }} styles={{ body: { height: '100%', overflow: 'auto', padding: '0 16px' } }}>
+      <Card style={{ flex: 1, minHeight: 0, overflow: 'hidden' }} styles={{ body: { height: '100%', overflow: 'auto', padding: '4px 16px 16px' } }}>
         <Table
           columns={columns}
           dataSource={charts}

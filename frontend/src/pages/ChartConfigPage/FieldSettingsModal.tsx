@@ -51,14 +51,14 @@ const FieldSettingsModal: React.FC<FieldSettingsModalProps> = ({
       {currentField && (
         <div style={{ paddingTop: 8 }}>
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>字段名称</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>字段名称</div>
             <Input value={currentField.displayName || currentField.originalName} disabled />
           </div>
 
           {currentField.area === 'filter' ? (
             <>
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>筛选器类型</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>筛选器类型</div>
                 <Radio.Group
                   value={tempFieldConfig.filterType || 'multiple'}
                   onChange={(e) => setTempFieldConfig(p => ({ ...p, filterType: e.target.value, filterDefault: e.target.value === 'dateRange' ? DEFAULT_DATE_RANGE_VALUE : [] }))}
@@ -71,17 +71,17 @@ const FieldSettingsModal: React.FC<FieldSettingsModalProps> = ({
 
               {tempFieldConfig.filterType !== 'dateRange' && (
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>排除模式</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>排除模式</div>
                   <Switch
                     checked={!!tempFieldConfig.filterExclude}
                     onChange={(checked) => setTempFieldConfig(p => ({ ...p, filterExclude: checked }))}
                   />
-                  <span style={{ marginLeft: 8, color: '#8c8c8c', fontSize: 12 }}>开启后仅排除所选值（NOT IN）</span>
+                  <span style={{ marginLeft: 8, color: 'var(--text-secondary)', fontSize: 12 }}>开启后仅排除所选值（NOT IN）</span>
                 </div>
               )}
 
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>筛选默认值</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>筛选默认值</div>
                 {tempFieldConfig.filterType === 'dateRange' ? (
                   <ChartDateRangePickerTrigger
                     value={(tempFieldConfig.filterDefault && typeof tempFieldConfig.filterDefault === 'object' && 'startType' in tempFieldConfig.filterDefault)
@@ -109,7 +109,7 @@ const FieldSettingsModal: React.FC<FieldSettingsModalProps> = ({
             <>
               {showAggregation && (
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>聚合方式</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>聚合方式</div>
                   <Select
                     value={tempFieldConfig.aggregation}
                     style={{ width: '100%' }}
@@ -127,7 +127,7 @@ const FieldSettingsModal: React.FC<FieldSettingsModalProps> = ({
 
               {showDataFormat && (
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>数据格式</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>数据格式</div>
                   <Select
                     value={tempFieldConfig.dataFormat}
                     style={{ width: '100%' }}
@@ -144,7 +144,7 @@ const FieldSettingsModal: React.FC<FieldSettingsModalProps> = ({
               )}
 
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 6 }}>排序</div>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 6 }}>排序</div>
                 <Select
                   value={tempFieldConfig.sort}
                   style={{ width: '100%' }}
@@ -157,7 +157,7 @@ const FieldSettingsModal: React.FC<FieldSettingsModalProps> = ({
             </>
           )}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid #f0f0f0', paddingTop: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--border-secondary)', paddingTop: 16 }}>
             <Button onClick={onCancel}>取消</Button>
             <Button type="primary" onClick={onSave}>确定</Button>
           </div>

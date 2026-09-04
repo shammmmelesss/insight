@@ -24,7 +24,7 @@ const FieldTag: React.FC<FieldTagProps> = ({
   return (
     <div style={{ position: 'relative' }}>
       {insertBefore && (
-        <div style={{ height: 2, backgroundColor: '#1677ff', borderRadius: 1, marginBottom: 2 }} />
+        <div style={{ height: 2, backgroundColor: 'var(--primary)', borderRadius: 1, marginBottom: 2 }} />
       )}
       <div
         draggable
@@ -34,11 +34,11 @@ const FieldTag: React.FC<FieldTagProps> = ({
           alignItems: 'center',
           gap: 4,
           padding: '3px 8px',
-          backgroundColor: '#f0f5ff',
-          border: '1px solid #adc6ff',
-          borderRadius: 4,
+          backgroundColor: 'var(--primary-bg)',
+          border: '1px solid #BFDBFE',
+          borderRadius: 6,
           fontSize: 12,
-          color: '#2f54eb',
+          color: '#1D4ED8',
           width: '100%',
           boxSizing: 'border-box',
           cursor: 'grab',
@@ -47,7 +47,7 @@ const FieldTag: React.FC<FieldTagProps> = ({
         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {field.displayName || field.originalName}
           {showAggregation && aggLabel && (
-            <span style={{ color: '#8c8c8c', marginLeft: 4, fontWeight: 400 }}>· {aggLabel}</span>
+            <span style={{ color: 'var(--text-tertiary)', marginLeft: 4, fontWeight: 400 }}>· {aggLabel}</span>
           )}
         </span>
         <Tooltip title="字段设置">
@@ -55,7 +55,7 @@ const FieldTag: React.FC<FieldTagProps> = ({
             size="small"
             type="text"
             icon={<SettingOutlined />}
-            style={{ color: '#595959', padding: 0, minWidth: 'auto', height: 'auto', flexShrink: 0 }}
+            style={{ color: 'var(--text-secondary)', padding: 0, minWidth: 'auto', height: 'auto', flexShrink: 0 }}
             onClick={(e) => { e.stopPropagation(); onSettings(field, area); }}
           />
         </Tooltip>
@@ -64,13 +64,13 @@ const FieldTag: React.FC<FieldTagProps> = ({
             size="small"
             type="text"
             icon={<DeleteOutlined />}
-            style={{ color: '#ff4d4f', padding: 0, minWidth: 'auto', height: 'auto', flexShrink: 0 }}
+            style={{ color: 'var(--error)', padding: 0, minWidth: 'auto', height: 'auto', flexShrink: 0 }}
             onClick={(e) => { e.stopPropagation(); onRemove(area, field.originalName); }}
           />
         </Tooltip>
       </div>
       {insertAfter && (
-        <div style={{ height: 2, backgroundColor: '#1677ff', borderRadius: 1, marginTop: 2 }} />
+        <div style={{ height: 2, backgroundColor: 'var(--primary)', borderRadius: 1, marginTop: 2 }} />
       )}
     </div>
   );

@@ -96,7 +96,7 @@ const CAL_STYLE = `
 .drfp-cal .ant-picker-calendar-date-value { display: none !important; }
 .drfp-cal .ant-picker-calendar-date-content { height: auto !important; overflow: visible !important; }
 .drfp-cal .ant-picker-cell-inner.ant-picker-calendar-date { padding: 1px 0 !important; min-height: 0 !important; background: transparent !important; border: none !important; }
-.drfp-cal .ant-picker-content th { font-size: 11px; color: #8c8c8c; padding: 1px 0; }
+.drfp-cal .ant-picker-content th { font-size: 11px; color: var(--text-secondary); padding: 1px 0; }
 .drfp-cal .ant-picker-content td { padding: 0 !important; }
 .drfp-cal .ant-picker-panel { background: transparent; }
 .drfp-cal .ant-picker-body { padding: 2px 6px !important; }
@@ -119,7 +119,7 @@ const DateRangeFilterPicker: React.FC<Props> = ({ value, onChange, onCancel }) =
       <div style={{ display: 'flex', background: '#fff', borderRadius: 8, overflow: 'hidden', width: 620, maxWidth: 'calc(100vw - 16px)' }}>
 
         {/* 左侧预设 */}
-        <div style={{ width: 128, borderRight: '1px solid #f0f0f0', padding: '10px 8px', flexShrink: 0 }}>
+        <div style={{ width: 128, borderRight: '1px solid var(--border-secondary)', padding: '10px 8px', flexShrink: 0 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {PRESET_ROWS.map((row, ri) => (
               <div key={ri} style={{ display: 'flex', gap: 3 }}>
@@ -138,11 +138,11 @@ const DateRangeFilterPicker: React.FC<Props> = ({ value, onChange, onCancel }) =
                       flex: 1,
                       padding: '3px 0',
                       fontSize: 11,
-                      border: `1px solid ${p.id === draft.presetId ? '#165DFF' : '#e8e8e8'}`,
+                      border: `1px solid ${p.id === draft.presetId ? 'var(--primary)' : 'var(--border)'}`,
                       borderRadius: 4,
                       cursor: 'pointer',
-                      background: p.id === draft.presetId ? '#165DFF' : '#fff',
-                      color: p.id === draft.presetId ? '#fff' : '#595959',
+                      background: p.id === draft.presetId ? 'var(--primary)' : '#fff',
+                      color: p.id === draft.presetId ? '#fff' : 'var(--text-secondary)',
                       whiteSpace: 'nowrap',
                       transition: 'all 0.15s',
                     }}
@@ -174,16 +174,16 @@ const DateRangeFilterPicker: React.FC<Props> = ({ value, onChange, onCancel }) =
                 padding: '5px 10px',
                 marginBottom: 10,
                 fontSize: 12,
-                color: '#262626',
+                color: 'var(--text)',
                 minHeight: 28,
               }}>
                 {label && (
-                  <span style={{ color: '#165DFF', fontWeight: 600, marginRight: 4 }}>{label}</span>
+                  <span style={{ color: 'var(--primary)', fontWeight: 600, marginRight: 4 }}>{label}</span>
                 )}
-                <span style={{ color: '#165DFF', fontWeight: 500 }}>{ps.format('YYYY/MM/DD')}</span>
-                <span style={{ color: '#8c8c8c', margin: '0 2px' }}>~</span>
-                <span style={{ color: '#165DFF', fontWeight: 500 }}>{pe.format('YYYY/MM/DD')}</span>
-                <span style={{ color: '#8c8c8c', fontSize: 11 }}>（{pe.diff(ps, 'day') + 1} 天）</span>
+                <span style={{ color: 'var(--primary)', fontWeight: 500 }}>{ps.format('YYYY/MM/DD')}</span>
+                <span style={{ color: 'var(--text-secondary)', margin: '0 2px' }}>~</span>
+                <span style={{ color: 'var(--primary)', fontWeight: 500 }}>{pe.format('YYYY/MM/DD')}</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>（{pe.diff(ps, 'day') + 1} 天）</span>
               </div>
             );
           })()}
@@ -205,7 +205,7 @@ const DateRangeFilterPicker: React.FC<Props> = ({ value, onChange, onCancel }) =
               onDynamicChange={n => update({ startDynamic: n })}
               onStaticChange={d => update({ startStatic: d })}
             />
-            <div style={{ display: 'flex', alignItems: 'flex-start', paddingTop: 46, color: '#bfbfbf', fontSize: 14, flexShrink: 0 }}>→</div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', paddingTop: 46, color: 'var(--text-tertiary)', fontSize: 14, flexShrink: 0 }}>→</div>
             <SidePanel
               type={draft.endType}
               dynamic={draft.endDynamic}
@@ -225,8 +225,8 @@ const DateRangeFilterPicker: React.FC<Props> = ({ value, onChange, onCancel }) =
             />
           </div>
 
-          <div style={{ borderTop: '1px solid #f0f0f0', paddingTop: 10, marginTop: 10 }}>
-            {error && <div style={{ color: '#ff4d4f', fontSize: 11, marginBottom: 6, textAlign: 'right' }}>{error}</div>}
+          <div style={{ borderTop: '1px solid var(--border-secondary)', paddingTop: 10, marginTop: 10 }}>
+            {error && <div style={{ color: 'var(--error)', fontSize: 11, marginBottom: 6, textAlign: 'right' }}>{error}</div>}
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <Button size="small" onClick={() => { setError(null); onCancel ? onCancel() : onChange(value ?? DEFAULT_VALUE); }}>取消</Button>
               <Button size="small" type="primary" onClick={() => {
@@ -281,10 +281,10 @@ const SidePanel: React.FC<SidePanelProps> = ({
         justifyContent: 'center',
         borderRadius: '50%',
         fontSize: 11,
-        background: isSelected ? '#165DFF' : 'transparent',
-        color: isSelected ? '#fff' : isToday ? '#165DFF' : isCurrentMonth ? '#262626' : '#c0c0c0',
+        background: isSelected ? 'var(--primary)' : 'transparent',
+        color: isSelected ? '#fff' : isToday ? 'var(--primary)' : isCurrentMonth ? 'var(--text)' : 'var(--text-tertiary)',
         fontWeight: isToday && !isSelected ? 700 : undefined,
-        border: isToday && !isSelected ? '1px solid #165DFF' : undefined,
+        border: isToday && !isSelected ? '1px solid var(--primary)' : undefined,
       }}>
         {date.date()}
       </div>
@@ -304,8 +304,8 @@ const SidePanel: React.FC<SidePanelProps> = ({
               fontSize: 11,
               border: 'none',
               cursor: 'pointer',
-              background: type === t ? '#165DFF' : '#fff',
-              color: type === t ? '#fff' : '#595959',
+              background: type === t ? 'var(--primary)' : '#fff',
+              color: type === t ? '#fff' : 'var(--text-secondary)',
               transition: 'all 0.15s',
               lineHeight: '18px',
             }}
@@ -330,7 +330,7 @@ const SidePanel: React.FC<SidePanelProps> = ({
               }}
               style={{ flex: 1 }}
             />
-            <span style={{ fontSize: 11, color: '#595959', whiteSpace: 'nowrap' }}>天前</span>
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>天前</span>
           </>
         ) : (
           <div style={{ flex: 1, height: 24 }} />
@@ -338,7 +338,7 @@ const SidePanel: React.FC<SidePanelProps> = ({
       </div>
 
       {/* 内联日历 */}
-      <div className="drfp-cal" style={{ border: '1px solid #f0f0f0', borderRadius: 6, overflow: 'hidden' }}>
+      <div className="drfp-cal" style={{ border: '1px solid var(--border-secondary)', borderRadius: 6, overflow: 'hidden' }}>
         <Calendar
           fullscreen={false}
           value={panelDate}
@@ -352,17 +352,17 @@ const SidePanel: React.FC<SidePanelProps> = ({
           disabledDate={minStaticDate ? (d) => d.isBefore(minStaticDate, 'day') : undefined}
           style={{ pointerEvents: type === 'dynamic' ? 'none' : undefined, opacity: type === 'dynamic' ? 0.7 : 1 }}
           headerRender={({ value: hv, onChange: hOnChange }) => (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', borderBottom: '1px solid #f0f0f0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', borderBottom: '1px solid var(--border-secondary)' }}>
               <button
                 onClick={() => { const d = hv.subtract(1, 'month'); hOnChange(d); setPanelDate(d); }}
-                style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 14, color: '#8c8c8c', padding: '0 2px', lineHeight: 1 }}
+                style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--text-secondary)', padding: '0 2px', lineHeight: 1 }}
               >‹</button>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#262626' }}>
+              <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>
                 {hv.format('YYYY年M月')}
               </span>
               <button
                 onClick={() => { const d = hv.add(1, 'month'); hOnChange(d); setPanelDate(d); }}
-                style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 14, color: '#8c8c8c', padding: '0 2px', lineHeight: 1 }}
+                style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 14, color: 'var(--text-secondary)', padding: '0 2px', lineHeight: 1 }}
               >›</button>
             </div>
           )}

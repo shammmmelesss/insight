@@ -70,7 +70,7 @@ export const renderCrossTable = (ctx: RenderContext) => {
             Object.assign(row.style, {
               padding: '7px 16px', cursor: 'pointer', fontSize: '14px', color: '#000',
             });
-            row.onmouseenter = () => { row.style.background = '#f5f5f5'; };
+            row.onmouseenter = () => { row.style.background = '#F6F8FB'; };
             row.onmouseleave = () => { row.style.background = ''; };
             row.onclick = () => {
               operator.menu.onClick({ key: item.key });

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { App, Button, Card, Table, Modal, Drawer, Form, Input, Tabs, Row, Col, Select, Radio, TimePicker, Tooltip, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined, SyncOutlined, CheckCircleOutlined, CloseCircleOutlined, StopOutlined, ClearOutlined, ShareAltOutlined, FileSearchOutlined, CopyOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, PlayCircleOutlined, SyncOutlined, CheckCircleOutlined, CloseCircleOutlined, StopOutlined, ClearOutlined, ShareAltOutlined, FileSearchOutlined, CopyOutlined, SearchOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { Dataset, CreateDatasetRequest, UpdateDatasetRequest, FieldConfig, DataType, DatasetType, ExtractSchedule, ExtractFrequency, ExtractStatus } from '@shared/api.interface';
@@ -489,7 +489,7 @@ const DatasetsPage: React.FC = () => {
 
 
   const renderExtractStatus = (status: ExtractStatus | undefined, lastAt: string | undefined, error: string | undefined) => {
-    if (!status || status === 'idle') return <Tag>未抽取</Tag>;
+    if (!status || status === 'idle') return <Tag color="default">未抽取</Tag>;
     if (status === 'running') return <Tag icon={<SyncOutlined spin />} color="processing">抽取中</Tag>;
     if (status === 'success') return (
       <Tooltip title={lastAt ? `最后抽取：${formatDateTime(lastAt)}` : undefined}>
@@ -511,9 +511,9 @@ const DatasetsPage: React.FC = () => {
       key: 'name',
       render: (name: string, record: Dataset) => (
         <div>
-          <div>{name}</div>
+          <div style={{ fontWeight: 500 }}>{name}</div>
           {record.description && (
-            <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{record.description}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{record.description}</div>
           )}
         </div>
       ),
@@ -538,7 +538,7 @@ const DatasetsPage: React.FC = () => {
       key: 'chartCount',
       render: (chartCount: number, record: Dataset) => (
         <span 
-          style={{ color: '#1890ff', cursor: 'pointer' }} 
+          style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: 500 }} 
           onClick={() => showChartModal(record.id)}
         >
           {chartCount}个
@@ -582,7 +582,7 @@ const DatasetsPage: React.FC = () => {
           <Button
             size="small"
             onClick={() => window.open(`/chart-config?datasetId=${record.id}`, '_blank')}
-            style={{ marginRight: 8, color: '#1890ff' }}
+            style={{ color: 'var(--primary)' }}
           >
             可视化
           </Button>
@@ -594,7 +594,6 @@ const DatasetsPage: React.FC = () => {
                 loading={stoppingIds.has(record.id)}
                 disabled={stoppingIds.has(record.id)}
                 onClick={() => stopExtract(record.id)}
-                style={{ marginRight: 8 }}
                 danger
               >
                 停止抽取
@@ -604,7 +603,6 @@ const DatasetsPage: React.FC = () => {
                 size="small"
                 icon={<SyncOutlined />}
                 onClick={() => triggerExtract(record.id)}
-                style={{ marginRight: 8 }}
               >
                 手动抽取
               </Button>
@@ -615,7 +613,6 @@ const DatasetsPage: React.FC = () => {
               size="small"
               icon={<ClearOutlined />}
               onClick={() => clearExtractData(record.id)}
-              style={{ marginRight: 8 }}
             >
               清空数据
             </Button>
@@ -626,7 +623,6 @@ const DatasetsPage: React.FC = () => {
             disabled={!editable}
             title={!editable ? '只有创建人或管理成员才能编辑' : undefined}
             onClick={() => showModal(record)}
-            style={{ marginRight: 8 }}
           >
             编辑
           </Button>
@@ -635,7 +631,6 @@ const DatasetsPage: React.FC = () => {
             size="small"
             loading={copyingIds.has(record.id)}
             onClick={() => handleCopy(record.id)}
-            style={{ marginRight: 8 }}
           >
             复制
           </Button>
@@ -645,7 +640,6 @@ const DatasetsPage: React.FC = () => {
             disabled={!editable}
             title={!editable ? '只有创建人或管理成员才能分享' : undefined}
             onClick={() => { setSharingDataset(record); setShareModalVisible(true); }}
-            style={{ marginRight: 8 }}
           >
             分享
           </Button>
@@ -673,8 +667,11 @@ const DatasetsPage: React.FC = () => {
 
   return (
     <div className="datasets-page" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexShrink: 0 }}>
-        <h2>数据集管理</h2>
+      <div className="page-header">
+        <div className="page-title">
+          <h2>数据集管理</h2>
+          <span className="page-sub-title">共 {datasets.length} 个数据集</span>
+        </div>
         <Button
           type="primary"
           icon={<PlusOutlined />}
@@ -684,21 +681,22 @@ const DatasetsPage: React.FC = () => {
         </Button>
       </div>
 
-      <Card style={{ marginBottom: 16, flexShrink: 0 }}>
-        <div style={{ display: 'flex', gap: 16 }}>
-          <Input
-            placeholder="搜索数据集名称..."
-            value={searchKeyword}
-            onChange={handleSearchChange}
-            style={{ width: 300 }}
-          />
-          <Button type="primary" onClick={handleSearch}>
-            搜索
-          </Button>
-        </div>
-      </Card>
+      <div className="list-toolbar" style={{ marginTop: 0 }}>
+        <Input
+          placeholder="搜索数据集名称..."
+          value={searchKeyword}
+          onChange={handleSearchChange}
+          onPressEnter={handleSearch}
+          allowClear
+          style={{ width: 300 }}
+          prefix={<SearchOutlined style={{ color: 'var(--text-tertiary)' }} />}
+        />
+        <Button type="primary" onClick={handleSearch}>
+          搜索
+        </Button>
+      </div>
 
-      <Card style={{ flex: 1, minHeight: 0, overflow: 'hidden' }} styles={{ body: { height: '100%', overflow: 'auto', padding: '0 16px' } }}>
+      <Card style={{ flex: 1, minHeight: 0, overflow: 'hidden' }} styles={{ body: { height: '100%', overflow: 'auto', padding: '4px 16px 16px' } }}>
         <Table
           columns={columns}
           dataSource={datasets}
@@ -766,7 +764,7 @@ const DatasetsPage: React.FC = () => {
                   <Radio.Button value="direct">直连</Radio.Button>
                   <Radio.Button value="extract">抽取</Radio.Button>
                 </Radio.Group>
-                <div style={{ marginTop: 4, fontSize: 12, color: '#888' }}>
+                <div style={{ marginTop: 4, fontSize: 12, color: 'var(--text-secondary)' }}>
                   {datasetType === 'direct'
                     ? '图表直接查询原始数据源 SQL'
                     : '将数据定期抽取到 ClickHouse，图表查询 ClickHouse 表'}
@@ -859,7 +857,7 @@ const DatasetsPage: React.FC = () => {
 
               {sqlResult.length > 0 && (
                 <div style={{ marginTop: 16 }}>
-                  <h4>查询结果</h4>
+                  <h4 style={{ marginBottom: 12 }}>查询结果</h4>
                   <Table
                     columns={sqlColumns.map((col: any) => ({
                       title: col.name,
@@ -883,7 +881,7 @@ const DatasetsPage: React.FC = () => {
               </div>
 
               {fieldsConfig.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 32, color: '#999' }}>
+                <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-tertiary)' }}>
                   暂无字段配置
                   <br />
                   请先在SQL语句标签页运行SQL生成字段
@@ -955,7 +953,7 @@ const DatasetsPage: React.FC = () => {
                           placeholder={isCalculated ? '请输入计算表达式（必填）' : '—'}
                           disabled={!isCalculated}
                           status={isEmpty ? 'error' : undefined}
-                          style={!isCalculated ? { background: '#f5f5f5', color: '#bbb', cursor: 'not-allowed' } : undefined}
+                          style={!isCalculated ? { background: 'var(--border-secondary)', color: 'var(--text-tertiary)', cursor: 'not-allowed' } : undefined}
                         />
                       );
                     }}
@@ -982,8 +980,8 @@ const DatasetsPage: React.FC = () => {
             </Tabs.TabPane>
           </Tabs>
 
-          <div className="modal-footer" style={{ marginTop: 24, textAlign: 'right' }}>
-            <Button onClick={handleCancel} style={{ marginRight: 8 }}>
+          <div className="modal-footer">
+            <Button onClick={handleCancel}>
               取消
             </Button>
             <Button type="primary" htmlType="submit">
@@ -1039,7 +1037,7 @@ const DatasetsPage: React.FC = () => {
                   <Button
                     size="small"
                     onClick={() => window.open(`/charts/edit/${record.id}`, '_blank')}
-                    style={{ marginRight: 8, color: '#1890ff' }}
+                    style={{ color: 'var(--primary)' }}
                   >
                     编辑
                   </Button>

@@ -1,7 +1,7 @@
-// G2 图表默认配色（左轴/主系列）
-export const G2_COLORS = ['#1783FF', '#00C9C9', '#F0884D', '#D580FF', '#7863FF', '#60C42D', '#BD8F24', '#FF80CA', '#2491B3', '#17C76F'];
+// G2 图表默认配色（左轴/主系列）—— 现代专业 BI 色板，首色与品牌主色一致
+export const G2_COLORS = ['#2563EB', '#10B981', '#F97316', '#8B5CF6', '#06B6D4', '#EF4444', '#F59E0B', '#EC4899', '#0891B2', '#84CC16'];
 // 双轴图右轴（折线）配色
-export const ORANGE_COLORS = ['#FA8C16', '#F5222D', '#FADB14', '#52C41A', '#722ED1', '#13C2C2'];
+export const ORANGE_COLORS = ['#F97316', '#EF4444', '#F59E0B', '#10B981', '#8B5CF6', '#06B6D4'];
 // 折线/双轴图自定义图例占用的高度
 export const LINE_LEGEND_HEIGHT = 36;
 

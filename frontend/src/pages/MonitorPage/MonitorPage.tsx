@@ -265,12 +265,12 @@ const MonitorPage: React.FC = () => {
       render: (_: any, record: Monitor) => {
         const editable = canModifyRecord(record.createdBy);
         return (
-        <Space>
+        <div className="action-buttons">
           <Button icon={<EditOutlined />} size="small" disabled={!editable} title={!editable ? '只有创建人才能编辑' : undefined} onClick={() => openEdit(record)}>编辑</Button>
           <Button icon={<CopyOutlined />} size="small" onClick={() => openCopy(record)}>复制</Button>
           <Button icon={<HistoryOutlined />} size="small" onClick={() => openHistory(record)}>告警历史</Button>
           <Button icon={<DeleteOutlined />} size="small" danger disabled={!editable} title={!editable ? '只有创建人才能删除' : undefined} onClick={() => handleDelete(record.id)}>删除</Button>
-        </Space>
+        </div>
         );
       },
     },
@@ -278,12 +278,15 @@ const MonitorPage: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexShrink: 0 }}>
-        <h2>监控</h2>
+      <div className="page-header">
+        <div className="page-title">
+          <h2>监控</h2>
+          <span className="page-sub-title">共 {monitors.length} 个监控</span>
+        </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>新增监控</Button>
       </div>
 
-      <Card style={{ flex: 1, minHeight: 0, overflow: 'hidden' }} styles={{ body: { height: '100%', overflow: 'auto', padding: '0 16px' } }}>
+      <Card style={{ flex: 1, minHeight: 0, overflow: 'hidden' }} styles={{ body: { height: '100%', overflow: 'auto', padding: '4px 16px 16px' } }}>
         <Table columns={columns} dataSource={monitors} rowKey="id" loading={loading} pagination={false} />
       </Card>
 
@@ -311,9 +314,9 @@ const MonitorPage: React.FC = () => {
                   <Tooltip title={`SQL: ${triggerResult.sql}`}>
                     <Space size={4}>
                       {triggerResult.triggered
-                        ? <CheckCircleOutlined style={{ color: '#ff4d4f' }} />
-                        : <CloseCircleOutlined style={{ color: '#52c41a' }} />}
-                      <span style={{ fontSize: 12, color: triggerResult.triggered ? '#ff4d4f' : '#52c41a' }}>
+                        ? <CheckCircleOutlined style={{ color: 'var(--error)' }} />
+                        : <CloseCircleOutlined style={{ color: 'var(--success)' }} />}
+                      <span style={{ fontSize: 12, color: triggerResult.triggered ? 'var(--error)' : 'var(--success)' }}>
                         {triggerResult.triggered
                           ? `已触发告警（${triggerResult.rows.length} 条满足条件 ${triggerResult.operator} ${triggerResult.threshold}）`
                           : `未触发（无数据满足条件 ${triggerResult.operator} ${triggerResult.threshold}）`}
@@ -321,7 +324,7 @@ const MonitorPage: React.FC = () => {
                     </Space>
                   </Tooltip>
                   {triggerResult.triggered && triggerResult.rows.length > 0 && (
-                    <div style={{ fontSize: 12, color: '#595959', maxHeight: 80, overflowY: 'auto' }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', maxHeight: 80, overflowY: 'auto' }}>
                       {triggerResult.rows.map((r, i) => (
                         <span key={i}>{r.dimension ? `${r.dimension}：` : ''}{r.value}；</span>
                       ))}
@@ -329,7 +332,7 @@ const MonitorPage: React.FC = () => {
                   )}
                   {triggerResult.notifyErrors && triggerResult.notifyErrors.length > 0 && (
                     <Tooltip title={triggerResult.notifyErrors.join('\n')}>
-                      <span style={{ fontSize: 12, color: '#faad14', cursor: 'pointer' }}>⚠️ 通知发送失败，点击查看详情</span>
+                      <span style={{ fontSize: 12, color: 'var(--warning)', cursor: 'pointer' }}>⚠️ 通知发送失败，点击查看详情</span>
                     </Tooltip>
                   )}
                 </Space>
@@ -519,21 +522,21 @@ const MonitorPage: React.FC = () => {
               dataIndex: 'triggered',
               key: 'triggered',
               render: (v: boolean) => v
-                ? <span style={{ color: '#ff4d4f' }}>已触发</span>
-                : <span style={{ color: '#52c41a' }}>未触发</span>,
+                ? <span style={{ color: 'var(--error)' }}>已触发</span>
+                : <span style={{ color: 'var(--success)' }}>未触发</span>,
             },
             {
               title: '通知状态',
               key: 'notifyStatus',
               render: (_: unknown, r: MonitorRecord) => {
-                if (!r.triggered) return <span style={{ color: '#bfbfbf' }}>-</span>;
+                if (!r.triggered) return <span style={{ color: 'var(--text-tertiary)' }}>-</span>;
                 const errors = parseJson<string[]>(r.notifyErrors, []);
                 if (r.notifySuccess) {
-                  return <span style={{ color: '#52c41a' }}><CheckCircleOutlined /> 已发送</span>;
+                  return <span style={{ color: 'var(--success)' }}><CheckCircleOutlined /> 已发送</span>;
                 }
                 return (
                   <Tooltip title={<pre style={{ margin: 0, whiteSpace: 'pre-wrap', maxWidth: 360 }}>{errors.join('\n')}</pre>}>
-                    <span style={{ color: '#ff4d4f', cursor: 'pointer' }}>
+                    <span style={{ color: 'var(--error)', cursor: 'pointer' }}>
                       <CloseCircleOutlined /> 发送失败
                     </span>
                   </Tooltip>
@@ -559,7 +562,7 @@ const MonitorPage: React.FC = () => {
               key: 'sql',
               render: (val: string) => (
                 <Tooltip title={<pre style={{ maxWidth: 500, whiteSpace: 'pre-wrap', margin: 0 }}>{val}</pre>}>
-                  <span style={{ color: '#1890ff', cursor: 'pointer', fontFamily: 'monospace', fontSize: 12 }}>
+                  <span style={{ color: 'var(--primary)', cursor: 'pointer', fontFamily: 'monospace', fontSize: 12 }}>
                     {val ? val.slice(0, 40) + (val.length > 40 ? '…' : '') : '-'}
                   </span>
                 </Tooltip>

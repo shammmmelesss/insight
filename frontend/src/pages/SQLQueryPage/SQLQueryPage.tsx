@@ -292,15 +292,15 @@ export default function SQLQueryPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {/* query tabs */}
-      <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #e8e8e8', flexShrink: 0, overflowX: 'auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid var(--border)', flexShrink: 0, overflowX: 'auto' }}>
         {tabs.map(tab => (
           <div key={tab.id} onClick={() => tab.id !== activeTabId && switchTab(tab.id)}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap', userSelect: 'none', borderBottom: tab.id === activeTabId ? '2px solid #165DFF' : '2px solid transparent', color: tab.id === activeTabId ? '#165DFF' : '#595959', marginBottom: -1, flexShrink: 0 }}>
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 14px', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap', userSelect: 'none', borderBottom: tab.id === activeTabId ? '2px solid var(--primary)' : '2px solid transparent', color: tab.id === activeTabId ? 'var(--primary)' : 'var(--text-secondary)', marginBottom: -1, flexShrink: 0 }}>
             {tab.name}
-            {tabs.length > 1 && <CloseOutlined style={{ fontSize: 10, color: '#bbb' }} onClick={e => closeTab(tab.id, e)} />}
+            {tabs.length > 1 && <CloseOutlined style={{ fontSize: 10, color: 'var(--text-tertiary)' }} onClick={e => closeTab(tab.id, e)} />}
           </div>
         ))}
-        <Button type="text" icon={<PlusOutlined />} onClick={addTab} style={{ flexShrink: 0, color: '#8c8c8c' }} title="新建查询" />
+        <Button type="text" icon={<PlusOutlined />} onClick={addTab} style={{ flexShrink: 0, color: 'var(--text-secondary)' }} title="新建查询" />
       </div>
 
       {/* toolbar */}
@@ -319,35 +319,35 @@ export default function SQLQueryPage() {
 
       <div ref={containerRef} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {/* editor */}
-        <div style={{ height: `${editorPct}%`, minHeight: 0, border: '1px solid #e8e8e8', borderRadius: 6, overflow: 'hidden' }}>
+        <div style={{ height: `${editorPct}%`, minHeight: 0, border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
           <Editor defaultLanguage="sql" defaultValue={tabs.find(t => t.id === activeTabId)?.sql ?? SQL_PLACEHOLDER} onMount={handleMount} onChange={handleEditorChange}
             options={{ fontSize: 14, minimap: { enabled: false }, lineNumbers: 'on', scrollBeyondLastLine: false, automaticLayout: true, tabSize: 2, wordWrap: 'on', suggestOnTriggerCharacters: true, quickSuggestions: true }} />
         </div>
 
         {/* drag handle */}
         <div onMouseDown={onDrag} style={{ height: 6, cursor: 'row-resize', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <div style={{ width: 40, height: 3, borderRadius: 2, background: '#d9d9d9' }} />
+          <div style={{ width: 40, height: 3, borderRadius: 2, background: 'var(--border)' }} />
         </div>
 
         {/* results */}
         <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {!activeTab || activeTab.results.length === 0 ? (
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', color: '#bbb', fontSize: 13 }}>
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>
               执行查询后结果将在此显示
             </div>
           ) : (
             <>
               {/* result tabs */}
-              <div style={{ display: 'flex', borderBottom: '1px solid #e8e8e8', flexShrink: 0, overflowX: 'auto' }}>
+              <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', flexShrink: 0, overflowX: 'auto' }}>
                 {activeTab.results.map(r => (
                   <div key={r.id}
                     onClick={() => setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, activeResultId: r.id } : t))}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap', userSelect: 'none', borderBottom: r.id === activeTab.activeResultId ? '2px solid #165DFF' : '2px solid transparent', color: r.id === activeTab.activeResultId ? '#165DFF' : '#595959', marginBottom: -1 }}>
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap', userSelect: 'none', borderBottom: r.id === activeTab.activeResultId ? '2px solid var(--primary)' : '2px solid transparent', color: r.id === activeTab.activeResultId ? 'var(--primary)' : 'var(--text-secondary)', marginBottom: -1 }}>
                     {r.status === 'running' && <Spin size="small" />}
-                    {r.status === 'success' && <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 11 }} />}
-                    {r.status === 'error' && <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: 11 }} />}
+                    {r.status === 'success' && <CheckCircleOutlined style={{ color: 'var(--success)', fontSize: 11 }} />}
+                    {r.status === 'error' && <CloseCircleOutlined style={{ color: 'var(--error)', fontSize: 11 }} />}
                     {r.label}
-                    <CloseOutlined style={{ fontSize: 10, color: '#aaa', marginLeft: 2 }} onClick={e => { e.stopPropagation(); removeResultTab(r.id); }} />
+                    <CloseOutlined style={{ fontSize: 10, color: 'var(--text-tertiary)', marginLeft: 2 }} onClick={e => { e.stopPropagation(); removeResultTab(r.id); }} />
                   </div>
                 ))}
               </div>
@@ -355,7 +355,7 @@ export default function SQLQueryPage() {
               {/* result content */}
               <div style={{ flex: 1, minHeight: 0, overflow: 'auto', padding: '8px 4px 4px' }}>
                 {active?.status === 'running' && <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 120 }}><Spin tip="查询中..." /></div>}
-                {active?.status === 'error' && <div style={{ padding: '12px 16px', color: '#ff4d4f', background: '#fff2f0', borderRadius: 6, fontSize: 13, fontFamily: 'monospace' }}>{active.error}</div>}
+                {active?.status === 'error' && <div style={{ padding: '12px 16px', color: 'var(--error)', background: 'var(--colorErrorBg, #fff2f0)', borderRadius: 6, fontSize: 13, fontFamily: 'monospace' }}>{active.error}</div>}
                 {active?.status === 'success' && (active.columns.length === 0
                   ? <Text type="secondary">查询成功，无返回数据（{active.elapsed} ms）</Text>
                   : <ResultTable columns={active.columns} rows={active.rows} />
@@ -389,7 +389,7 @@ export default function SQLQueryPage() {
               dataSource={history}
               renderItem={entry => (
                 <List.Item
-                  style={{ padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid #f0f0f0' }}
+                  style={{ padding: '10px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border-secondary)' }}
                   onClick={() => {
                     editorRef.current?.setValue(entry.sql);
                     editorRef.current?.focus();
@@ -407,19 +407,19 @@ export default function SQLQueryPage() {
                     title={
                       <Space size={6} wrap>
                         {entry.status === 'success'
-                          ? <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 12 }} />
-                          : <CloseCircleOutlined style={{ color: '#ff4d4f', fontSize: 12 }} />}
-                        <Text style={{ fontSize: 12, color: '#8c8c8c' }}>
+                          ? <CheckCircleOutlined style={{ color: 'var(--success)', fontSize: 12 }} />
+                          : <CloseCircleOutlined style={{ color: 'var(--error)', fontSize: 12 }} />}
+                        <Text style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                           {new Date(entry.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </Text>
                         <Tag style={{ fontSize: 10, padding: '0 4px', lineHeight: '16px' }}>{entry.dataSourceName}</Tag>
                         {entry.status === 'success' && entry.elapsed != null && (
-                          <Text style={{ fontSize: 11, color: '#aaa' }}>{entry.rowCount} 行 · {entry.elapsed} ms</Text>
+                          <Text style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{entry.rowCount} 行 · {entry.elapsed} ms</Text>
                         )}
                       </Space>
                     }
                     description={
-                      <pre style={{ margin: 0, fontSize: 12, color: entry.status === 'error' ? '#ff4d4f' : '#262626', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 72, overflow: 'hidden', fontFamily: 'monospace' }}>
+                      <pre style={{ margin: 0, fontSize: 12, color: entry.status === 'error' ? 'var(--error)' : 'var(--text)', whiteSpace: 'pre-wrap', wordBreak: 'break-all', maxHeight: 72, overflow: 'hidden', fontFamily: 'monospace' }}>
                         {entry.sql.length > 200 ? entry.sql.slice(0, 200) + '…' : entry.sql}
                       </pre>
                     }

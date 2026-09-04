@@ -752,7 +752,7 @@ const DashboardsPage: React.FC = () => {
             placeholder="搜索字段"
             value={fieldPickerSearch[chartId] || ''}
             onChange={e => setFieldPickerSearch(prev => ({ ...prev, [chartId]: e.target.value }))}
-            style={{ width: '100%', padding: '4px 8px', border: '1px solid #d9d9d9', borderRadius: 4, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+            style={{ width: '100%', padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 4, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
           />
         </div>
         {/* 分组列表 */}
@@ -775,9 +775,9 @@ const DashboardsPage: React.FC = () => {
                     ref={el => { if (el) el.indeterminate = groupIndeterminate; }}
                     onChange={e => toggleGroup(set, names, e.target.checked)}
                     onClick={e => e.stopPropagation()}
-                    style={{ cursor: 'pointer', accentColor: '#1677ff' }}
+                    style={{ cursor: 'pointer', accentColor: 'var(--primary)' }}
                   />
-                  <span style={{ fontSize: 13, fontWeight: 500, color: '#262626' }}>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>
                     {label}({checkedCount}/{names.length})
                   </span>
                 </div>
@@ -793,9 +793,9 @@ const DashboardsPage: React.FC = () => {
                       checked={temp[set].has(name)}
                       onChange={() => toggle(set, name)}
                       onClick={e => e.stopPropagation()}
-                      style={{ cursor: 'pointer', accentColor: '#1677ff' }}
+                      style={{ cursor: 'pointer', accentColor: 'var(--primary)' }}
                     />
-                    <span style={{ fontSize: 13, color: '#595959', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 13, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {labelMap[name] || name}
                     </span>
                   </div>
@@ -805,27 +805,27 @@ const DashboardsPage: React.FC = () => {
           })}
         </div>
         {/* 底部：全选 + 按钮 */}
-        <div style={{ borderTop: '1px solid #f0f0f0', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ borderTop: '1px solid var(--border-secondary)', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13 }}>
             <input
               type="checkbox"
               checked={allChecked}
               ref={el => { if (el) el.indeterminate = allIndeterminate; }}
               onChange={e => toggleAll(e.target.checked)}
-              style={{ cursor: 'pointer', accentColor: '#1677ff' }}
+              style={{ cursor: 'pointer', accentColor: 'var(--primary)' }}
             />
             全选
           </label>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               onClick={() => setFieldPickerOpen(prev => ({ ...prev, [chartId]: false }))}
-              style={{ padding: '3px 12px', fontSize: 13, border: '1px solid #d9d9d9', borderRadius: 4, background: '#fff', cursor: 'pointer' }}
+              style={{ padding: '3px 12px', fontSize: 13, border: '1px solid var(--border)', borderRadius: 4, background: '#fff', cursor: 'pointer' }}
             >
               取消
             </button>
             <button
               onClick={() => confirmFieldPicker(chartId, cfg, chartType)}
-              style={{ padding: '3px 12px', fontSize: 13, border: 'none', borderRadius: 4, background: '#1677ff', color: '#fff', cursor: 'pointer' }}
+              style={{ padding: '3px 12px', fontSize: 13, border: 'none', borderRadius: 4, background: 'var(--primary)', color: '#fff', cursor: 'pointer' }}
             >
               确定
             </button>
@@ -877,14 +877,14 @@ const DashboardsPage: React.FC = () => {
   const embed = isEmbedMode();
 
   return (
-    <Layout style={{ height: embed ? '100vh' : 'calc(100vh - 64px)', overflow: 'hidden', position: 'relative' }}>
+    <Layout style={{ height: embed ? '100vh' : 'calc(100vh - var(--header-height))', overflow: 'hidden', position: 'relative' }}>
       {!embed && (
-      <Sider
+<Sider
         width={240}
         collapsedWidth={0}
         collapsed={siderCollapsed}
         trigger={null}
-        style={{ background: '#fff', borderRight: '1px solid #f0f0f0', transition: 'all 0.2s', overflow: 'hidden', height: '100%' }}
+        style={{ background: '#fff', borderRight: '1px solid var(--border-secondary)', transition: 'all 0.2s', overflow: 'hidden', height: '100%' }}
       >
         <DashboardList
           dashboards={dashboards}
@@ -912,10 +912,10 @@ const DashboardsPage: React.FC = () => {
             onClick={() => setSiderCollapsed(false)}
             style={{
               position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
-              zIndex: 10, background: '#fff', border: '1px solid #f0f0f0', borderLeft: 'none',
+              zIndex: 10, background: '#fff', border: '1px solid var(--border-secondary)', borderLeft: 'none',
               borderRadius: '0 4px 4px 0', width: 16, height: 48, padding: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '2px 0 6px rgba(0,0,0,0.08)', color: '#666',
+              boxShadow: '2px 0 6px rgba(0,0,0,0.08)', color: 'var(--text-secondary)',
             }}
           />
         </Tooltip>
@@ -930,25 +930,25 @@ const DashboardsPage: React.FC = () => {
           WebkitBackdropFilter: 'blur(6px)', zIndex: 100,
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         }}>
-          <LockOutlined style={{ fontSize: 44, color: '#bfbfbf', marginBottom: 16 }} />
-          <div style={{ fontSize: 18, fontWeight: 600, color: '#595959', marginBottom: 6 }}>暂无访问权限</div>
-          <div style={{ fontSize: 13, color: '#8c8c8c' }}>
+          <LockOutlined style={{ fontSize: 44, color: 'var(--text-tertiary)', marginBottom: 16 }} />
+          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>暂无访问权限</div>
+          <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
             {noPermission ? `你没有「${noPermission}」看板的访问权限` : '你没有该看板的访问权限'}
           </div>
         </div>
       )}
 
-      <Content style={{ background: '#f0f2f5', overflow: 'auto', padding: '12px 12px 12px' }}>
+      <Content style={{ background: 'var(--bg-layout)', overflow: 'auto', padding: '12px 12px 12px' }}>
         {/* 标题栏 - sticky，负margin抵消Content两侧padding；嵌入模式下隐藏 */}
         {!embed && (
-        <div style={{ background: '#fff', border: '1px solid #ebebeb', padding: '0 12px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderRadius: 6 }}>
+        <div style={{ background: '#fff', border: '1px solid var(--border)', padding: '0 14px', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderRadius: 10, boxShadow: 'var(--shadow-card)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {selectedDashboard && <div style={{ width: 3, height: 16, background: '#4096ff', borderRadius: 2 }} />}
-            <span style={{ fontSize: 16, fontWeight: 600, color: '#1f1f1f' }}>
+            {selectedDashboard && <div style={{ width: 3, height: 16, background: 'var(--primary)', borderRadius: 2 }} />}
+            <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>
               {selectedDashboard ? selectedDashboard.name : '看板'}
             </span>
             {selectedDashboard && (selectedDashboard.updatedByName || selectedDashboard.updatedBy) && (
-              <span style={{ fontSize: 12, color: '#999' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
                 修改人：{displayCreator(selectedDashboard.updatedByName, selectedDashboard.updatedBy)}
               </span>
             )}
@@ -958,7 +958,7 @@ const DashboardsPage: React.FC = () => {
               {(selectedDashboard.createdByName || selectedDashboard.createdBy) && (
                 <Tooltip title={`创建人：${displayCreator(selectedDashboard.createdByName, selectedDashboard.createdBy)}`}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 12, color: '#999' }}>创建人</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>创建人</span>
                     <Avatar
                       size="small"
                       src={selectedDashboard.createdBy ? userAvatarMap[selectedDashboard.createdBy] : undefined}
@@ -1019,20 +1019,20 @@ const DashboardsPage: React.FC = () => {
         {selectedDashboard && parsedLayout.filter(item => item.type === 'text' && item.position === 'top').map(item => (
           <div key={item.chartId} style={{ marginBottom: 12 }}>
             <Card
-              style={{ minWidth: 0, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+              style={{ minWidth: 0, borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-card)' }}
               styles={{ body: { padding: '12px 16px' } }}
             >
-              <RichTextView html={item.text} style={{ color: '#262626' }} />
+              <RichTextView html={item.text} style={{ color: 'var(--text)' }} />
             </Card>
           </div>
         ))}
 
         {/* 筛选器栏 */}
         {selectedDashboard && filters.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, padding: '10px 12px', marginBottom: 12, background: '#fff', borderRadius: 6, border: '1px solid #ebebeb' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, padding: '10px 12px', marginBottom: 12, background: '#fff', borderRadius: 10, border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
             {filters.map(filter => (
               <div key={filter.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                <span style={{ fontSize: 12, color: '#666' }}>{filter.name}</span>
+                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{filter.name}</span>
                 {filter.type === 'dateRange' ? (
                   <Popover
                     trigger="click"
@@ -1088,10 +1088,10 @@ const DashboardsPage: React.FC = () => {
                     style={{ gridColumn: isWide(item) ? 'span 2' : 'span 1', minWidth: 0 }}
                   >
                     <Card
-                      style={{ minWidth: 0, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }}
+                      style={{ minWidth: 0, borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-card)' }}
                       styles={{ body: { padding: '12px 16px' } }}
                     >
-                      <RichTextView html={item.text} style={{ color: '#262626' }} />
+                      <RichTextView html={item.text} style={{ color: 'var(--text)' }} />
                     </Card>
                   </div>
                 );
@@ -1135,7 +1135,7 @@ const DashboardsPage: React.FC = () => {
               const cardTitle = (
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, flex: 1 }}>
-                    <span style={{ fontWeight: 500, fontSize: 13, color: '#262626', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontWeight: 500, fontSize: 13, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {chart?.name || `图表${index + 1}`}
                     </span>
                     {appliedFilters.length > 0 && (
@@ -1149,7 +1149,7 @@ const DashboardsPage: React.FC = () => {
                           </div>
                         }
                       >
-                        <FilterOutlined style={{ fontSize: 12, color: '#1677ff', flexShrink: 0, cursor: 'default' }} />
+                        <FilterOutlined style={{ fontSize: 12, color: 'var(--primary)', flexShrink: 0, cursor: 'default' }} />
                       </Tooltip>
                     )}
                   </div>
@@ -1174,7 +1174,7 @@ const DashboardsPage: React.FC = () => {
                                 const dpKey = `cf:${item.chartId}:${ff.originalName}`;
                                 return (
                                   <div key={ff.originalName} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                                    <span style={{ fontSize: 12, color: '#666' }}>{ff.displayName || ff.originalName}</span>
+                                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{ff.displayName || ff.originalName}</span>
                                     {fType === 'dateRange' ? (
                                       <Popover
                                         trigger="click"
@@ -1225,7 +1225,7 @@ const DashboardsPage: React.FC = () => {
                           size="small"
                           type="text"
                           icon={<FilterOutlined style={{ fontSize: 12 }} />}
-                          style={{ fontSize: 12, color: '#595959', padding: '0 6px', display: 'flex', alignItems: 'center' }}
+                          style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '0 6px', display: 'flex', alignItems: 'center' }}
                           onClick={e => e.stopPropagation()}
                         >
                           筛选
@@ -1258,12 +1258,12 @@ const DashboardsPage: React.FC = () => {
                         <Button
                           size="small"
                           type="text"
-                          style={{ fontSize: 12, color: '#595959', padding: '0 6px', display: 'flex', alignItems: 'center', gap: 4 }}
+                          style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '0 6px', display: 'flex', alignItems: 'center', gap: 4 }}
                           onClick={e => e.stopPropagation()}
                         >
                           分组({selectedGroups.length})
                           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ marginTop: 1 }}>
-                            <path d="M2 3.5L5 6.5L8 3.5" stroke="#595959" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M2 3.5L5 6.5L8 3.5" stroke="var(--text-secondary)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </Button>
                       </Popover>
@@ -1285,18 +1285,18 @@ const DashboardsPage: React.FC = () => {
                         <Button
                           size="small"
                           type="text"
-                          style={{ fontSize: 12, color: '#595959', padding: '0 6px', display: 'flex', alignItems: 'center', gap: 4 }}
+                          style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '0 6px', display: 'flex', alignItems: 'center', gap: 4 }}
                           onClick={e => e.stopPropagation()}
                         >
                           已选字段({selectedFieldCount})
                           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{ marginTop: 1 }}>
-                            <path d="M2 3.5L5 6.5L8 3.5" stroke="#595959" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M2 3.5L5 6.5L8 3.5" stroke="var(--text-secondary)" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </Button>
                       </Popover>
                     )}
                     <Dropdown menu={{ items: chartMenuItems }} trigger={['click']} placement="bottomRight">
-                      <Button type="text" size="small" icon={<EllipsisOutlined style={{ fontSize: 13, color: '#8c8c8c' }} />} onClick={e => e.stopPropagation()} />
+                      <Button type="text" size="small" icon={<EllipsisOutlined style={{ fontSize: 13, color: 'var(--text-secondary)' }} />} onClick={e => e.stopPropagation()} />
                     </Dropdown>
                   </div>
                 </div>
@@ -1310,15 +1310,15 @@ const DashboardsPage: React.FC = () => {
                 >
                   <Card
                     title={cardTitle}
-                    style={{ minWidth: 0, borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', transition: 'box-shadow 0.2s' }}
+                    style={{ minWidth: 0, borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-card)', transition: 'box-shadow 0.2s' }}
                     styles={{ header: { padding: '10px 16px', minHeight: 44, borderBottom: 'none' }, body: { padding: '12px 16px', overflow: 'hidden' } }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(0,0,0,0.12)'; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'; }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-hover)'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow-card)'; }}
                   >
                     {isLoading && !hasData ? (
                       <Skeleton active paragraph={{ rows: 4 }} style={{ height: chartH }} />
                     ) : isEmpty ? (
-                      <div style={{ height: chartH, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bfbfbf', fontSize: 13 }}>
+                      <div style={{ height: chartH, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)', fontSize: 13 }}>
                         <InboxOutlined style={{ fontSize: 24, marginRight: 8 }} />暂无数据
                       </div>
                     ) : hasData ? (
@@ -1340,17 +1340,17 @@ const DashboardsPage: React.FC = () => {
               );
             }) : (
               <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', background: '#fff', borderRadius: 8 }}>
-                <InboxOutlined style={{ fontSize: 40, color: '#d9d9d9', marginBottom: 12 }} />
-                <div style={{ fontSize: 14, color: '#595959', marginBottom: 4 }}>暂无图表</div>
-                <div style={{ fontSize: 12, color: '#bbb' }}>请编辑看板添加图表</div>
+                <InboxOutlined style={{ fontSize: 40, color: 'var(--border)', marginBottom: 12 }} />
+                <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 4 }}>暂无图表</div>
+                <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>请编辑看板添加图表</div>
               </div>
             )}
           </div>
         ) : noPermission !== null ? null : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 320 }}>
-            <InboxOutlined style={{ fontSize: 48, color: '#d9d9d9', marginBottom: 16 }} />
-            <div style={{ fontSize: 15, color: '#595959', marginBottom: 6 }}>请从左侧选择一个看板</div>
-            <div style={{ fontSize: 13, color: '#bbb', marginBottom: 20 }}>或新建一个看板开始使用</div>
+            <InboxOutlined style={{ fontSize: 48, color: 'var(--border)', marginBottom: 16 }} />
+            <div style={{ fontSize: 15, color: 'var(--text-secondary)', marginBottom: 6 }}>请从左侧选择一个看板</div>
+            <div style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 20 }}>或新建一个看板开始使用</div>
             <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/dashboards/create')}>
               新建看板
             </Button>
@@ -1365,7 +1365,7 @@ const DashboardsPage: React.FC = () => {
         footer={null}
         width={700}
       >
-        <pre style={{ background: '#f5f5f5', padding: 16, borderRadius: 4, overflow: 'auto', maxHeight: 400, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 13 }}>
+        <pre style={{ background: '#111827', padding: 16, borderRadius: 10, overflow: 'auto', maxHeight: 400, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 13, color: '#D1D5DB', fontFamily: 'source-code-pro, Menlo, Monaco, Consolas, monospace' }}>
           {chartSQLs[currentSQLChartId] || '暂无SQL'}
         </pre>
       </Modal>

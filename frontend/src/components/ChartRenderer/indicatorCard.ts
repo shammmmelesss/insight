@@ -35,8 +35,8 @@ export const renderIndicatorCard = (ctx: RenderContext) => {
     return `
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;
         min-width:120px;padding:16px 24px;background:#f0f5ff;border-radius:8px;">
-        <div style="font-size:13px;color:#8c8c8c;margin-bottom:8px;text-align:center;">${label}</div>
-        <div style="font-size:32px;font-weight:700;color:#165DFF;line-height:1.2;">${display}</div>
+        <div style="font-size:13px;color:#6B7280;margin-bottom:8px;text-align:center;">${label}</div>
+        <div style="font-size:32px;font-weight:700;color:#2563EB;line-height:1.2;">${display}</div>
       </div>`;
   }).join('');
 

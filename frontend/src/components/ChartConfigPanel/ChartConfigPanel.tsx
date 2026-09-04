@@ -65,8 +65,8 @@ const FieldSettingsPopover: React.FC<{
   if (isFilter) {
     return (
       <div style={{ width: 200 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>{field.displayName || field.originalName}</div>
-        <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 4 }}>筛选类型</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>{field.displayName || field.originalName}</div>
+        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>筛选类型</div>
         <Radio.Group
           size="small"
           value={cfg.filterType || 'multiple'}
@@ -83,10 +83,10 @@ const FieldSettingsPopover: React.FC<{
 
   return (
     <div style={{ width: 210 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: '#262626', marginBottom: 8 }}>{field.displayName || field.originalName}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>{field.displayName || field.originalName}</div>
       {showAggregation && (
         <>
-          <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 4 }}>聚合方式</div>
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>聚合方式</div>
           <Select
             size="small"
             style={{ width: '100%', marginBottom: 8 }}
@@ -98,7 +98,7 @@ const FieldSettingsPopover: React.FC<{
           <Divider style={{ margin: '6px 0' }} />
         </>
       )}
-      <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 4 }}>数据格式</div>
+      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>数据格式</div>
       <Select
         size="small"
         style={{ width: '100%', marginBottom: 8 }}
@@ -108,7 +108,7 @@ const FieldSettingsPopover: React.FC<{
         {DATA_FORMAT_OPTIONS.map(o => <Select.Option key={o} value={o}>{o}</Select.Option>)}
       </Select>
       <Divider style={{ margin: '6px 0' }} />
-      <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 4 }}>排序</div>
+      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 4 }}>排序</div>
       <Select
         size="small"
         style={{ width: '100%' }}
@@ -129,22 +129,22 @@ const FieldTag: React.FC<FieldTagProps> = ({
   const aggLabel = field.config?.aggregation;
   return (
     <div style={{ position: 'relative' }}>
-      {insertBefore && <div style={{ height: 2, backgroundColor: '#1677ff', borderRadius: 1, marginBottom: 2 }} />}
+      {insertBefore && <div style={{ height: 2, backgroundColor: 'var(--primary)', borderRadius: 1, marginBottom: 2 }} />}
       <div
         draggable
         onDragStart={(e) => { e.stopPropagation(); onReorderDragStart(e, area, index); }}
         style={{
           display: 'flex', alignItems: 'center', gap: 4,
-          padding: '3px 8px', backgroundColor: '#f0f5ff',
-          border: '1px solid #adc6ff', borderRadius: 4,
-          fontSize: 12, color: '#2f54eb', width: '100%',
+          padding: '3px 8px', backgroundColor: '#F0F6FF',
+          border: '1px solid #D1DDF5', borderRadius: 4,
+          fontSize: 12, color: '#1D4ED8', width: '100%',
           boxSizing: 'border-box', cursor: 'grab',
         }}
       >
         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {field.displayName || field.originalName}
           {showAggregation && aggLabel && (
-            <span style={{ color: '#8c8c8c', marginLeft: 4, fontWeight: 400 }}>· {aggLabel}</span>
+            <span style={{ color: 'var(--text-secondary)', marginLeft: 4, fontWeight: 400 }}>· {aggLabel}</span>
           )}
         </span>
         <Popover
@@ -164,7 +164,7 @@ const FieldTag: React.FC<FieldTagProps> = ({
           <Tooltip title="字段设置">
             <Button
               size="small" type="text" icon={<SettingOutlined />}
-              style={{ color: '#8c8c8c', padding: 0, minWidth: 'auto', height: 'auto', flexShrink: 0 }}
+              style={{ color: 'var(--text-secondary)', padding: 0, minWidth: 'auto', height: 'auto', flexShrink: 0 }}
               onClick={(e) => e.stopPropagation()}
             />
           </Tooltip>
@@ -172,12 +172,12 @@ const FieldTag: React.FC<FieldTagProps> = ({
         <Tooltip title="移除">
           <Button
             size="small" type="text" icon={<DeleteOutlined />}
-            style={{ color: '#ff4d4f', padding: 0, minWidth: 'auto', height: 'auto', flexShrink: 0 }}
+            style={{ color: 'var(--error)', padding: 0, minWidth: 'auto', height: 'auto', flexShrink: 0 }}
             onClick={(e) => { e.stopPropagation(); onRemove(area, field.originalName); }}
           />
         </Tooltip>
       </div>
-      {insertAfter && <div style={{ height: 2, backgroundColor: '#1677ff', borderRadius: 1, marginTop: 2 }} />}
+      {insertAfter && <div style={{ height: 2, backgroundColor: 'var(--primary)', borderRadius: 1, marginTop: 2 }} />}
     </div>
   );
 };
@@ -249,13 +249,13 @@ const DropZone: React.FC<DropZoneProps> = ({
   const isReordering = reorderFromIndex !== null;
 
   return (
-    <div style={{ marginBottom: 8, border: '1px solid #f0f0f0', borderRadius: 6, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', padding: '5px 10px', backgroundColor: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>
-        <span style={{ fontSize: 12, fontWeight: 500, color: '#595959', flex: 1 }}>{label}</span>
+    <div style={{ marginBottom: 8, border: '1px solid var(--border-secondary)', borderRadius: 6, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '5px 10px', backgroundColor: '#F8FAFC', borderBottom: '1px solid var(--border-secondary)' }}>
+        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', flex: 1 }}>{label}</span>
         {fields.length > 0 && (
           <Button
             type="link" size="small"
-            style={{ fontSize: 11, padding: '0 2px', height: 'auto', color: '#1677ff' }}
+            style={{ fontSize: 11, padding: '0 2px', height: 'auto', color: 'var(--primary)' }}
             onClick={() => onOpenBatchSettings(areaKey)}
           >
             批量设置
@@ -265,8 +265,8 @@ const DropZone: React.FC<DropZoneProps> = ({
       <div
         style={{
           minHeight: 40, padding: '6px 10px', display: 'flex', flexDirection: 'column', gap: 5,
-          border: isOver && !isReordering ? '2px dashed #4096ff' : '2px solid transparent',
-          backgroundColor: isOver && !isReordering ? '#e6f4ff' : 'transparent',
+          border: isOver && !isReordering ? '2px dashed var(--primary)' : '2px solid transparent',
+          backgroundColor: isOver && !isReordering ? 'var(--primary-bg)' : 'transparent',
           borderRadius: 4, transition: 'all 0.15s',
         }}
         onDragEnter={(e) => { if (!isReordering) onDragEnter(e, areaKey); }}
@@ -287,7 +287,7 @@ const DropZone: React.FC<DropZoneProps> = ({
             </div>
           ))
         ) : (
-          <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, color: '#bfbfbf', fontSize: 12, userSelect: 'none' }}>
+          <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, color: 'var(--text-tertiary)', fontSize: 12, userSelect: 'none' }}>
             <DragOutlined style={{ fontSize: 12 }} />
             <span>拖入字段</span>
           </div>
@@ -541,8 +541,8 @@ const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, o
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: '#fff' }}>
       {/* 顶部 */}
-      <div style={{ padding: '10px 12px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        <Button type="text" size="small" icon={<ArrowLeftOutlined />} onClick={onClose} style={{ color: '#595959' }} />
+      <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border-secondary)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <Button type="text" size="small" icon={<ArrowLeftOutlined />} onClick={onClose} style={{ color: 'var(--text-secondary)' }} />
         <Input
           value={chartName}
           onChange={e => setChartName(e.target.value)}
@@ -559,12 +559,12 @@ const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, o
       {/* 两列布局 */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* 字段设置 */}
-        <div style={{ flex: 1, borderRight: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ padding: '8px 10px', borderBottom: '1px solid #f0f0f0', flexShrink: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#595959', textAlign: 'center' }}>字段设置</div>
+        <div style={{ flex: 1, borderRight: '1px solid var(--border-secondary)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-secondary)', flexShrink: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', textAlign: 'center' }}>字段设置</div>
           </div>
-          <div style={{ padding: '8px 10px', borderBottom: '1px solid #f0f0f0', flexShrink: 0 }}>
-            <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 6 }}>图表类型</div>
+          <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-secondary)', flexShrink: 0 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 6 }}>图表类型</div>
             <Space wrap size={3}>
               {chartTypeOptions.map(opt => (
                 <Tooltip key={opt.value} title={opt.label} placement="top">
@@ -622,10 +622,10 @@ const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, o
 
         {/* 数据集字段 */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <div style={{ padding: '8px 10px', borderBottom: '1px solid #f0f0f0', flexShrink: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#595959', textAlign: 'center' }}>数据集</div>
+          <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border-secondary)', flexShrink: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', textAlign: 'center' }}>数据集</div>
           </div>
-          <div style={{ padding: '6px 10px', borderBottom: '1px solid #f0f0f0', flexShrink: 0 }}>
+          <div style={{ padding: '6px 10px', borderBottom: '1px solid var(--border-secondary)', flexShrink: 0 }}>
             <Select
               placeholder="选择数据集"
               style={{ width: '100%' }}
@@ -637,9 +637,9 @@ const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, o
             </Select>
           </div>
           {datasetFields.length > 0 && (
-            <div style={{ padding: '6px 10px', borderBottom: '1px solid #f0f0f0', flexShrink: 0 }}>
+            <div style={{ padding: '6px 10px', borderBottom: '1px solid var(--border-secondary)', flexShrink: 0 }}>
               <input
-                style={{ width: '100%', padding: '3px 8px', fontSize: 12, border: '1px solid #d9d9d9', borderRadius: 4, outline: 'none', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '3px 8px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 4, outline: 'none', boxSizing: 'border-box' }}
                 placeholder="搜索字段..."
                 value={fieldSearch}
                 onChange={e => setFieldSearch(e.target.value)}
@@ -648,12 +648,12 @@ const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, o
           )}
           <div style={{ flex: 1, overflow: 'auto', padding: '8px 10px' }}>
             {datasetFields.length === 0 ? (
-              <div style={{ textAlign: 'center', color: '#bfbfbf', fontSize: 12, paddingTop: 20 }}>请先选择数据集</div>
+              <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12, paddingTop: 20 }}>请先选择数据集</div>
             ) : (
               <>
                 {dimensionFields.length > 0 && (
                   <>
-                    <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 5, fontWeight: 500 }}>维度 ({dimensionFields.length})</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 5, fontWeight: 500 }}>维度 ({dimensionFields.length})</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 10 }}>
                       {dimensionFields.map((field, i) => {
                         const isSelected = selectedFields.has(field.originalName);
@@ -670,14 +670,14 @@ const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, o
                             onDragStart={(e) => handleDragStart(e, field)}
                             onDragEnd={handleDragEnd}
                             style={{
-                              padding: '4px 7px', backgroundColor: isSelected ? '#d6e4ff' : '#f0f5ff',
-                              border: isSelected ? '1px solid #1677ff' : '1px solid #d6e4ff',
+                              padding: '4px 7px', backgroundColor: isSelected ? '#DBEAFE' : '#F0F6FF',
+                              border: isSelected ? '1px solid var(--primary)' : '1px solid #DBEAFE',
                               borderRadius: 4, cursor: 'grab', display: 'flex', alignItems: 'center', gap: 5, userSelect: 'none',
                             }}
                           >
                             <Tag color="blue" style={{ fontSize: 10, padding: '0 3px', lineHeight: '15px', height: 15, flexShrink: 0, margin: 0 }}>维</Tag>
                             <div style={{ flex: 1, overflow: 'hidden' }}>
-                              <div style={{ fontSize: 11, color: '#1d39c4', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <div style={{ fontSize: 11, color: '#1D4ED8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {field.displayName || field.originalName}
                               </div>
                             </div>
@@ -689,7 +689,7 @@ const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, o
                 )}
                 {metricFields.length > 0 && (
                   <>
-                    <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 5, fontWeight: 500 }}>指标 ({metricFields.length})</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 5, fontWeight: 500 }}>指标 ({metricFields.length})</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                       {metricFields.map((field, i) => {
                         const isSelected = selectedFields.has(field.originalName);
@@ -706,14 +706,14 @@ const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, o
                             onDragStart={(e) => handleDragStart(e, field)}
                             onDragEnd={handleDragEnd}
                             style={{
-                              padding: '4px 7px', backgroundColor: isSelected ? '#ffe7ba' : '#fff7e6',
-                              border: isSelected ? '1px solid #fa8c16' : '1px solid #ffd591',
+                              padding: '4px 7px', backgroundColor: isSelected ? '#FFEDD5' : '#FFF7ED',
+                              border: isSelected ? '1px solid #F97316' : '1px solid #FFD9A8',
                               borderRadius: 4, cursor: 'grab', display: 'flex', alignItems: 'center', gap: 5, userSelect: 'none',
                             }}
                           >
                             <Tag color="orange" style={{ fontSize: 10, padding: '0 3px', lineHeight: '15px', height: 15, flexShrink: 0, margin: 0 }}>指</Tag>
                             <div style={{ flex: 1, overflow: 'hidden' }}>
-                              <div style={{ fontSize: 11, color: '#d46b08', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <div style={{ fontSize: 11, color: '#C2410C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {field.displayName || field.originalName}
                               </div>
                             </div>
@@ -724,7 +724,7 @@ const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, o
                   </>
                 )}
                 {filteredFields.length === 0 && (
-                  <div style={{ textAlign: 'center', color: '#bfbfbf', fontSize: 12, paddingTop: 16 }}>无匹配字段</div>
+                  <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12, paddingTop: 16 }}>无匹配字段</div>
                 )}
               </>
             )}
@@ -739,8 +739,8 @@ const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, o
         const isMeasureArea = ['measure', 'yAxis', 'y2Axis', 'indicator'].includes(batchAreaKey || '');
         const allChecked = areaFields.length > 0 && areaFields.every(f => batchSelected.has(f.originalName));
         const someChecked = areaFields.some(f => batchSelected.has(f.originalName));
-        const thStyle: React.CSSProperties = { padding: '8px 10px', fontSize: 12, fontWeight: 500, color: '#595959', textAlign: 'left', borderBottom: '1px solid #f0f0f0', backgroundColor: '#fafafa', whiteSpace: 'nowrap' };
-        const tdStyle: React.CSSProperties = { padding: '8px 10px', verticalAlign: 'middle', borderBottom: '1px solid #f5f5f5' };
+        const thStyle: React.CSSProperties = { padding: '8px 10px', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', textAlign: 'left', borderBottom: '1px solid var(--border-secondary)', backgroundColor: '#F8FAFC', whiteSpace: 'nowrap' };
+        const tdStyle: React.CSSProperties = { padding: '8px 10px', verticalAlign: 'middle', borderBottom: '1px solid var(--border-secondary)' };
         return (
           <Modal
             title="批量字段设置"
@@ -753,8 +753,8 @@ const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, o
             styles={{ body: { padding: '12px 0 0' } }}
           >
             {someChecked && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', backgroundColor: '#e6f4ff', borderBottom: '1px solid #bae0ff', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 12, color: '#1677ff', fontWeight: 500, marginRight: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', backgroundColor: 'var(--primary-bg)', borderBottom: '1px solid #BFDBFE', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 500, marginRight: 4 }}>
                   已选 {batchSelected.size} 项，设置：
                 </span>
                 {isMeasureArea && (
@@ -828,7 +828,7 @@ const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, o
                   const cfg = batchEdits[field.originalName]?.config || {};
                   const checked = batchSelected.has(field.originalName);
                   return (
-                    <tr key={field.originalName} style={{ backgroundColor: checked ? '#fff' : '#fafafa' }}>
+                    <tr key={field.originalName} style={{ backgroundColor: checked ? '#fff' : '#F8FAFC' }}>
                       <td style={tdStyle}>
                         <input type="checkbox" checked={checked}
                           onChange={() => setBatchSelected(prev => {
@@ -839,7 +839,7 @@ const ChartConfigPanel: React.FC<ChartConfigPanelProps> = ({ chartId, onClose, o
                           })}
                         />
                       </td>
-                      <td style={{ ...tdStyle, fontSize: 12, color: '#595959' }}>{field.displayName || field.originalName}</td>
+                      <td style={{ ...tdStyle, fontSize: 12, color: 'var(--text-secondary)' }}>{field.displayName || field.originalName}</td>
                       {isMeasureArea && (
                         <td style={tdStyle}>
                           <Select size="small" style={{ width: '100%' }} value={cfg.aggregation || '计数'}

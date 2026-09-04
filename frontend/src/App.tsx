@@ -18,6 +18,7 @@ import GlobalWatermark from './components/GlobalWatermark';
 import ErrorBoundary from './components/ErrorBoundary';
 import { WorkspaceProvider, useWorkspace } from './contexts/WorkspaceContext';
 import AuthProvider from './contexts/AuthContext';
+import themeConfig from './theme';
 import './App.css';
 
 /** 用 currentWorkspace.id 作为 key，切换空间时强制重新挂载所有页面组件 */
@@ -53,12 +54,7 @@ function App() {
   return (
     <ErrorBoundary>
       <ConfigProvider
-        theme={{
-          token: {
-            colorPrimary: '#165DFF',
-            borderRadius: 8,
-          },
-        }}
+        theme={themeConfig}
       >
         <AntdApp>
           <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>

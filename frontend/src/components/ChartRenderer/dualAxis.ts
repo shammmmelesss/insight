@@ -95,7 +95,7 @@ export const renderDualAxisChart = (ctx: RenderContext) => {
   const dualColorMap: Record<string, string> = {};
   actualLeftFields.forEach((f, i) => { dualColorMap[f] = G2_COLORS[i % G2_COLORS.length]; });
   actualRightFields.forEach((f, i) => {
-    dualColorMap[f] = actualRightFields.length > 1 ? ORANGE_COLORS[i % ORANGE_COLORS.length] : '#FA8C16';
+    dualColorMap[f] = actualRightFields.length > 1 ? ORANGE_COLORS[i % ORANGE_COLORS.length] : '#F97316';
   });
 
   createAndRenderG2Chart((chart) => {
@@ -176,7 +176,7 @@ export const renderDualAxisChart = (ctx: RenderContext) => {
           range: ORANGE_COLORS,
         });
       } else {
-        line.style({ stroke: '#FA8C16', lineWidth: 2 });
+        line.style({ stroke: '#F97316', lineWidth: 2 });
       }
 
       chart
@@ -197,7 +197,7 @@ export const renderDualAxisChart = (ctx: RenderContext) => {
   // 合并左右轴系列构建统一自定义图例
   const dualLegendItems = [
     ...actualLeftFields.map((f, i) => ({ name: getFieldLabel(f), color: G2_COLORS[i % G2_COLORS.length] })),
-    ...actualRightFields.map((f, i) => ({ name: getFieldLabel(f), color: actualRightFields.length > 1 ? ORANGE_COLORS[i % ORANGE_COLORS.length] : '#FA8C16' })),
+    ...actualRightFields.map((f, i) => ({ name: getFieldLabel(f), color: actualRightFields.length > 1 ? ORANGE_COLORS[i % ORANGE_COLORS.length] : '#F97316' })),
   ];
   renderCustomLegend(dualLegendItems);
 };

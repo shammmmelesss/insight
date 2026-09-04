@@ -238,11 +238,11 @@ const PortalSidebar: React.FC = () => {
         onMouseEnter={cancelClose}
         onMouseLeave={scheduleClose}
       >
-        {/* Header — matches AntD Header height (64px) */}
+        {/* Header — matches app header height */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          height: 64, padding: '0 20px',
-          borderBottom: '1px solid #f0f0f0',
+          height: 'var(--header-height)', padding: '0 20px',
+          borderBottom: '1px solid var(--border-secondary)',
           flexShrink: 0,
         }}>
           <span style={{ fontWeight: 700, fontSize: 15, color: '#111' }}>arsenal · 产品与服务</span>
@@ -258,7 +258,7 @@ const PortalSidebar: React.FC = () => {
         <div style={{
           display: 'flex', alignItems: 'center', gap: 12,
           padding: '10px 20px',
-          borderBottom: '1px solid #f5f5f5',
+          borderBottom: '1px solid var(--border-secondary)',
           flexShrink: 0,
         }}>
           <a
@@ -292,7 +292,7 @@ const PortalSidebar: React.FC = () => {
 
           {/* 我的收藏 */}
           {!loading && searchResults === null && myApps.length > 0 && (
-            <div style={{ borderBottom: '1px solid #f0f0f0', paddingBottom: 8, marginBottom: 4 }}>
+            <div style={{ borderBottom: '1px solid var(--border-secondary)', paddingBottom: 8, marginBottom: 4 }}>
               <div style={{ padding: '10px 12px 2px', fontSize: 15, fontWeight: 700, color: '#111' }}>
                 我的收藏
               </div>
@@ -323,7 +323,7 @@ const PortalSidebar: React.FC = () => {
               <div style={{
                 padding: '10px 12px 2px',
                 fontSize: 15, fontWeight: 700, color: '#111',
-                borderTop: pi === 0 ? 'none' : '1px solid #f0f0f0',
+                borderTop: pi === 0 ? 'none' : '1px solid var(--border-secondary)',
                 marginTop: pi === 0 ? 6 : 0,
               }}>
                 {primary}

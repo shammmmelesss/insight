@@ -1,42 +1,46 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Typography, List, Tag, Button } from 'antd';
+import { Card, Row, Col, Typography, List, Tag, Skeleton } from 'antd';
 import { Link } from 'react-router-dom';
-import { DatabaseOutlined, BarChartOutlined, LayoutOutlined } from '@ant-design/icons';
+import { ArrowRightOutlined, DatabaseOutlined, BarChartOutlined, LayoutOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { RecentUpdatesResponse } from '@shared/api.interface';
-
+import './HomePage.css';
 
 const { Title, Text } = Typography;
 
 // 导航卡片数据
 const navCards = [
   {
-    title: '数据源',
-    description: '管理和配置数据源连接',
-    icon: <DatabaseOutlined style={{ fontSize: 48, color: '#165DFF' }} />,
-    path: '/data-sources',
-    color: '#E6F2FF',
-  },
-  {
     title: '数据集',
-    description: '创建和管理数据集查询',
-    icon: <DatabaseOutlined style={{ fontSize: 48, color: '#52C41A' }} />,
+    description: '基于 SQL 创建和管理数据查询',
+    icon: <DatabaseOutlined />,
     path: '/datasets',
-    color: '#F6FFED',
+    bg: '#EFF6FF',
+    color: '#2563EB',
   },
   {
     title: '图表配置',
-    description: '创建和配置可视化图表',
-    icon: <BarChartOutlined style={{ fontSize: 48, color: '#FAAD14' }} />,
+    description: '拖拽配置可视化图表',
+    icon: <BarChartOutlined />,
     path: '/charts',
-    color: '#FFFBE6',
+    bg: '#FDF1E7',
+    color: '#EA7A1D',
   },
   {
     title: '看板',
-    description: '构建和管理数据看板',
-    icon: <LayoutOutlined style={{ fontSize: 48, color: '#722ED1' }} />,
+    description: '搭建交互式数据看板',
+    icon: <LayoutOutlined />,
     path: '/dashboards',
-    color: '#F9F0FF',
+    bg: '#F4F0FF',
+    color: '#722ED1',
+  },
+  {
+    title: '监控',
+    description: '数据资产运行状态与概览',
+    icon: <BarChartOutlined />,
+    path: '/monitor',
+    bg: '#F0FDF4',
+    color: '#16A34A',
   },
 ];
 
@@ -54,6 +58,12 @@ const formatTime = (dateString: string) => {
   if (hours < 24) return `${hours}小时前`;
   if (days < 30) return `${days}天前`;
   return date.toLocaleDateString('zh-CN');
+};
+
+const typeColor: Record<string, string> = {
+  数据集: 'geekblue',
+  图表: 'green',
+  看板: 'purple',
 };
 
 const HomePage: React.FC = () => {
@@ -81,93 +91,116 @@ const HomePage: React.FC = () => {
 
   // 合并所有最近更新并按时间排序
   const allRecentItems = [
-    ...recentData.recentDatasets.map((item) => ({ ...item, type: '数据集' as const, path: `/datasets` })),
-    ...recentData.recentCharts.map((item) => ({ ...item, type: '图表' as const, path: `/charts` })),
-    ...recentData.recentDashboards.map((item) => ({ ...item, type: '看板' as const, path: `/dashboards` })),
+    ...recentData.recentDatasets.map(item => ({ ...item, type: '数据集' as const, path: `/datasets` })),
+    ...recentData.recentCharts.map(item => ({ ...item, type: '图表' as const, path: `/charts` })),
+    ...recentData.recentDashboards.map(item => ({ ...item, type: '看板' as const, path: `/dashboards` })),
   ]
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-    .slice(0, 10);
+    .slice(0, 8);
+
+  const stats = [
+    { label: '数据集', value: recentData.datasetCount ?? allRecentItems.filter(i => i.type === '数据集').length },
+    { label: '图表', value: recentData.chartCount ?? allRecentItems.filter(i => i.type === '图表').length },
+    { label: '看板', value: recentData.dashboardCount ?? allRecentItems.filter(i => i.type === '看板').length },
+  ];
 
   return (
     <div className="home-page">
-      {/* 欢迎区域 */}
-      <div className="welcome-section">
-        <Title level={2}>欢迎使用Insight</Title>
-        <Text>从数据到洞察，轻松构建可视化分析。管理数据源、创建图表、搭建看板，让数据说话。</Text>
+      {/* 欢迎横幅 */}
+      <div className="home-welcome">
+        <Title>欢迎使用 Insight</Title>
+        <Text className="home-welcome-sub">
+          从数据到洞察，轻松构建可视化分析。管理数据集、拖拽配置图表、搭建看板，让数据说话。
+        </Text>
+        <div className="home-welcome-stats">
+          {stats.map(s => (
+            <div className="home-stat" key={s.label}>
+              <div className="home-stat-value">{s.value}</div>
+              <div className="home-stat-label">{s.label}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* 导航卡片 */}
-      <div className="nav-section">
-        <Title level={3} style={{ marginBottom: 24 }}>快速导航</Title>
+      {/* 快速导航 */}
+      <div>
+        <div className="home-section-title">
+          <Title level={4}>快速导航</Title>
+        </div>
         <Row gutter={[16, 16]}>
           {navCards.map((card, index) => (
             <Col xs={24} sm={12} md={6} key={index}>
-              <Card
-                hoverable
-                className="nav-card"
-                style={{ backgroundColor: card.color, border: 'none' }}
-                actions={[
-                  <Link to={card.path} key="link">
-                    <Button type="primary" size="small">
-                      进入
-                    </Button>
-                  </Link>,
-                ]}
-              >
-                <div className="card-content">
-                  {card.icon}
-                  <div className="card-text">
-                    <Title level={4} style={{ margin: '16px 0 8px 0' }}>{card.title}</Title>
-                    <Text style={{ color: '#666' }}>{card.description}</Text>
+              <Link to={card.path} style={{ display: 'block', height: '100%' }}>
+                <Card className="home-nav-card" bordered>
+                  <div
+                    className="home-nav-icon"
+                    style={{ background: card.bg, color: card.color, fontSize: 20 }}
+                  >
+                    {card.icon}
                   </div>
-                </div>
-              </Card>
+                  <div>
+                    <div className="home-nav-title">{card.title}</div>
+                    <div className="home-nav-desc">{card.description}</div>
+                  </div>
+                  <span className="home-nav-enter">
+                    进入 <ArrowRightOutlined style={{ fontSize: 11 }} />
+                  </span>
+                </Card>
+              </Link>
             </Col>
           ))}
         </Row>
       </div>
 
       {/* 最近更新 */}
-      {allRecentItems.length > 0 && (
-        <div className="recent-section">
-          <Title level={3} style={{ marginBottom: 24 }}>最近更新</Title>
-          <Card>
-            <List
-              loading={loading}
-              dataSource={allRecentItems}
-              renderItem={(item) => (
-                <List.Item
-                  actions={[
-                    <Link to={item.path} key="link">
-                      查看
-                    </Link>
-                  ]}
-                >
-                  <List.Item.Meta
-                    title={
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <Text strong>{item.name}</Text>
-                        <Tag style={{ marginLeft: 8 }} color={
-                          item.type === '数据集' ? '#165DFF' :
-                          item.type === '图表' ? '#52C41A' : '#722ED1'
-                        }>
-                          {item.type}
-                        </Tag>
-                      </div>
-                    }
-                    description={
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text type="secondary">{item.type}更新</Text>
-                        <Text type="secondary">{formatTime(item.updatedAt)}</Text>
-                      </div>
-                    }
-                  />
-                </List.Item>
-              )}
-            />
-          </Card>
+      <div>
+        <div className="home-section-title">
+          <Title level={4}>最近更新</Title>
+          {allRecentItems.length > 0 && (
+            <Link className="home-more" to="/dashboards">
+              查看全部
+            </Link>
+          )}
         </div>
-      )}
+        <Card bordered>
+          <List
+            className="home-recent-list"
+            loading={loading}
+            dataSource={allRecentItems}
+            locale={{ emptyText: <Skeleton active /> }}
+            renderItem={item => (
+              <List.Item
+                actions={[
+                  <Link to={item.path} key="link" style={{ fontSize: 13 }}>
+                    查看
+                  </Link>,
+                ]}
+              >
+                <List.Item.Meta
+                  title={
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Text strong style={{ fontSize: 14 }}>{item.name}</Text>
+                      <Tag color={typeColor[item.type]} style={{ borderRadius: 6, marginInlineEnd: 0 }}>
+                        {item.type}
+                      </Tag>
+                    </div>
+                  }
+                  description={
+                    <span>
+                      <Text type="secondary" style={{ fontSize: 12 }}>{item.type}更新</Text>
+                    </span>
+                  }
+                />
+                <div style={{ marginRight: 8 }}>
+                  <Text type="secondary" style={{ fontSize: 12, whiteSpace: 'nowrap' }}>
+                    {formatTime(item.updatedAt)}
+                  </Text>
+                </div>
+              </List.Item>
+            )}
+          />
+        </Card>
+      </div>
     </div>
   );
 };

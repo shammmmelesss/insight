@@ -15,8 +15,8 @@ interface AreaSettingsModalProps {
   onOk: () => void;
 }
 
-const thStyle: React.CSSProperties = { padding: '8px 10px', fontSize: 12, fontWeight: 500, color: '#595959', textAlign: 'left', borderBottom: '1px solid #f0f0f0', backgroundColor: '#fafafa', whiteSpace: 'nowrap' };
-const tdStyle: React.CSSProperties = { padding: '8px 10px', verticalAlign: 'middle', borderBottom: '1px solid #f5f5f5' };
+const thStyle: React.CSSProperties = { padding: '8px 10px', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', textAlign: 'left', borderBottom: '1px solid var(--border-secondary)', backgroundColor: '#F8FAFC', whiteSpace: 'nowrap' };
+const tdStyle: React.CSSProperties = { padding: '8px 10px', verticalAlign: 'middle', borderBottom: '1px solid var(--border-secondary)' };
 
 // 区域字段批量设置弹窗（勾选多行后统一设置聚合/格式/排序/筛选器类型）
 const AreaSettingsModal: React.FC<AreaSettingsModalProps> = ({
@@ -50,8 +50,8 @@ const AreaSettingsModal: React.FC<AreaSettingsModalProps> = ({
       styles={{ body: { padding: '12px 0 0' } }}
     >
       {someChecked && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', backgroundColor: '#e6f4ff', borderBottom: '1px solid #bae0ff', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12, color: '#1677ff', fontWeight: 500, marginRight: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', backgroundColor: 'var(--primary-bg)', borderBottom: '1px solid #BFDBFE', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 500, marginRight: 4 }}>
             已选 {selectedAreaRows.size} 项，设置：
           </span>
           {isMeasureArea && (
@@ -148,7 +148,7 @@ const AreaSettingsModal: React.FC<AreaSettingsModalProps> = ({
             const cfg = edit.config || {};
             const checked = selectedAreaRows.has(field.originalName);
             return (
-              <tr key={field.originalName} style={{ backgroundColor: checked ? '#fff' : '#fafafa' }}>
+              <tr key={field.originalName} style={{ backgroundColor: checked ? '#fff' : '#F8FAFC' }}>
                 <td style={tdStyle}>
                   <input
                     type="checkbox"
@@ -161,7 +161,7 @@ const AreaSettingsModal: React.FC<AreaSettingsModalProps> = ({
                     })}
                   />
                 </td>
-                <td style={{ ...tdStyle, fontSize: 12, color: '#595959' }}>{field.displayName || field.originalName}</td>
+                <td style={{ ...tdStyle, fontSize: 12, color: 'var(--text-secondary)' }}>{field.displayName || field.originalName}</td>
                 {isMeasureArea && (
                   <td style={tdStyle}>
                     <Select

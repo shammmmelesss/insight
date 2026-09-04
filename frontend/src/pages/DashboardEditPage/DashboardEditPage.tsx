@@ -675,7 +675,7 @@ const DashboardEditPage: React.FC = () => {
 
       {/* 主内容区域 */}
       <Layout style={{ flex: 1, minHeight: 0, height: 'auto', overflow: 'hidden' }}>
-        <Content style={{ padding: '10px', background: '#f0f2f5', overflow: 'auto' }}>
+        <Content style={{ padding: '10px', background: 'var(--bg-layout)', overflow: 'auto' }}>
           {/* 置于筛选器上方的文本组件 */}
           {selectedCharts.filter(item => item.type === 'text' && item.position === 'top').map(item => (
             <div key={item.chartId} style={{ marginBottom: 10 }}>
@@ -703,10 +703,10 @@ const DashboardEditPage: React.FC = () => {
 
           {/* 筛选器展示区域 */}
           {filters.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, padding: '10px 12px', marginBottom: 10, background: '#fff', borderRadius: 6, border: '1px solid #ebebeb' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, padding: '10px 12px', marginBottom: 10, background: '#fff', borderRadius: 10, border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
               {filters.map(filter => (
                 <div key={filter.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                  <span style={{ fontSize: 12, color: '#666' }}>{filter.name}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{filter.name}</span>
                   {filter.type === 'dateRange' ? (
                     <Popover
                       trigger="click"
@@ -824,13 +824,13 @@ const DashboardEditPage: React.FC = () => {
                                   </div>
                                 }
                               >
-                                <FilterOutlined style={{ fontSize: 12, color: '#1677ff', flexShrink: 0, cursor: 'default' }} />
+                                <FilterOutlined style={{ fontSize: 12, color: 'var(--primary)', flexShrink: 0, cursor: 'default' }} />
                               </Tooltip>
                             )}
                           </span>
                         );
                       })()}
-                      style={{ height: '100%', boxShadow: isConfigSelected ? '0 0 0 2px #1677ff' : 'none', overflow: 'visible' }}
+                      style={{ height: '100%', boxShadow: isConfigSelected ? '0 0 0 2px var(--primary)' : 'none', overflow: 'visible' }}
                       styles={{
                         header: { height: '40px', padding: '0 12px', display: 'flex', alignItems: 'center', borderBottom: 'none', cursor: 'move' },
                         body: { padding: '10px', overflow: 'visible', height: 'calc(100% - 40px)' },
@@ -857,7 +857,7 @@ const DashboardEditPage: React.FC = () => {
                                     const dpKey = `cf:${item.chartId}:${ff.originalName}`;
                                     return (
                                       <div key={ff.originalName} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-                                        <span style={{ fontSize: 12, color: '#666' }}>{ff.displayName || ff.originalName}</span>
+                                        <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{ff.displayName || ff.originalName}</span>
                                         {fType === 'dateRange' ? (
                                           <Popover
                                             trigger="click"
@@ -908,7 +908,7 @@ const DashboardEditPage: React.FC = () => {
                               size="small"
                               type="text"
                               icon={<FilterOutlined style={{ fontSize: 12 }} />}
-                              style={{ fontSize: 12, color: '#595959', padding: '0 6px', display: 'flex', alignItems: 'center' }}
+                              style={{ fontSize: 12, color: 'var(--text-secondary)', padding: '0 6px', display: 'flex', alignItems: 'center' }}
                               onClick={e => e.stopPropagation()}
                               onMouseDown={e => e.stopPropagation()}
                             >
@@ -953,7 +953,7 @@ const DashboardEditPage: React.FC = () => {
                               { type: 'divider' as const },
                               {
                                 key: 'remove',
-                                label: <span style={{ color: '#ff4d4f' }}>移除</span>,
+                                label: <span style={{ color: 'var(--error)' }}>移除</span>,
                                 onClick: () => handleRemoveChart(key),
                               },
                             ],
@@ -980,15 +980,15 @@ const DashboardEditPage: React.FC = () => {
               })}
             </ReactGridLayout>
           ) : (
-            <div style={{ textAlign: 'center', padding: '60px 0', backgroundColor: '#fafafa', borderRadius: '8px' }}>
-              <div style={{ fontSize: '16px', color: '#666', marginBottom: 16 }}>暂无图表</div>
-              <div style={{ fontSize: '14px', color: '#999' }}>请从右侧选择图表添加到看板</div>
+            <div style={{ textAlign: 'center', padding: '60px 0', backgroundColor: '#F8FAFC', borderRadius: '12px', border: '1px dashed var(--border)' }}>
+              <div style={{ fontSize: 16, color: 'var(--text-secondary)', marginBottom: 16 }}>暂无图表</div>
+              <div style={{ fontSize: 14, color: 'var(--text-tertiary)' }}>请从右侧选择图表添加到看板</div>
             </div>
           )}
         </Content>
 
         {/* 图表选择 / 配置区域 */}
-        <Sider width={siderWidth} style={{ background: '#fff', borderLeft: '1px solid #f0f0f0', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        <Sider width={siderWidth} style={{ background: '#fff', borderLeft: '1px solid var(--border-secondary)', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}>
           {/* 拖动调整宽度 */}
           <div
             onMouseDown={handleSiderResizeStart}
@@ -1032,8 +1032,8 @@ const DashboardEditPage: React.FC = () => {
                 {filteredCharts.length > 0 ? (
                   <div>
                     {filteredCharts.filter(chart => !chart.id.startsWith('draft-')).map((chart) => (
-                      <div key={chart.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, padding: '8px 12px', borderRadius: '4px', backgroundColor: '#fafafa' }}>
-                        <div>{chart.name}</div>
+                      <div key={chart.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, padding: '8px 12px', borderRadius: 8, backgroundColor: '#F8FAFC', border: '1px solid var(--border-secondary)' }}>
+                        <div style={{ fontWeight: 500 }}>{chart.name}</div>
                         {isChartAdded(chart.id) ? (
                           <Button type="text" danger size="small" onClick={() => handleRemoveChart(chart.id)}>移除</Button>
                         ) : (
@@ -1043,7 +1043,7 @@ const DashboardEditPage: React.FC = () => {
                     ))}
                   </div>
                 ) : (
-                  <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>没有找到匹配的图表</div>
+                  <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>没有找到匹配的图表</div>
                 )}
               </div>
             </div>
@@ -1082,7 +1082,7 @@ const DashboardEditPage: React.FC = () => {
         footer={null}
         width={700}
       >
-        <pre style={{ background: '#f5f5f5', padding: 16, borderRadius: 4, overflow: 'auto', maxHeight: 400, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 13 }}>
+        <pre style={{ background: '#111827', padding: 16, borderRadius: 10, overflow: 'auto', maxHeight: 400, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 13, color: '#D1D5DB', fontFamily: 'source-code-pro, Menlo, Monaco, Consolas, monospace' }}>
           {currentSQL}
         </pre>
       </Modal>

@@ -41,9 +41,25 @@ func GetRecentUpdates(c *gin.Context) {
 	}
 	q.Find(&recentDashboards)
 
+	countDataset := int64(0)
+	countChart := int64(0)
+	countDashboard := int64(0)
+	if workspaceID != "" {
+		database.DB.Model(&models.Dataset{}).Where("workspace_id = ?", workspaceID).Count(&countDataset)
+		database.DB.Model(&models.Chart{}).Where("workspace_id = ?", workspaceID).Count(&countChart)
+		database.DB.Model(&models.Dashboard{}).Where("workspace_id = ?", workspaceID).Count(&countDashboard)
+	} else {
+		database.DB.Model(&models.Dataset{}).Count(&countDataset)
+		database.DB.Model(&models.Chart{}).Count(&countChart)
+		database.DB.Model(&models.Dashboard{}).Count(&countDashboard)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"recentDatasets":   recentDatasets,
-		"recentCharts":     recentCharts,
-		"recentDashboards": recentDashboards,
+		"recentDatasets":     recentDatasets,
+		"recentCharts":       recentCharts,
+		"recentDashboards":   recentDashboards,
+		"datasetCount":       countDataset,
+		"chartCount":         countChart,
+		"dashboardCount":     countDashboard,
 	})
 }

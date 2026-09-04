@@ -14,12 +14,12 @@
 }
 
 .insight-rich-text-editor .ql-toolbar {
-  border-color: #f0f0f0;
+  border-color: var(--border-secondary);
   flex-shrink: 0;
 }
 
 .insight-rich-text-editor .ql-container {
-  border-color: #f0f0f0;
+  border-color: var(--border-secondary);
   flex: 1;
   min-height: 0;
   overflow: auto;

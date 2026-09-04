@@ -440,6 +440,9 @@ export interface RecentUpdatesResponse {
   recentDatasets: RecentDataset[];
   recentCharts: RecentChart[];
   recentDashboards: RecentDashboard[];
+  datasetCount?: number;
+  chartCount?: number;
+  dashboardCount?: number;
 }
 
 // ==================== 筛选器模块 ====================

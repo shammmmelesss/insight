@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Table, Drawer, Form, Input, InputNumber, Switch, message, Select, Row, Col, Tag } from 'antd';
+import { App, Button, Card, Table, Drawer, Form, Input, InputNumber, Select, Row, Col, Tag, Typography, Switch } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, CheckOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { DataSource, CreateDataSourceRequest, UpdateDataSourceRequest } from '@shared/api.interface';
 
 const { Option } = Select;
 const { TextArea } = Input;
+const { Text } = Typography;
 
 // BigQuery 类型判断
 const isBigQueryType = (type?: string) => type === 'BigQuery';
 
 const DataSourcesPage: React.FC = () => {
+  const { message, modal } = App.useApp();
   const [dataSources, setDataSources] = useState<DataSource[]>([]);
   const [loading, setLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -113,15 +115,24 @@ const DataSourcesPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    try {
-      await axios.delete(`/api/data-sources/${id}`);
-      message.success('数据源删除成功');
-      fetchDataSources();
-    } catch (error) {
-      message.error('数据源删除失败');
-      console.error('数据源删除失败:', error);
-    }
+  const handleDelete = (id: string) => {
+    modal.confirm({
+      title: '确认删除',
+      content: '删除后无法恢复，确定要删除该数据源吗？',
+      okText: '确认删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await axios.delete(`/api/data-sources/${id}`);
+          message.success('数据源删除成功');
+          fetchDataSources();
+        } catch (error) {
+          message.error('数据源删除失败');
+          console.error('数据源删除失败:', error);
+        }
+      },
+    });
   };
 
   const handleTestConnection = async (id: string) => {
@@ -143,13 +154,14 @@ const DataSourcesPage: React.FC = () => {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
+      render: (name: string) => <span style={{ fontWeight: 500 }}>{name}</span>,
     },
     {
       title: '类型',
       dataIndex: 'type',
       key: 'type',
       render: (type: string) => (
-        <Tag color={isBigQueryType(type) ? 'blue' : 'default'}>{type}</Tag>
+        <Tag color={isBigQueryType(type) ? 'geekblue' : 'default'}>{type}</Tag>
       ),
     },
     {
@@ -157,18 +169,21 @@ const DataSourcesPage: React.FC = () => {
       key: 'connection',
       render: (_: any, record: DataSource) => {
         if (isBigQueryType(record.type)) {
-          return <span>Project: {record.database}</span>;
+          return <span className="num">Project: {record.database}</span>;
         }
-        return <span>{record.host}:{record.port} / {record.database}</span>;
+        return <span className="num">{record.host}:{record.port} / {record.database}</span>;
       },
     },
     {
       title: '状态',
       dataIndex: 'isActive',
       key: 'isActive',
-      render: (isActive: boolean) => (
-        <Switch checked={isActive} disabled />
-      ),
+      render: (isActive: boolean) =>
+        isActive ? (
+          <Tag color="success">已启用</Tag>
+        ) : (
+          <Tag color="default">已停用</Tag>
+        ),
     },
     {
       title: '操作',
@@ -179,7 +194,6 @@ const DataSourcesPage: React.FC = () => {
             icon={<EditOutlined />}
             size="small"
             onClick={() => showModal(record)}
-            style={{ marginRight: 8 }}
           >
             编辑
           </Button>
@@ -188,7 +202,6 @@ const DataSourcesPage: React.FC = () => {
             size="small"
             danger
             onClick={() => handleDelete(record.id)}
-            style={{ marginRight: 8 }}
           >
             删除
           </Button>
@@ -208,8 +221,11 @@ const DataSourcesPage: React.FC = () => {
 
   return (
     <div className="data-sources-page" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexShrink: 0 }}>
-        <h2>数据源管理</h2>
+      <div className="page-header">
+        <div className="page-title">
+          <h2>数据源管理</h2>
+          <span className="page-sub-title">共 {dataSources.length} 个数据源</span>
+        </div>
         <Button
           type="primary"
           icon={<PlusOutlined />}
@@ -233,7 +249,7 @@ const DataSourcesPage: React.FC = () => {
         title={
           <div>
             <div style={{ fontWeight: 600, fontSize: 16 }}>{editingId ? '编辑数据源' : '新增数据源'}</div>
-            <div style={{ marginTop: 4, color: '#888', fontSize: '13px', fontWeight: 400 }}>配置数据库连接信息，用于后续创建数据集</div>
+            <Text type="secondary" style={{ fontSize: 13 }}>配置数据库连接信息，用于后续创建数据集</Text>
           </div>
         }
         open={isModalVisible}
@@ -356,11 +372,11 @@ const DataSourcesPage: React.FC = () => {
             <Switch defaultChecked />
           </Form.Item>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '24px' }}>
-            <Button onClick={handleCancel} style={{ marginRight: 8 }}>
+          <div className="modal-footer">
+            <Button onClick={handleCancel}>
               取消
             </Button>
-            <Button type="primary" htmlType="submit" size="large">
+            <Button type="primary" htmlType="submit">
               {editingId ? '更新' : '保存'}
             </Button>
           </div>

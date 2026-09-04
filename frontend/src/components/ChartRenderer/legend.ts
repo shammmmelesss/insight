@@ -23,9 +23,9 @@ export const renderCustomLegend = (ctx: RenderContext, series: SeriesItem[]) => 
 
   const makeArrow = (dir: 'left' | 'right') => {
     const btn = document.createElement('button');
-    btn.style.cssText = 'flex-shrink:0;display:none;align-items:center;justify-content:center;width:20px;height:20px;border:none;background:transparent;cursor:pointer;color:#8c8c8c;padding:0;transition:color 0.15s;';
-    btn.addEventListener('mouseenter', () => { btn.style.color = '#1783FF'; });
-    btn.addEventListener('mouseleave', () => { btn.style.color = '#8c8c8c'; });
+    btn.style.cssText = 'flex-shrink:0;display:none;align-items:center;justify-content:center;width:20px;height:20px;border:none;background:transparent;cursor:pointer;color:#6B7280;padding:0;transition:color 0.15s;';
+    btn.addEventListener('mouseenter', () => { btn.style.color = '#2563EB'; });
+    btn.addEventListener('mouseleave', () => { btn.style.color = '#6B7280'; });
     const d = dir === 'left'
       ? 'M8 10L5 7l3-3'
       : 'M4 4l3 3-3 3';
@@ -66,11 +66,11 @@ export const renderCustomLegend = (ctx: RenderContext, series: SeriesItem[]) => 
 
     const soloBtn = document.createElement('span');
     soloBtn.title = '仅显示此项';
-    soloBtn.style.cssText = `display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;cursor:pointer;color:${isSolo ? '#1783FF' : '#bfbfbf'};transition:color 0.15s;flex-shrink:0;`;
+    soloBtn.style.cssText = `display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;cursor:pointer;color:${isSolo ? '#2563EB' : '#9CA3AF'};transition:color 0.15s;flex-shrink:0;`;
     soloBtn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.5"/><circle cx="6" cy="6" r="2" fill="currentColor"/></svg>`;
 
-    soloBtn.addEventListener('mouseenter', () => { soloBtn.style.color = '#1783FF'; });
-    soloBtn.addEventListener('mouseleave', () => { soloBtn.style.color = (hiddenSeriesRef.current.size > 0 && !hiddenSeriesRef.current.has(name)) ? '#1783FF' : '#bfbfbf'; });
+    soloBtn.addEventListener('mouseenter', () => { soloBtn.style.color = '#2563EB'; });
+    soloBtn.addEventListener('mouseleave', () => { soloBtn.style.color = (hiddenSeriesRef.current.size > 0 && !hiddenSeriesRef.current.has(name)) ? '#2563EB' : '#9CA3AF'; });
 
     soloBtn.addEventListener('click', (e) => {
       e.stopPropagation();

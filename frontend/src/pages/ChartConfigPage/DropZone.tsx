@@ -75,8 +75,8 @@ const DropZone: React.FC<DropZoneProps> = ({
     <div
       style={{
         marginBottom: 10,
-        border: '1px solid #f0f0f0',
-        borderRadius: 6,
+        border: '1px solid var(--border-secondary)',
+        borderRadius: 8,
         overflow: 'hidden',
       }}
     >
@@ -85,16 +85,16 @@ const DropZone: React.FC<DropZoneProps> = ({
           display: 'flex',
           alignItems: 'center',
           padding: '6px 10px',
-          backgroundColor: '#fafafa',
-          borderBottom: '1px solid #f0f0f0',
+          backgroundColor: 'var(--bg-layout)',
+          borderBottom: '1px solid var(--border-secondary)',
         }}
       >
-        <span style={{ fontSize: 12, fontWeight: 500, color: '#595959', flex: 1 }}>{label}</span>
+        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', flex: 1 }}>{label}</span>
         {fields.length > 0 && onAreaSettings && (
           <Button
             size="small"
             type="link"
-            style={{ fontSize: 12, padding: '0 4px', height: 'auto', color: '#1677ff' }}
+            style={{ fontSize: 12, padding: '0 4px', height: 'auto', color: 'var(--primary)' }}
             onClick={() => onAreaSettings(areaKey)}
           >
             设置
@@ -108,8 +108,8 @@ const DropZone: React.FC<DropZoneProps> = ({
           display: 'flex',
           flexDirection: 'column',
           gap: 6,
-          border: isOver && !isReordering ? '2px dashed #4096ff' : '2px solid transparent',
-          backgroundColor: isOver && !isReordering ? '#e6f4ff' : 'transparent',
+          border: isOver && !isReordering ? '2px dashed var(--primary)' : '2px solid transparent',
+          backgroundColor: isOver && !isReordering ? 'var(--primary-bg)' : 'transparent',
           borderRadius: 4,
           transition: 'all 0.15s',
         }}
@@ -145,7 +145,7 @@ const DropZone: React.FC<DropZoneProps> = ({
               alignItems: 'center',
               justifyContent: 'center',
               gap: 4,
-              color: '#bfbfbf',
+              color: 'var(--text-tertiary)',
               fontSize: 12,
               userSelect: 'none',
             }}

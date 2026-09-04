@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { App, Avatar, Button, Card, Table, Modal, Form, Input, Space, Tooltip, Typography } from 'antd';
+import { App, Avatar, Button, Card, Table, Modal, Form, Input, Space, Tooltip } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { Workspace } from '@shared/api.interface';
 import { useAuth } from '../../contexts/AuthContext';
 import { WorkUser, fetchAllWorkUsers } from '@/lib/workUser';
 
-const { Title } = Typography;
 const { TextArea } = Input;
 
 const formatDateTime = (val?: string) => {
@@ -160,14 +159,17 @@ const WorkspacesPage: React.FC = () => {
   ];
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <Title level={4} style={{ margin: 0 }}>项目空间管理</Title>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <div className="page-header">
+        <div className="page-title">
+          <h2>项目空间管理</h2>
+          <span className="page-sub-title">共 {workspaces.length} 个项目空间</span>
+        </div>
         <Button type="primary" icon={<PlusOutlined />} onClick={showCreateModal}>
           新建空间
         </Button>
       </div>
-      <Card bodyStyle={{ padding: 0 }}>
+      <Card bodyStyle={{ padding: '4px 16px 16px' }}>
         <Table
           rowKey="id"
           loading={loading}

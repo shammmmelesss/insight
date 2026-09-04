@@ -369,7 +369,7 @@ const ChartConfigPage: React.FC = () => {
   };
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: '#f5f6f7' }}>
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-layout)' }}>
       {/* 顶部导航 */}
       <div
         style={{
@@ -378,7 +378,7 @@ const ChartConfigPage: React.FC = () => {
           padding: '0 16px',
           height: 52,
           backgroundColor: '#fff',
-          borderBottom: '1px solid #e8e8e8',
+          borderBottom: '1px solid var(--border-secondary)',
           gap: 12,
           flexShrink: 0,
         }}
@@ -387,12 +387,12 @@ const ChartConfigPage: React.FC = () => {
           type="text"
           icon={<ArrowLeftOutlined />}
           onClick={() => navigate('/charts')}
-          style={{ color: '#595959' }}
+          style={{ color: 'var(--text-secondary)' }}
         >
           返回
         </Button>
-        <div style={{ width: 1, height: 20, backgroundColor: '#e8e8e8' }} />
-        <span style={{ fontSize: 14, color: '#8c8c8c', whiteSpace: 'nowrap' }}>图表配置</span>
+        <div style={{ width: 1, height: 20, backgroundColor: 'var(--border-secondary)' }} />
+        <span style={{ fontSize: 14, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>图表配置</span>
         <Input
           placeholder="请输入图表名称"
           value={chartName}
@@ -413,14 +413,14 @@ const ChartConfigPage: React.FC = () => {
           style={{
             width: 220,
             backgroundColor: '#fff',
-            borderRight: '1px solid #e8e8e8',
+            borderRight: '1px solid var(--border-secondary)',
             display: 'flex',
             flexDirection: 'column',
             flexShrink: 0,
           }}
         >
-          <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #f0f0f0' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 8 }}>数据集</div>
+          <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--border-secondary)' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>数据集</div>
             <Select
               placeholder="选择数据集"
               style={{ width: '100%' }}
@@ -433,11 +433,11 @@ const ChartConfigPage: React.FC = () => {
           </div>
 
           {datasetFields.length > 0 && (
-            <div style={{ padding: '8px 12px', borderBottom: '1px solid #f0f0f0' }}>
+            <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-secondary)' }}>
               <Input
                 size="small"
                 placeholder="搜索字段"
-                prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+                prefix={<SearchOutlined style={{ color: 'var(--text-tertiary)' }} />}
                 value={fieldSearch}
                 onChange={(e) => setFieldSearch(e.target.value)}
                 allowClear
@@ -447,14 +447,14 @@ const ChartConfigPage: React.FC = () => {
 
           <div style={{ flex: 1, overflow: 'auto', padding: '8px 12px' }}>
             {datasetFields.length === 0 ? (
-              <div style={{ textAlign: 'center', color: '#bfbfbf', fontSize: 12, paddingTop: 24 }}>
+              <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12, paddingTop: 24 }}>
                 请先选择数据集
               </div>
             ) : (
               <>
                 {dimensionFields.length > 0 && (
                   <>
-                    <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 6, fontWeight: 500 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 500 }}>
                       维度 ({dimensionFields.length})
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
@@ -469,9 +469,9 @@ const ChartConfigPage: React.FC = () => {
                           onDragEnd={handleDragEnd}
                           style={{
                             padding: '5px 8px',
-                            backgroundColor: isSelected ? '#d6e4ff' : '#f0f5ff',
-                            border: isSelected ? '1px solid #1677ff' : '1px solid #d6e4ff',
-                            borderRadius: 4,
+                            backgroundColor: isSelected ? '#DBEAFE' : '#F0F6FF',
+                            border: isSelected ? '1px solid var(--primary)' : '1px solid #D1DDF5',
+                            borderRadius: 6,
                             cursor: 'grab',
                             display: 'flex',
                             alignItems: 'center',
@@ -486,10 +486,10 @@ const ChartConfigPage: React.FC = () => {
                             维
                           </Tag>
                           <div style={{ flex: 1, overflow: 'hidden' }}>
-                            <div style={{ fontSize: 12, color: '#1d39c4', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: 12, color: '#1D4ED8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {field.displayName || field.originalName}
                             </div>
-                            <div style={{ fontSize: 10, color: '#8c8c8c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {field.originalName}
                             </div>
                           </div>
@@ -501,7 +501,7 @@ const ChartConfigPage: React.FC = () => {
                 )}
                 {metricFields.length > 0 && (
                   <>
-                    <div style={{ fontSize: 11, color: '#8c8c8c', marginBottom: 6, fontWeight: 500 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginBottom: 6, fontWeight: 500 }}>
                       指标 ({metricFields.length})
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -516,9 +516,9 @@ const ChartConfigPage: React.FC = () => {
                           onDragEnd={handleDragEnd}
                           style={{
                             padding: '5px 8px',
-                            backgroundColor: isSelected ? '#ffe7ba' : '#fff7e6',
-                            border: isSelected ? '1px solid #fa8c16' : '1px solid #ffd591',
-                            borderRadius: 4,
+                            backgroundColor: isSelected ? '#FFEDD5' : '#FFF7ED',
+                            border: isSelected ? '1px solid #F97316' : '1px solid #FFEDD5',
+                            borderRadius: 6,
                             cursor: 'grab',
                             display: 'flex',
                             alignItems: 'center',
@@ -533,10 +533,10 @@ const ChartConfigPage: React.FC = () => {
                             指
                           </Tag>
                           <div style={{ flex: 1, overflow: 'hidden' }}>
-                            <div style={{ fontSize: 12, color: '#d46b08', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: 12, color: '#C2410C', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {field.displayName || field.originalName}
                             </div>
-                            <div style={{ fontSize: 10, color: '#8c8c8c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {field.originalName}
                             </div>
                           </div>
@@ -547,7 +547,7 @@ const ChartConfigPage: React.FC = () => {
                   </>
                 )}
                 {filteredFields.length === 0 && (
-                  <div style={{ textAlign: 'center', color: '#bfbfbf', fontSize: 12, paddingTop: 16 }}>
+                  <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 12, paddingTop: 16 }}>
                     无匹配字段
                   </div>
                 )}
@@ -561,14 +561,14 @@ const ChartConfigPage: React.FC = () => {
           style={{
             width: 260,
             backgroundColor: '#fff',
-            borderRight: '1px solid #e8e8e8',
+            borderRight: '1px solid var(--border-secondary)',
             display: 'flex',
             flexDirection: 'column',
             flexShrink: 0,
           }}
         >
-          <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid #f0f0f0', flexShrink: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#262626', marginBottom: 10 }}>图表类型</div>
+          <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--border-secondary)', flexShrink: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 10 }}>图表类型</div>
             <Space wrap size={4}>
               {chartTypeOptions.map(opt => (
                 <Tooltip key={opt.value} title={opt.label} placement="top">
@@ -587,7 +587,7 @@ const ChartConfigPage: React.FC = () => {
           </div>
 
           <div style={{ flex: 1, overflow: 'auto', padding: '10px 12px' }}>
-            <div style={{ fontSize: 12, fontWeight: 500, color: '#8c8c8c', marginBottom: 8 }}>字段配置</div>
+            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 8 }}>字段配置</div>
 
             {/* 交叉表 */}
             {chartType === 'crossTable' && (
@@ -643,11 +643,11 @@ const ChartConfigPage: React.FC = () => {
           <div
             style={{
               padding: '12px 16px',
-              borderBottom: '1px solid #f0f0f0',
+              borderBottom: '1px solid var(--border-secondary)',
               flexShrink: 0,
             }}
           >
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#262626' }}>报表预览</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>报表预览</span>
           </div>
 
           {/* 筛选条件 */}
@@ -658,8 +658,8 @@ const ChartConfigPage: React.FC = () => {
                 flexWrap: 'wrap',
                 gap: 12,
                 padding: '10px 16px',
-                borderBottom: '1px solid #f0f0f0',
-                backgroundColor: '#fafafa',
+                borderBottom: '1px solid var(--border-secondary)',
+                backgroundColor: 'var(--bg-layout)',
                 flexShrink: 0,
               }}
             >
@@ -669,7 +669,7 @@ const ChartConfigPage: React.FC = () => {
                 const value = filterValues[f.originalName] ?? f.config?.filterDefault;
                 return (
                   <div key={f.originalName} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 160, maxWidth: 240 }}>
-                    <span style={{ fontSize: 12, color: '#595959' }}>{f.displayName || f.originalName}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{f.displayName || f.originalName}</span>
                     {filterType === 'dateRange' ? (
                       <Popover
                         trigger="click"
@@ -754,8 +754,8 @@ const ChartConfigPage: React.FC = () => {
         footer={<Button onClick={() => setIsSQLModalVisible(false)}>关闭</Button>}
         width={800}
       >
-        <div style={{ backgroundColor: '#f5f5f5', padding: 16, borderRadius: 4, overflow: 'auto', maxHeight: 400 }}>
-          <pre style={{ margin: 0, fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+        <div style={{ backgroundColor: '#111827', padding: 16, borderRadius: 10, overflow: 'auto', maxHeight: 400 }}>
+          <pre style={{ margin: 0, fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', wordBreak: 'break-all', color: '#D1D5DB', fontFamily: 'source-code-pro, Menlo, Monaco, Consolas, monospace' }}>
             {sqlContent}
           </pre>
         </div>

@@ -1,34 +1,92 @@
-.ant-layout-header {
-  padding: 0 24px;
+/* ---------- 应用级布局样式（配合 Layout 组件使用） ---------- */
+
+/* 顶栏 */
+.app-header {
+  height: var(--header-height);
+  padding: 0 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  background-color: #fff;
+  background: var(--bg-container);
+  border-bottom: 1px solid var(--border-secondary);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  z-index: 10;
 }
 
-.ant-layout-content {
-  padding: 24px;
+/* 内容宿主 */
+.app-content {
+  padding: 16px;
   overflow-y: auto;
 }
 
-.ant-layout-sider {
-  background-color: #001529;
+/* 页面内容卡片（Layout 中包住各页面） */
+.app-content-shell {
+  background: var(--bg-container);
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.react-grid-item {
-  overflow: visible !important;
+/* 侧边栏菜单里的品牌区 */
+.app-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--header-height);
+  padding: 0 20px;
+  color: var(--sidebar-text-active);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+/* 顶部导航中的品牌区（覆盖侧栏样式） */
+.app-logo--top {
+  height: auto;
+  padding: 0;
+  color: var(--text);
+  flex-shrink: 0;
 }
 
-.logo {
-  height: 32px;
-  margin: 16px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
+/* 顶部横向菜单 */
+.app-top-menu.ant-menu-horizontal {
+  line-height: var(--header-height);
+  font-size: 14px;
+}
+.app-top-menu.ant-menu-horizontal > .ant-menu-item {
+  padding-inline: 16px;
+}
+/* 未选中菜单项文字加深，避免颜色过浅 */
+.app-top-menu.ant-menu-horizontal > .ant-menu-item:not(.ant-menu-item-selected),
+.app-top-menu.ant-menu-horizontal > .ant-menu-item:not(.ant-menu-item-selected) a {
+  color: var(--text);
+}
+.app-top-menu.ant-menu-horizontal > .ant-menu-item:not(.ant-menu-item-selected):hover,
+.app-top-menu.ant-menu-horizontal > .ant-menu-item:not(.ant-menu-item-selected):hover a {
+  color: var(--primary);
+}
+
+.app-logo .app-logo-mark {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   color: #fff;
-  font-weight: bold;
-  font-size: 16px;
+  font-size: 15px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* react-grid-layout 溢出 */
+.react-grid-item {
+  overflow: visible !important;
 }

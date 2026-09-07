@@ -1082,7 +1082,7 @@ const DashboardEditPage: React.FC = () => {
         footer={null}
         width={700}
       >
-        <pre style={{ background: '#111827', padding: 16, borderRadius: 10, overflow: 'auto', maxHeight: 400, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 13, color: '#D1D5DB', fontFamily: 'source-code-pro, Menlo, Monaco, Consolas, monospace' }}>
+        <pre style={{ background: '#f5f5f5', padding: 16, borderRadius: 4, overflow: 'auto', maxHeight: 400, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 13 }}>
           {currentSQL}
         </pre>
       </Modal>

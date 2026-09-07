@@ -663,6 +663,20 @@ type chartFilterFieldConfig struct {
 	} `json:"config"`
 }
 
+// isEmptyRawFilterVal 判断筛选值的原始 JSON 是否为"空"（未设置）：
+// nil / "null" / 空数组 [] / 空字符串 "" / 空白，均视为空，需回退到默认值。
+func isEmptyRawFilterVal(raw json.RawMessage) bool {
+	if raw == nil {
+		return true
+	}
+	s := strings.TrimSpace(string(raw))
+	switch s {
+	case "", "null", "[]", `""`:
+		return true
+	}
+	return false
+}
+
 // extractCalcFieldExprs 从数据集 FieldsConfig JSON 中提取计算字段的原始名称→表达式映射
 func extractCalcFieldExprs(fieldsConfigJSON string) map[string]string {
 	result := make(map[string]string)
@@ -756,9 +770,11 @@ func buildChartSQL(configJSON string, chartType string, datasetSQL string, filte
 		if !isValidIdentifier(ff.OriginalName) {
 			continue
 		}
+		// filterValues 仅为预览态，可能为空数组/空串/null；此类空值视为"未设置"，
+		// 回退到图表配置的筛选默认值 filterDefault（与前端 effectiveFilterVal 行为一致）。
 		rawVal, ok := config.FilterValues[ff.OriginalName]
-		if !ok || rawVal == nil {
-			if ff.Config != nil && ff.Config.FilterDefault != nil {
+		if !ok || isEmptyRawFilterVal(rawVal) {
+			if ff.Config != nil && !isEmptyRawFilterVal(ff.Config.FilterDefault) {
 				rawVal = ff.Config.FilterDefault
 			} else {
 				continue

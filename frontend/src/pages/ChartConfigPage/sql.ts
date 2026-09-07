@@ -2,6 +2,13 @@ import { resolveDateRangeValue, DateRangeFilterValue } from '../../components/Da
 import type { FieldConfig } from './types';
 import type { ChartType } from '@shared/api.interface';
 
+// 判断筛选运行值是否为空（缺省）。空数组 / 空串 / null / undefined 都视为未设置，
+// 需要回退到配置的默认值 filterDefault（不能直接用 ?? ，否则空数组会挡住回退）。
+export const effectiveFilterVal = (v: any, def: any): any => {
+  const empty = v == null || (Array.isArray(v) && v.length === 0) || v === '';
+  return empty ? def : v;
+};
+
 const mapAggregationToSQL = (aggregation: string): string => {
   const map: Record<string, string> = {
     '求和': 'SUM',
@@ -78,9 +85,9 @@ export const generateSQL = (params: GenerateSQLParams): string => {
   const filterClauses = filterFields
     .map(f => {
       const filterType = f.config?.filterType || 'multiple';
-      // 未在 filterValues 中显式设置时，回退到配置的筛选默认值，
+      // 未在 filterValues 中显式设置（含空数组/空串）时，回退到配置的筛选默认值，
       // 与后端 buildChartSQL 的 FilterDefault 回退行为保持一致，确保编辑预览中默认值生效
-      const vals = filterValues[f.originalName] ?? f.config?.filterDefault;
+      const vals = effectiveFilterVal(filterValues[f.originalName], f.config?.filterDefault);
       if (!vals) return null;
       const expr = fieldExpr(f);
       if (filterType === 'dateRange') {
@@ -96,7 +103,8 @@ export const generateSQL = (params: GenerateSQLParams): string => {
       const arr: string[] = Array.isArray(vals) ? vals : (vals !== '' ? [String(vals)] : []);
       if (arr.length === 0) return null;
       const quoted = arr.map((v: string) => `'${v.replace(/'/g, "''")}'`).join(', ');
-      return `${expr} IN (${quoted})`;
+      // 排除模式：生成 NOT IN
+      return `${expr} ${f.config?.filterExclude ? 'NOT IN' : 'IN'} (${quoted})`;
     })
     .filter((c): c is string => c !== null);
 

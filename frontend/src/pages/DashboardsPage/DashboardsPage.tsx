@@ -466,18 +466,22 @@ const DashboardsPage: React.FC = () => {
     const params: FilterParam[] = [];
     const fields = (Array.isArray(cfg.filterFields) ? cfg.filterFields : []) as Array<{ originalName: string; config?: { filterType?: string } }>;
     fields.forEach(f => {
+      // 仅处理用户已交互过的字段（key 存在）；未交互的字段不下发覆盖，由后端回退到配置默认值。
+      // 已交互但被清空的字段，下发空值覆盖（values: []），后端据此剔除该字段的默认筛选、显示全部数据。
+      if (!(f.originalName in activeValues)) return;
       const val = activeValues[f.originalName];
-      if (val === undefined || val === null) return;
       const type = f.config?.filterType || 'multiple';
       const dataType = (datasetId && datasetFieldTypes[`${datasetId}:${f.originalName}`]) || 'text';
       if (type === 'dateRange') {
         if (val && typeof val === 'object' && 'startType' in (val as object)) {
           const [s, e] = resolveDateRangeValue(val as DateRangeFilterValue);
           params.push({ field: f.originalName, type: 'dateRange', dataType, values: [s.format('YYYY-MM-DD'), e.format('YYYY-MM-DD')] });
+        } else {
+          params.push({ field: f.originalName, type: 'dateRange', dataType, values: [] });
         }
       } else {
-        const values = Array.isArray(val) ? val : (val !== '' ? [val] : []);
-        if (values.length > 0) params.push({ field: f.originalName, type, dataType, values: values.map(String) });
+        const values = Array.isArray(val) ? val : (val != null && val !== '' ? [val] : []);
+        params.push({ field: f.originalName, type, dataType, values: values.map(String) });
       }
     });
     return params;
@@ -1365,7 +1369,7 @@ const DashboardsPage: React.FC = () => {
         footer={null}
         width={700}
       >
-        <pre style={{ background: '#111827', padding: 16, borderRadius: 10, overflow: 'auto', maxHeight: 400, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 13, color: '#D1D5DB', fontFamily: 'source-code-pro, Menlo, Monaco, Consolas, monospace' }}>
+        <pre style={{ background: '#f5f5f5', padding: 16, borderRadius: 4, overflow: 'auto', maxHeight: 400, whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 13 }}>
           {chartSQLs[currentSQLChartId] || '暂无SQL'}
         </pre>
       </Modal>

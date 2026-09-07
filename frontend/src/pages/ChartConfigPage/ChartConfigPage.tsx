@@ -19,7 +19,7 @@ import axios from 'axios';
 import ChartRenderer from '../../components/ChartRenderer';
 import type { ChartType } from '@shared/api.interface';
 import type { FieldConfig } from './types';
-import { generateSQL as buildSQL } from './sql';
+import { generateSQL as buildSQL, effectiveFilterVal } from './sql';
 import DropZone from './DropZone';
 import { useFieldAreas } from './useFieldAreas';
 import { useDatasetSource } from './useDatasetSource';
@@ -150,6 +150,7 @@ const ChartConfigPage: React.FC = () => {
       setGroupFields(config.groupFields || []);
       setIndicatorFields(config.indicatorFields || []);
       setFilterFields(config.filterFields || []);
+      // 兼容历史数据里保存过的 filterValues：仍读取以恢复预览态，但新保存不再写入
       if (config.filterValues) pendingFilterValues.current = config.filterValues;
       message.success('图表信息加载成功');
     }).catch(() => message.error('获取图表详情失败'));
@@ -158,7 +159,8 @@ const ChartConfigPage: React.FC = () => {
   const handleSaveChart = async () => {
     if (!chartName) { message.error('请输入图表名称'); return; }
     if (!selectedDataset) { message.error('请选择数据集'); return; }
-    const config = JSON.stringify({ rowFields, colFields, measureFields, xAxisFields, yAxisFields, y2AxisFields, groupFields, indicatorFields, filterFields, filterValues });
+    // 预览时填写的 filterValues 仅供预览使用，不入库；图表只保存筛选默认值（filterFields[].config.filterDefault）
+    const config = JSON.stringify({ rowFields, colFields, measureFields, xAxisFields, yAxisFields, y2AxisFields, groupFields, indicatorFields, filterFields });
     try {
       if (chartId) {
         await axios.put(`/api/charts/${chartId}`, { name: chartName, datasetId: selectedDataset, type: chartType, config });
@@ -666,7 +668,7 @@ const ChartConfigPage: React.FC = () => {
               {filterFields.map(f => {
                 const filterType = f.config?.filterType || 'multiple';
                 const options = filterFieldOptions[`${selectedDataset}:${f.originalName}`] || [];
-                const value = filterValues[f.originalName] ?? f.config?.filterDefault;
+                const value = effectiveFilterVal(filterValues[f.originalName], f.config?.filterDefault);
                 return (
                   <div key={f.originalName} style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 160, maxWidth: 240 }}>
                     <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{f.displayName || f.originalName}</span>

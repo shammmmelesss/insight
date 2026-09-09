@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { Button, Card, Modal, Layout, Skeleton, Select, Tooltip, Dropdown, Popover, Avatar, Checkbox } from 'antd';
+import { Button, Card, Modal, Layout, Skeleton, Select, Tooltip, Dropdown, Popover, Avatar, Checkbox, Spin } from 'antd';
 import { EditOutlined, MenuUnfoldOutlined, EllipsisOutlined, CodeOutlined, InboxOutlined, PlusOutlined, CalendarOutlined, FilterOutlined, UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
@@ -185,7 +185,7 @@ const DashboardsPage: React.FC = () => {
   const navigate = useNavigate();
   const { id: urlId } = useParams<{ id: string }>();
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [selectedDashboard, setSelectedDashboard] = useState<Dashboard | null>(null);
   // 非 null 时表示无权限访问 URL 指定的看板（值为看板名称，空串表示名称未知）
   const [noPermission, setNoPermission] = useState<string | null>(null);
@@ -252,6 +252,7 @@ const DashboardsPage: React.FC = () => {
 
     if (cached) {
       applyDashboardList(cached, false);
+      setLoading(false);
       void (async () => {
         try {
           const response = await axios.get('/api/dashboards');
@@ -1350,7 +1351,11 @@ const DashboardsPage: React.FC = () => {
               </div>
             )}
           </div>
-        ) : noPermission !== null ? null : (
+        ) : noPermission !== null ? null : loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 320 }}>
+            <Spin />
+          </div>
+        ) : (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 320 }}>
             <InboxOutlined style={{ fontSize: 48, color: 'var(--border)', marginBottom: 16 }} />
             <div style={{ fontSize: 15, color: 'var(--text-secondary)', marginBottom: 6 }}>请从左侧选择一个看板</div>
